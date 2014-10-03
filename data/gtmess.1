@@ -1,5 +1,5 @@
 .\" 
-.TH "gtmess" "1" "November 3, 2006" "" "gtmess messenger"
+.TH "gtmess" "1" "December 26, 2007" "" "gtmess messenger"
 .SH "NAME"
 gtmess \- MSN messenger client
 
@@ -11,7 +11,7 @@ gtmess [options]
 gtmess is an MSN messenger client, which allows you to use
 the MSN messenger service. It is a console application that
 uses the curses library to present a friendly user interface.
-This manpage corresponds to version 0.92.
+This manpage corresponds to version 0.94.
 
 .SH "OPTIONS"
 .TP 
@@ -60,6 +60,13 @@ window. See also the
 .B notif_aliases
 variable. The default value is
 .BR 1 .
+
+.TP 
+.BI auto_cl "" = B
+When enabled, the contact list is selected automatically when the last chat window closes.
+The default value is
+.BR 1 .
+
 
 .TP 
 .BI auto_login "" = B
@@ -144,14 +151,21 @@ The default value is computed at configure\-time and is of the following form:
 For example:
 .BR "0x0409 Linux 2.6.8\-1\-686 i686 GTMESS 0.9 MSMSGS" .
 
+.TP
+.BI err_connreset "" = B
+Ignore `Connection reset by peer' error messages in chat windows. These messages
+may occur very often as the server closes inactive connections. Therefore,
+they are not displayed by default.
+
 .TP 
 .BI gtmesscontrol_ignore "" = S
 Ignore gtmess\-specific messages that are substrings of
-.I R S "."
+.IR S "."
 To accept all such messages, leave
 .I S
 empty. To ignore all such messages, use the special value
-.BR *all*. By default, all such messages are accepted.
+.BR *all*. 
+By default, all such messages are accepted.
 
 .TP 
 .BI idle_sec "" = N
@@ -247,9 +261,9 @@ The default value is
 
 .TP 
 .BI msg_debug "" = N
-Defines the client behaviour on unrecognised messages. If
+Defines the client behavior on unrecognized messages. If
 .I N
-is 0, then those messages are ignored silently.
+is 0, then those messages are silently ignored.
 If
 .I N
 is 1, then the type of the message is displayed, and if
@@ -270,7 +284,7 @@ may not be visible all the time. However, you will not be notified
 if less than
 .I N
 seconds have passed since the previous message. This is to avoid
-too many notifications thay might be annoying. In fact, if
+too many notifications that might be annoying. In fact, if
 .I N
 is 1, then the extra notification will occur only when the user is
 in Idle mode.
@@ -287,13 +301,26 @@ The default value is
 .BR 6891 .
 
 .TP 
+.BI nonotif_mystatus "" = N
+Specifies a set of statuses that the user may be in without receiving any sound
+or popup notifications. For example, if a user is Busy, having notification
+windows pop up all the time might be annoying. Each status corresponds to
+a bit of
+.I N
+in the order presented in the paragraph describing
+.BR initial_status .
+The default value is
+.B 368
+which stands for the set of statuses {Away, Busy, Be-Right-Back, Out-To-Lunch}, as its
+binary representation is 101110000.
+
+.TP 
 .BI notif_aliases "" = N
 This variable has exactly the same meaning as the
 .B aliases
 variable. It affects the use of aliases in the notification window.
 The default value is
 .BR 0 .
-
 
 .TP 
 .BI online_only "" = B
@@ -313,6 +340,18 @@ The default value is
 .BR 1 .
 
 .TP 
+.BI safe_msg "" = N
+Prevents the user from inadvertently closing a chat window containing
+very recent messages. It does so by not allowing the user to close a window 
+when there are messages
+that have appeared during the last
+.IR N +1
+seconds. A value of 
+.B -1 
+disables this option. The default value is
+.BR 0.
+
+.TP 
 .BI server "" = S
 Sets the initial server to connect to. For the MSN Messenger protocol,
 this can be a dispatch or a notification server.
@@ -322,6 +361,15 @@ is of the form
 If port is not specified, 1863 is assumed.
 The default value is 
 .BR messenger.hotmail.com .
+
+.TP 
+.BI skip_says "" = N
+Skips subsequent `..... says:' prefixes in a chat window from the same user, 
+when the user messages are less than
+.I N
+seconds apart. The purpose of this option is to allow for more text in the
+chat window suppressing redundant prompts. The default value is
+.BR 20. 
 
 .TP 
 .BI snd_dir "" = S
@@ -337,27 +385,25 @@ directory in the data prefix, usually
 .BI snd_exec "" = S
 Sets the playback program for the sound effects. The default
 value is
-.B /usr/bin/aplay \-Nq %
+.B /usr/bin/aplay -Nq %s > /dev/null 2>&1 &
 which corresponds to the playback utility of the ALSA system.
-Note that this string is parsed in a naive way. Therefore, each
-argument should be separated by exactly one space character and there is no 
-form of escape sequence for space characters. The percent character
-substitutes to the full path of the audio file in the sound effects directory.
-
-.TP 
-.BI snd_redirect "" = N
-Redirects standard output and standard error streams of the sound player into 
-.BR /dev/null .
-A value of 0 performs no redirection, 1 redirects stdout, 2 redirects stderr and
-3 redirects both. The default value is
-.BR 3 .
+Note that this string will be passed to system() and
+only a single `%s' is allowed which will be substituted
+with the full path of the audio file.
 
 .TP 
 .BI sound "" = N
 Sets sound mode.
 .I N
-can be 0, 1 or 2. 0 disables all sound, 1 produces always a (console) beep,
-while 2 plays sound effects (through a sound device using an external utility).
+can be 0, 1, 2, 3 or 4. 0 disables all sound, 1 produces always a (console) beep,
+while 2 plays sound effects (using the external command defined by
+.BR snd_exec ).
+Value 3 produces pcspeaker sounds using the external program 
+.BR beep,
+and value 4 produces pcspeaker sounds by directly accessing
+the speaker on linux systems. However, this last option requires special
+privileges and might not work at all, or work only as root. It works
+in linux VTs, however (i.e., ctrl-alt-F1).
 The default value is
 .B 1
 (beep).
@@ -373,7 +419,7 @@ There are 6 sound effects that correspond to various events (guess from the name
 .BI syn_cache "" = B
 If enabled, the contact/group lists are cached for future use. This option
 seems to have no meaning nowadays, as the msn server always rejects the cached version
-of the list. It has been disabled in this version of the client and will be removed
+of the list. It has been disabled in this version of the client and may be removed
 completely in the future.
 The default value is
 .BR 0 .
@@ -397,6 +443,19 @@ Note that you can always update the nickname of a specific contact manually (ren
 The default value is
 .BR 0 .
 
+.TP 
+.BI url_exec "" = S
+Sets the command line for the url browser. This typically launches
+a web browser to open urls that a users sends to you. Those urls are automatically
+parsed and displayed in the transfers window. The default
+value is
+.B opera --remote 'openURL(%s,new-page)' >/dev/null 2>&1 &
+which corresponds to opening the url using the Opera web browser.
+As in 
+.BR snd_exec ,
+only one occurrence of `%s' is allowed that will be replaced by the url.
+
+
 .SH "USER INTERFACE"
 .PP 
 The screen is divided in 7 parts. Four lines and three windows.
@@ -415,7 +474,7 @@ from the operating system, as well as the notification server.
 
 The switchboard
 window is separated from the messages window by two lines. The first line
-is the edibox where you type your text when you chat. 
+is the editbox where you type your text when you chat. 
 The second line is a kind of window\-bar that displays a character for each open 
 switchboard window. The window bar is displayed in three different modes, depending
 on the number of open switchboard windows:
@@ -438,8 +497,8 @@ window has unread messages .
 .TP 
 .B Stats
 If there are too many open windows, then the window bar displays
-the only the number of the current window. It also displays how many
-windows exist on the left and right of the current one and how many
+only the number of the current window. It also displays how many
+windows exist on the left and on the right of the current one and how many
 of them have unread messages. The 5 numbers displayed correspond to these
 quantities respectively: left_unread, left, current, right_unread, right.
 
@@ -451,17 +510,13 @@ first).
 .SS MENUS
 
 .PP 
-The functions of the main menu can be accesed by pressing ESC first, 
+The functions of the main menu can be accessed by pressing ESC or F9 first, 
 or by holding down the default modifier key (ALT) and then pressing one
 of the following keys (case insensitive):
 
 .TP 
 .B C
 Connect to server
-
-.TP 
-.B D
-Logout from notification server
 
 .TP 
 .B S
@@ -472,226 +527,185 @@ Change status
 Manage contact/group lists
 
 .TP 
-.B N
-Change nickname
+.B V
+Server functions
 
 .TP 
 .B O
 Options
 
 .TP 
-.B M
-Display mailbox status
-
-.TP 
-.B P
-Ping the server and calculate RTT
-
-.TP 
 .B I
 Invite a contact from your Forward List to the active switchboard window. This
 is actually a shortcut for 
 .I R "" Alt\-L\-F\- contact \-I,
-although only online contacts are shown.
+although only online contacts are shown. An alternative way to invite a contact
+is to first enter contact list mode by pressing TAB and then pick a contact
+by pressing ENTER on it.
 
 .TP 
 .B T
-Write a note to the notification window.
+Write a note in the notification window
+
+.TP 
+.B Q
+Quit the program
 
 .TP 
 .B /
-Enter special client command (none available yet)
+Enter special client command (try "test colors")
 
 .PP 
-The shortcut key for the menu is shown in parentheses. Some menu
-entries may display a nested menu. The menu tree of the application is
-the following (for readability purposes the parentheses have been omitted
-and the shortcut key is shown alone on the left; also full names have
-been used instead of abbreviations):
+The shortcut key for the menu is shown underlined. Some menu
+entries may display a nested menu. Only selected menu entries are
+explained in this document:
 
-.IP A 4
-.B Add
+.TP
+.B Lists
+List management. There are four lists in this protocol version.
+Forward List (FL) which is your contact list, Allow List (AL) that
+contains contacts that can see your online presence (normally AL contains
+most of your FL),
+Block List (BL) that contains blocked contacts and finally, Reverse List (RL)
+that contains those who have added you in their forward list. 
+When you are working with lists, you are presented with a contact selection menu.
 
-.IP C 8
-.B Contact
-
-.IP F 12
-.B Forward
-\- add a contact in your forward list
-
-.IP B 12
-.B Block
-\- add a contact in your block list
-
-.IP G 8
-.B Group
-\- add a new group
-
-.IP C 4
-.B Connect
-
-.IP D 4
-.B Disconnect
-
-.IP S 4
-.B Status
-.IP N 8
-.B On\-line
-.IP I 8
-.B Idle 
-.IP A 8
-.B Away
-.IP S 8
-.B Busy 
-.IP B 8
-.B "Be Right Back"
-.IP P 8
-.B "On the Phone"
-.IP L 8
-.B "Out to Lunch"
-.IP H 8
-.B "Appear Offline (Hidden)"
-
-.IP L 4
-.B List
-.IP F 8
-.B Forward 
-\- you are presented with a contact selection menu where you can pick up
-up a contact from your list and do the following
-.IP B 16
-.B Block
-the selected contact (by adding him/her to the block list)
-.IP R 16
-.B Remove
-the contact from the list
-.IP U 16
-.B Unblock
-the selected contact (by adding him/her to the allow list)
-.IP N 16
-.B Rename
-\- change the name of the contact (see also the
+.TP
+.B Lists/Forward/Block
+add contact to BL and remove from AL
+.TP 
+.B Lists/Forward/Unblock
+add contact to AL and remove from BL
+.TP
+.B Lists/Forward/Rename
+change the name of the contact (see also the
 .B update_nicks
 variable)
-.IP C 16
-.B Copy
+.TP 
+.B Lists/Forward/Copy
 the contact to another group
-.IP M 16
-.B Move
+.TP
+.B Lists/Forward/Move
 the contact to a different group
-.IP I 16
-.B Invite
-the contact to the active switchboard window
-
-.IP R 8
-.B Reverse
-.IP A 16
-.B Add
+.TP
+.B Lists/Forward/Invite
+the contact to the current switchboard session
+.TP
+.B "Lists/Forward/Per-contact settings"
+Manage contact-specific settings. Currently
+there are two settings for each contact.
+.B Notifications
+(enabled by default)
+toggles the popup windows and sound effects
+for the selected contact (i.e., when somebody keeps logging in
+and out, it can be quite irritating).
+.B Ignored
+option (disabled by default) causes gtmess to ignore the contact's
+requests to start a chat with you. 
+It might appear to the other party that there is
+no response from the network. In this mode, conversations
+can be initiated only by yourself. 
+.TP
+.B Lists/Reverse/Add
 the contact to your forward list, too
 (usually you 'll do this just after somebody has added you 
 to his/her forward list)
-.IP B 16
-.B Block
+.TP
+.B Lists/Reverse/Block
 the contact
 (you don't have to add the contact to your forward list if you don't want to,
 you can block him/her instead)
-
-.IP A 8
-.B Allow
-.IP R 16
-.B Remove
-the contact from your allow list
-.IP B 16
-.B Block
-\- remove the contact from your allow list and add to your block list
-
-.IP B 8
-.B Block
-.IP R 16
-.B Remove
-the contact from your block list
-.IP A 16
-.B Allow
-\- remove the contact from your block list and add to your allow list
-
-.IP G 8
-.B Group
-.IP R 16
-.B Remove
-the selected group
-.IP N 16
-.B Rename
-the selected group
-
-.IP X 8
-.B Export aliases
-\- export the forward list into 
+.TP
+.B Lists/Group/Empty
+remove all contacts in a group (use with care!)
+.TP
+.B Lists/Add
+a new contact or create a new group
+.TP
+.B "Lists/Export aliases"
+export the forward list into 
 .B ~/.gtmess/aliases 
 so that you can edit it
-
-.IP C 8
-.B List cleanup
-\- helps you remove obsolete entries from your contact lists. Shows
+.TP
+.B "Lists/Clean up"
+helps you remove obsolete entries from your contact lists. Shows
 which contacts have removed you from their contact list, so that there is no
-point in having them in your forward (FL), allow (AL) and block (BL) lists.
+point in having them in your FL, AL and BL.
 Having some contact in your FL while not in RL is pointless. Having
 a contact in your AL while not in RL is pointless unless you have disabled the
 "All others" (BLP) flag. Having a contact in your BL while not in RL is
 pointless unless you have the BLP flag enabled and that contact is disturbing you.
-Normally, there should be AL \+ BL \= RL, that is each contact in the reverse list
+Normally, there should hold AL \+ BL \= RL, that is each contact in the reverse list
 is either blocked or allowed. Upon login, gtmess displays these numbers in different
 color, according to whether AL \+ BL is less than, equal or greater than RL.
 
-.IP N 4
-.B Name
-
-.IP O 4
-.B Options
-
-.IP R 8
-.B "RL Prompt"
-\- prompt when others add you to their forward list. This option is stored
+.TP
+.B "Server/RL Prompt"
+prompt when others add you to their forward list. This option is stored
 on the server.
 
-.IP A 8
-.B "All others"
-\- allow others (not on your forward list) to start conversations with you. This
+.TP
+.B "Server/All others"
+allow others (not on your forward list) to start conversations with you. This
 is also referred to as the BLP flag. This option is stored on the server.
 
-.IP V 8
-.B Var
-\- set the value of a configuration variable; takes effect immediately
+.TP
+.B "Options/Variables"
+set the value of a configuration variable; takes effect immediately
 
-.IP Q 8
-.B Query
+.TP
+.B Options/Query
 all configuration variables
 
-.IP W 8
-.B Write
+.TP
+.B Options/Write
 configuration variables into 
 .BR ~/.gtmess/config ; 
 in fact, only those variables with values other than the default are written
 
-.IP 1\-6 8
-.B Playback
-respective sound effect (for testing)
+.TP
+.B Options/Password
+Obfuscates the given password, so that you can store it in the configuration
+file. While this cannot be considered SAFE, it would prevent someone
+from stealing your password just by looking in your configuration file for a few
+seconds.
 
-.IP M 4
-.B Mail
-
-.IP P 4
-.B Ping
-
-.IP I 4
-.B Invite
-
-.IP T 4
-.B Note
+.TP
+.B "Options/(1)-(6) Sound test"
+By pressing the number keys `1' to `6', you can test the different sound
+effects.
+ 
+.SS MENU NAVIGATION (F9)
+.TP
+.BR "[] " or " arrow left/right"
+previous/next entry
+.TP
+.BR "{} " or " home/end"
+first/last entry
+.TP
+.BR "<> " or " PgUp/PgDn"
+page up/down (skip many entries)
+.TP
+.B "ENTER/SPACE"
+select
+.TP
+.B SPACE
+check (for checkable items)
+.TP
+.B "-/ESC/BACKSPACE"
+cancel or return to parent menu
+.TP
+.B "underlined letter"
+shortcut for selection
+.TP
+.B F9
+cancel all menus (no return to parent)
 
 .SS SWITCHBOARD (chat window) CONTROLS
 
 .TP 
 .B ^N
-new switchboard session
+new switchboard (chat) session
 
 .TP 
 .B ^W
@@ -699,8 +713,11 @@ leave current switchboard session and close the window
 
 .TP 
 .B ^X
-leave current swithboard session, but leave the window open
+leave current switchboard session, but keep the window open
 
+.TP
+.B TAB
+toggle between chat windows and contact list menu
 
 .TP 
 .B F1
@@ -715,20 +732,75 @@ next switchboard session
 next switchboard session that has unread messages
 
 .TP 
-.B PgUp
+.B PgUp/F7
 scroll down switchboard window
 
 .TP 
-.B PgDn
+.B PgDn/F8
 scroll up switchboard window
 
 .TP 
 .B @F7
-participant list scroll down
+participant list scroll down (participants in chat session)
 
 .TP 
 .B @F8
 participant list scroll up
+
+.SS CONTACT LIST MENU MODE
+
+.TP 
+.BR ] " or " "arrow DOWN"
+next contact
+
+.TP 
+.BR [ " or " "arrow UP"
+previous contact
+
+.TP 
+.B ^N
+new switchboard (chat) session
+
+.TP 
+.B ^W
+leave current switchboard session and close window
+
+.TP
+.B i
+invite contact to current session (i.e. after ^N)
+
+.TP
+.B I
+invite contact to current session & leave menu
+
+.TP
+.B q
+contact information
+
+.TP
+.B ENTER/SPACE
+new chat session & invite contact & leave menu
+
+.TP
+.B "+/b"
+block/unblock contact
+
+.TP
+.B ":"
+toggle ignore contact
+
+.TP
+.B "TAB"
+toggle between chat windows and contact list menu
+
+.TP
+.B PgUp/F7
+contact list scroll down
+
+.TP
+.B PgDn/F8
+contact list scroll up
+
 
 .SS SWITCHBOARD TEXT INPUT
 
@@ -760,7 +832,7 @@ Send a raw command string to server.
 .BI "/invite " useraccount
 Invite the user with account
 .I useraccount
-to join the switchboard session. You can also use the shorcut
+to join the switchboard session. You can also use the shortcut
 .B /i
 for this command. Example:
 .br 
@@ -805,6 +877,14 @@ redraw screen from scratch
 produce a console beep
 
 .TP 
+.B ^F
+toggle display of offline contacts
+
+.TP 
+.B ?
+mini help
+
+.TP 
 .B F4
 display / hide the transfers window
 
@@ -817,12 +897,8 @@ messages window scroll down
 messages window scroll up
 
 .TP 
-.B F7
-contact list scroll down
-
-.TP 
-.B F8
-contact list scroll up
+.B F9
+toggle menu bar
 
 .TP 
 .B F10
@@ -868,6 +944,10 @@ move one word left
 .B ^D 
 move one word right
 
+.TP
+.B ^Y
+cut line to clipboard (same as ^K-X, see below)
+
 .TP 
 .BR BACKSPACE " or " ^H
 delete character on the left
@@ -891,7 +971,7 @@ enter escape mode
 .SS EDITBOX ESCAPE MODE CONTROLS
 .PP 
 Escape mode is valid for exactly one keystroke and is automatically exited
-after it. Typical operations in this mode are cliboard operations. 
+after it. Typical operations in this mode are clipboard operations. 
 Invalid keystrokes exit the mode. You cannot cut or copy a masked field 
 (i.e. password), though you can paste on it. The following are valid keystrokes
 in escape mode:
@@ -945,7 +1025,10 @@ delete word
 .SS CONTACT/GROUP SELECTION MODE
 .PP 
 When you are presented with a list of contacts or groups, you can use
-the following keys:
+the following keys (note that this contact/group selection 
+is required by some functions and appears
+in the bottom line; do not confuse it with the contact list on the right that
+can also be used as a menu):
 
 .TP 
 .BR ] " or " "arrow RIGHT/DOWN"
@@ -1010,7 +1093,7 @@ cancel (abort) incoming/outgoing transfer or outgoing invitation
 
 .TP 
 .B q
-quick printout
+information
 
 .TP 
 .B DELETE
@@ -1117,6 +1200,14 @@ windows. The client writes data in this file.
 The directory where console logs are stored.
 
 .TP 
+.BI ~/.gtmess/ account /per_contact
+The file where per-contact settings are stored.
+Each line contains the contact email and its specific
+settings. The file is updated upon logout. Per-contact settings
+can be modified from the menu and only those contacts whose settings have
+been modified are stored.
+
+.TP 
 .B ./root.pem
 Trusted root certificates, verified upon the initialization 
 of an SSL connection. Gtmess first looks into the current directory
@@ -1133,7 +1224,6 @@ might be different in your system.
 
 .SH "BUGS"
 This is a list of known bugs and limitations. 
-They will be removed as soon as possible.
 
 Notification or Passport login servers are not cached.
 
@@ -1148,8 +1238,10 @@ Messages are always assumed to be UTF\-8 encoded.
 
 .SH "SEE ALSO"
 .BR gtmess\-notify "(1), "
-.BR "gtmess\_w" "(1)"
-
+.BR "gtmess\_w" "(1), "
+.BR README
+file that comes along with the program; contains more up-to-date
+information, especially on the keyboard shortcuts
 
 .SH "MAKING OF"
 .TP 
@@ -1174,7 +1266,7 @@ The GIMP
 .B File Manager
 Midnight Commander
 
-.SH "ACKNOWLEDGEMENTS"
+.SH "ACKNOWLEDGMENTS"
 Credits go to the following people:
 
 .B "Mike Mintz"
@@ -1201,12 +1293,13 @@ for some useful ideas I got from their client.
 
 .SH "CONTRIBUTORS"
 .B "Tibor Billes"
-has corrected quite a few bugs and is also actively contributing code to the project.
+has corrected quite a few bugs and is also actively contributing code 
+to the project.
 
 .SH "AUTHORS"
 gtmess \- MSN Messenger client
 .br 
-Copyright (C) 2002\-2006  George M. Tzoumas
+Copyright (C) 2002\-2007  George M. Tzoumas
 
 .PP 
 This program is free software; you can redistribute it and/or modify

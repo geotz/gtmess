@@ -51,14 +51,15 @@ void mn_init(menu_t *m, int size, int msz, ...)
     m->left = 0;
     m->cur = 0;
     m->item = (menuitem_t *) malloc((size+1) * sizeof(menuitem_t));
-    m->attr = attrs[C_MNU];
+    m->attr = C_MNU;
 
     va_start(ap, msz);
     for (i = 0; i < size; i++) {
         m->item[i].index = i;
         m->item[i].text = strdup(va_arg(ap, char *));
         m->item[i].hotkey = va_arg(ap, int);
-        if (m->item[i].hotkey < 256 && isalpha(m->item[i].hotkey)) m->item[i].hotkey = tolower(m->item[i].hotkey);
+        if (m->item[i].hotkey < 256 && isalpha(m->item[i].hotkey)) 
+            m->item[i].hotkey = tolower(m->item[i].hotkey);
         m->item[i].hotpos = va_arg(ap, int);
         m->item[i].offset = o;
         o += strlen(m->item[i].text) + 2;
@@ -145,16 +146,24 @@ void mn_draw(menu_t *m, int row, int col, WINDOW *w)
     wmove(w, row, col);
     if (m->left > 0) waddstr(w, "<");
     wmove(w, y, x);
-    wattrset(w, attrs[C_NORMAL]);
+    wattrset(w, C_NORMAL);
     wrefresh(w);
+}
+
+
+int submenu(int m)
+{
+    if (m == -1) return 1;
+    else return m;
 }
 
 /* 
   return value:
     0  = key ignored
-    1  = key handled by menu (i.e. arrows) or swallowed
+    1  = key handled by menu (i.e. arrows) or swallowed or submenu returned
     2  = menu item selected (i.e. enter)
     -1 = menu cancelled (i.e. escape)
+    -2 = exit whole menu (all parents)
 
     on ENTER (etc.) the value of the callback (if any) is returned 
 */
@@ -193,9 +202,9 @@ int mn_keydown(menu_t *m, int key)
             break;
         case 13:
         case 32:
-             if (m->item[m->cur].callback != NULL) 
-                 return (*m->item[m->cur].callback)(&m->item[m->cur]);
-             else if (m->item[m->cur].checked > 0) {
+             if (m->item[m->cur].callback != NULL) {
+                 return submenu((*m->item[m->cur].callback)(&m->item[m->cur]));
+             } else if (m->item[m->cur].checked > 0) {
                  mn_toggle(&m->item[m->cur]);
                  break;
              } else return 2;
@@ -211,12 +220,12 @@ int mn_keydown(menu_t *m, int key)
                 if (m->item[j].hotkey >= 0 && m->item[j].hotkey == key) {
                     m->cur = j;
                     if (m->item[j].callback != NULL) 
-                        return (*m->item[j].callback)(&m->item[j]);
+                        return submenu((*m->item[j].callback)(&m->item[j]));
                     else return 2;
                 }
             }
             if (m->item[m->n].callback == NULL) return 0;
-            else return (*m->item[m->n].callback)((void *) key);
+            else return submenu((*m->item[m->n].callback)((void *) key));
     }
     return 1;
 }

@@ -58,6 +58,8 @@ snd_dir, 27
 snd_exec, 28
 url_exec, 29
 keep_alive, 30
-nonotif_status, 31
+nonotif_mystatus, 31
 skip_says, 32
 safe_msg, 33
+err_connreset, 34
+auto_cl, 35

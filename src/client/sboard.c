@@ -35,14 +35,22 @@
 #include "gtmess.h"
 #include "hash_tbl.h"
 
+#ifndef ECONNRESET
+#define ECONNRESET 0
+#endif
+
 pthread_mutex_t SX; /* switchboard mutex */
 msn_sblist_t SL; /* switchboard */
 pthread_key_t key_sboard;
+
 xqueue_t q_sb_req; /* new-sb requests */
+/*  type 0: stores SB pointer (to reuse existing SB)
+    type 1: stores LOGIN (to invite immediately) */
 
 time_t dlg_time = 0;
 
 extern char MyIP[];
+extern char *help_str[];
 
 void sboard_leave_all(int panic)
 {
@@ -89,7 +97,8 @@ int _sboard_kill()
 
     time(&now);
     LOCK(&SX);
-    if (difftime(now, SL.head->real_dlg_now) < Config.safe_msg) {
+    if (Config.safe_msg >= 0 && SL.count > 0 && 
+            difftime(now, SL.head->real_dlg_now) <= Config.safe_msg) {
         UNLOCK(&SX);
         flash();
         return -1; /* too soon */
@@ -214,6 +223,9 @@ void sb_blah()
                         msn_msg_typenotif(sb->sfd, sb->tid++, args);
                     } else if (strcmp(cmd, "/beep") == 0) {
                         msn_msg_gtmess(sb->sfd, sb->tid++, "BEEP", ZS);
+                    } else if (strcmp(cmd, "/help") == 0) {
+                        msg(C_DBG, "%s\n", help_str[0]);
+                        msg(C_DBG, "%s\n", help_str[1]);
                     } else if (strcmp(cmd, "/gtmess") == 0) {
                         msn_msg_gtmess(sb->sfd, sb->tid++, "GTMESS", ZS);
                     } else if (strcmp(cmd, "/msg") == 0) {
@@ -426,7 +438,7 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
         time_t now;
         
         time(&now);
-        msn_clist_update(&msn.FL, arg1, NULL, -1, -1, now);
+        msn_clist_update(&msn.CL, msn_FL, arg1, NULL, -1, now);
         draw_lst(1);
         /* rather tricky! (in order to be drawn *after* time_user_types sec) */
         sched_draw_lst(Config.time_user_types + 1); 
@@ -637,7 +649,10 @@ void *msn_sbdaemon(void *arg)
         pthread_testcancel();
         LOCK(&SX);
         if (r == -2) dlg(C_ERR, "bfParseLine(): buffer overrun\n");
-        else if (r < 0) dlg(C_ERR, "bfParseLine(): %s\n", strerror(errno));
+        else if (r < 0) {
+            if (errno != ECONNRESET || (errno == ECONNRESET && Config.err_connreset == 0))
+                dlg(C_ERR, "bfParseLine(): %s\n", strerror(errno));
+        }
         UNLOCK(&SX);
         if (r <= 0) break;
 
@@ -685,7 +700,7 @@ void *msn_sbdaemon(void *arg)
             sscanf(s + 4, "%s %s", arg1, arg2);
             url2str(arg2, nick);
             LOCK(&SX);
-            msn_clist_add(&sb->PL, -1, arg1, nick);
+            msn_clist_add(&sb->PL, 0, arg1, nick, 0);
             if (sb->PL.count > 1) sb->multi = 1;
             if (sb->PL.count == 1) {
                 Strcpy(sb->master, arg1, SML);
@@ -703,7 +718,7 @@ void *msn_sbdaemon(void *arg)
             sscanf(s + 4, "%*u %d %*d %s %s", &index, arg1, arg2);
             url2str(arg2, nick);
             LOCK(&SX);
-            msn_clist_add(&sb->PL, -1, arg1, nick);
+            msn_clist_add(&sb->PL, 0, arg1, nick, 0);
             draw_plst(sb, 0);
             if (sb->PL.count > 1) sb->multi = 1;
             dlg(C_DBG, "%d. %s <%s>\n", index, getnick(arg1, nick, Config.aliases), arg1);
@@ -739,8 +754,8 @@ void *msn_sbdaemon(void *arg)
             sscanf(s + 4, "%s", arg1);
             LOCK(&msn.lock);
             LOCK(&SX);
-            msn_clist_rem(&sb->PL, arg1, -1);
-	    /* gtmess is a GreaT MESS of source code! ;-) [egg] */
+            msn_clist_rem(&sb->PL, 0, arg1, -1);
+	    /* GreaT MESS of source code! ;-) */
             leave = sb->PL.count == 0 && sb->multi;
             draw_plst(sb, 0);
             dlg(C_ERR, "<%s> has left the conversation\n", arg1);
@@ -763,7 +778,7 @@ void *msn_sbdaemon(void *arg)
         /* error code */
 
             LOCK(&SX);
-            sb->pending = 1;
+            if (SL.head != sb) sb->pending = 1;
             if (!scan_error_sb(com))
                 dlgn(C_DBG, strlen(s)+6, "<<< %s\n", s);
             UNLOCK(&SX);

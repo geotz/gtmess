@@ -1719,8 +1719,8 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 PACKAGE="gtmess"
-VERSION="0.93"
-VDATE="? Feb 2007"
+VERSION="0.94"
+VDATE="26 Dec 2007"
 am__api_version="1.9"
 ac_aux_dir=
 for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do

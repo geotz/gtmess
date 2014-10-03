@@ -1,5 +1,5 @@
 *******************************
-* Version 0.93 (? ??? 2007)   *
+* Version 0.94 (26 Dec 2007)  *
 *******************************
 * improved handling of `notify.pip'
 ! clear screen on exit
@@ -7,14 +7,14 @@
 * reorganized menus
 + url parsing and handling [url_exec]
 ! proper redraw of xfer window (was missing in some cases)
-- removed option -- no longer used [snd_redirect]
+- removed option as no longer used [snd_redirect]
 * system() call for sound [snd_exec]
 + obfuscated stored password & tool
 + xfer list auto-focus
-+ disable snd/popup in certain statuses [nonotif_status]
++ disable snd/popup in certain statuses [nonotif_mystatus]
 ! window bar drawing (utf8)
 + queue text messages preceding screen init.
-+ toggle display of online-only contacts (^F)
++ toggle display of offline contacts (^F)
 + per-contact settings {Tibor}
 * simplified sound daemon (with pipes)
 + pcspeaker tunes [sound]
@@ -22,6 +22,17 @@
 + skip redundant 'says:' messages [skip_says]
 + acknowledge variable changes
 + don't close chat win after too recent msg (possibly unread!) [safe_msg]
+* changed internal contact list representation
+! fixed segv in eb_flush()
+! fixed some memory leaks (valgrind rulez!)
+* changed C_XXX color rep.
+* improved BW color scheme
++ selectable contacts on contact list
+* PgUp/Dn also work on contact list
+! fixed SB pending status after error messages
++ built-in mini help (`?')
++ option to remove ALL contacts in a group
++ ignore common `Connection reset by peer' messages on SB [err_connreset]
 
 *******************************
 * Version 0.92 (7 Nov 2006)   *

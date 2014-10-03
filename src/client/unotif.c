@@ -49,11 +49,12 @@ void unotif_init(int asound, int apopup)
 void unotif_done()
 {
     if (pfd >= 0) close(pfd);
+    sound_done();
 }
 
 void unotify(char *mesg, char effect)
 {
-    if ((Config.nonotif_status & (1 << msn.status)) == (1 << msn.status)) return;
+    if ((Config.nonotif_mystatus & (1 << msn.status)) == (1 << msn.status)) return;
     playsound(effect);
     if (pfd == -1) return;
     write(pfd, mesg, strlen(mesg));
@@ -61,7 +62,7 @@ void unotify(char *mesg, char effect)
 
 int can_notif(char *login) 
 {
-    msn_contact_t *p = msn_clist_find(&msn.FL, login);
+    msn_contact_t *p = msn_clist_find(&msn.CL, 0, login);
     if (p != NULL) return p->notify;
     else return 1;
 }

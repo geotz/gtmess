@@ -37,9 +37,14 @@ typedef struct {
     char BLP; /* all other users: (A)llow; (B)lock */
     char GTC; /* prompt when other users add you: (A)lways; (N)ever */
     /* lists */
-    msn_glist_t GL; /* group */
-    msn_clist_t FL, RL, AL, BL; /* forward, reverse, allow, block */
-    msn_clist_t IL; /* initial status */
+    msn_glist_t GL; /* group list */
+    msn_clist_t CL; /* contact list (forward, reverse, allow, block) */
+
+    char hlogin[SML]; /* highlighted contact in CL */
+    int hgid;         /* highlighted group in CL */
+    int dhid;          /* delta pos. of highlighted contact */
+    
+    msn_clist_t IL; /* initial status list */
     unsigned int SYN; /* syn list version */
     int list_count; /* number of LST responses */
     
@@ -65,7 +70,7 @@ typedef struct {
 
 void *msn_ndaemon(void *dummy);
 void msn_init(msn_t *msn);
-int  msn_list_cleanup(msn_clist_t *LL, msn_clist_t *RL);
+int  msn_list_cleanup(msn_clist_t *q, unsigned char lf);
 
 extern msn_t msn;
 #endif

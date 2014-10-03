@@ -20,6 +20,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <pthread.h>
@@ -29,6 +30,7 @@
 #include "screen.h"
 
 #ifdef __linux__
+#include <sys/ioctl.h>
 #include <linux/kd.h>
 #include <fcntl.h>
 #endif
@@ -120,12 +122,14 @@ void *sound_daemon(void *dummy)
 {
     char sound_effect;
 
-    pthread_detach(pthread_self());
+/*    pthread_detach(pthread_self());*/
     
     while (read(snd_pfd[0], &sound_effect, 1) > 0)
         exec_soundplayer(sound_effect);
 
     close(snd_pfd[0]);
+    
+    return NULL;
 }
 
 void sound_init()
@@ -133,4 +137,12 @@ void sound_init()
     if (pipe(snd_pfd) == 0)
         pthread_create(&thrid, NULL, sound_daemon, NULL);
     else msg(C_ERR, "sound_init(): could not intitialize sound daemon\n");
+}
+
+void sound_done()
+{
+    if (snd_pfd[0] != -1) {
+        pthread_cancel(thrid);
+        pthread_join(thrid, NULL);
+    }
 }

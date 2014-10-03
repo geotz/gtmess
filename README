@@ -8,32 +8,62 @@ To see command line options:
 Keys:
 ^ = CTRL, @ = ALT (or ESC first), $ = SHIFT
 ===========================================
+
+Global Shortcuts
+----------------
+^L		redraw screen (in case it gets garbled)
+^G		test console beep
+^F		toggle display of offline contacts
+?               mini help
+
+F4		transfers window (show/hide)
+F5		message window scroll down
+F6		message window scroll up
+F9		menu bar
+F10		exit
+ESC		escape mode (menu mode like F9)
+@-<letter>	jump to main menu letter (ESC-letter)
+
+
+********* NOTE *******************************
+Instead of F1-F10 you can use ESC-1 to ESC-0
+F7 = ESC-7, @F7 = ESC-&, @F8 = ESC-* 
+Also, try ALT-1..ALT-0, ALT-&, ALT-*
+
+
+Switchboard Mode (chat windows)
+-------------------------------
 ^N	new switchboard (chat) session
 ^W	leave sb session and close window
-^X	leave sb session, but leave window open
-^L	redraw screen (in case it gets garbled)
-^G	test console beep
-^F	toggle display of offline contacts
+^X	leave sb session, but keep window open
+TAB	toggle between chat windows and contact list menu
 
 F1	previous sb session
 F2	next sb session
 F3	next sb session that has unread messages
-F4	transfers window (show/hide)
-F5	message window scroll down
-F6	message window scroll up
-F7	contact list scroll down
-F8	contact list scroll up
-F9	menu bar
-F10	exit
 
-PgUp	switchboard (chat) window scroll down
-PgDn	switchboard window scroll up
+PgUp/F7	switchboard (chat) window scroll down
+PgDn/F8	switchboard window scroll up
 @F7	participant list scroll down (chat session)
 @F8	participant list scroll up
 
-NOTE: Instead of F1-F10 you can use ESC-1 to ESC-0
-F7 = ESC-7, @F7 = ESC-&, @F8 = ESC-* 
-Also, try ALT-1..ALT-0, ALT-&, ALT-*
+Contact List Mode
+(when selecting contacts from the contact list)
+-------------------------------------------------
+]/arrow down	next contact
+[/arrow up	previous contact
+^N		new switchboard (chat) session
+^W		leave sb session and close window
+i		invite contact to current session (i.e. after ^N)
+I		invite contact to current session & leave menu
+q		information
+ENTER/SPACE	new chat session & invite contact & leave menu
++/b		block/unblock contact
+:		toggle ignore contact
+TAB		toggle between chat windows and contact list menu
+PgUp/F7		contact list scroll down
+PgDn/F8		contact list scroll up
+
 
 ESC first, or ALT down: shortcut of main menu
 ----------------------------------------------
@@ -53,14 +83,16 @@ Menu navigation (F9)
 {} or home/end		navigation home/end
 <> or pgup/pgdn		page up/down (skip many entries)
 ENTER / SPACE		select
+SPACE			check (for checkable items)
 -/ESC/BACKSPACE		cancel or return to parent menu
-undelined entry letter	shortcut for selection
+underlined letter	shortcut for selection
 F9			cancel all menus (no return to parent)
 
 Switchboard (chat) text input:
 ------------------------------
 * to talk, just type any text and press enter to send it to the switchboard server
-* while you are typing, typing notifications are being sent in 4sec intervals.
+* while you are typing, typing notifications are being sent in 4sec
+  intervals (configurable).
 * if the string begins with "/", then it forms a special command 
   (and typing notifications are not being sent while you are typing it).
 * use // if you want to send one "/" in the beginning
@@ -135,9 +167,9 @@ arrow up/down           recall previous/next line from history
 * invalid keystokes exit the mode
 * you cannot cut & copy a masked field (i.e. password), though you can paste on it
 
-Contact/Group Selection Mode:
-(when you are presented with a list of contacts or groups)
-----------------------------------------------------------
+Contact/Group Selection Mode: 
+(when you are presented with a list of contacts or groups -- bottom line)
+-------------------------------------------------------------------------
 ]/arrow right/down	next entry
 [/arrow left/up		previous entry
 {/home			first entry
@@ -158,7 +190,6 @@ c			cancel (abort) incoming/outgoing transfer
 			or outgoing invitation
 q			information
 delete			kill entry (and cancel of course)
-?			mini help
 
 
 ******************************************

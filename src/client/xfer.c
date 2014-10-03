@@ -38,6 +38,7 @@ pthread_mutex_t XX = PTHREAD_MUTEX_INITIALIZER;
 xfer_l XL;
 
 extern char MyIP[];
+extern char *help_str[];
 
 char *xstat_str[] = { "???", "REQUEST", "ACCEPTED", 
         "CANCELLED", "REJECTED", "TIMEOUT", "FAILED",
@@ -211,34 +212,34 @@ void xf_draw(TWindow *w)
             case XS_CONNECT: 
             case XS_UNKNOWN:
             case XS_ACCEPT: 
-                attr = attrs[C_DBG]; break;
+                attr = C_DBG; break;
             case XS_INVITE:
-                attr = attrs[C_NORMAL]; break;
+                attr = C_NORMAL; break;
             case XS_COMPLETE:
-                attr = attrs[C_MSG]; break;
+                attr = C_MSG; break;
             default:
-                attr = attrs[C_ERR]; break;
+                attr = C_ERR; break;
         }
         wattrset(w->wh, attr); 
         xf_print(x, tmp);
         if (XL.cur == x) {
-            wbkgdset(w->wh, ' ' | attrs[C_MNU]);
+            wbkgdset(w->wh, ' ' | C_MNU);
             wclrtoeol(w->wh);
             waddch(w->wh, '>'); 
-            wattrset(w->wh, attrs[C_MNU]);
+            wattrset(w->wh, C_MNU);
         } else waddch(w->wh, ' ');
         if (left + w->w - 3 < SML) tmp[left + w->w - 3] = 0;
         wprintw(w->wh, " %s\n", tmp+left);
-        wbkgdset(w->wh, ' ' | attrs[C_NORMAL]);
+        wbkgdset(w->wh, ' ' | C_NORMAL);
         if (x->index - top + 2 == w->h) break;
     }
     wmove(w->wh, w->h-1, 0);
-    wbkgdset(w->wh, ' ' | attrs[C_MNU]);
+    wbkgdset(w->wh, ' ' | C_MNU);
     wclrtoeol(w->wh);
-    wattrset(w->wh, attrs[C_MNU]);
+    wattrset(w->wh, C_MNU);
     if (XL.count == 0) waddstr(w->wh, "list is empty");
     else wprintw(w->wh, "%d entr%s", XL.count, XL.count == 1? "y": "ies");
-    wbkgdset(w->wh, ' ' | attrs[C_NORMAL]);
+    wbkgdset(w->wh, ' ' | C_NORMAL);
     UNLOCK(&w->lock);
     UNLOCK(&XX);
 }
@@ -267,7 +268,7 @@ void tm_draw_xfer(int r)
     if (now - tm_last_draw >= TM_DRAW) draw_xfer(r);
 }
 
-void xf_keydown(int c)
+int xf_keydown(int c)
 {
     xfer_t *x;
 /*    switch (c) {
@@ -289,7 +290,7 @@ void xf_keydown(int c)
     x = XL.cur;
     if (x == NULL) {
         UNLOCK(&XX);
-        return;
+        return 0;
     }
     switch (c) {
         case 'a':
@@ -373,7 +374,7 @@ void xf_keydown(int c)
         case 13:
         case '?':
         /* mini help */
-            msg(C_DBG, "A = Accept, R = Reject, C = Cancel, Q = Quick info\n");
+            msg(C_DBG, "%s\n", help_str[2]);
             break;
             
         case ']':
@@ -413,9 +414,14 @@ void xf_keydown(int c)
             if (XL.cur != NULL && XL.cur->index < top) top--;
             break;
         }
+        default: 
+            UNLOCK(&XX);
+            return 0;
+        
     }
     UNLOCK(&XX);
     draw_xfer(1);
+    return 1;
 }
 
 char *fnuniq(char *dest, char *prefix, char *src, size_t n)
@@ -721,6 +727,7 @@ char *msnftpd_err_str[] = {"internal error", "socket()", "bind()", "listen()"};
 
 void msnftp_init()
 {
+    msnftpd.status = -1;
     if (Config.msnftpd > 0) {
         msnftpd.port = Config.msnftpd;
         msnftpd.backlog = 10;
@@ -739,4 +746,10 @@ void msnftp_init()
         }
     }
     sprintf(incoming_dir, "%s/received", Config.cfgdir);
+}
+
+void msnftp_done()
+{
+    if (msnftpd.status == -4)
+        pthread_cancel(msnftpd.th_server);
 }

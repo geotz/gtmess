@@ -1,10 +1,10 @@
 This package was debianized by George M. Tzoumas <geotz@hotmail.com> on
-Sun,  8 Oct 2006 23:30:27 +0300.
+Thu, 27 Dec 2007 02:12:30 +0200.
 
 Home page: http://gtmess.sourceforge.net/
 
 Package maintained by upstream author.
-Copyright: 2002-2006 George M. Tzoumas
+Copyright: 2002-2007 George M. Tzoumas
 
 License:
 
@@ -25,5 +25,5 @@ License:
 On Debian systems, the complete text of the GNU General
 Public License can be found in `/usr/share/common-licenses/GPL'.
 
-The Debian packaging is (C) 2006, George M. Tzoumas <geotz@hotmail.com> and
+The Debian packaging is (C) 2007, George M. Tzoumas <geotz@hotmail.com> and
 is licensed under the GPL, see `/usr/share/common-licenses/GPL'.

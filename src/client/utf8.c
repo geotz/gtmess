@@ -21,7 +21,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <wchar.h>
 
 #include "utf8.h"
 
@@ -99,14 +98,18 @@ int strwidth(char *s)
     mbstate_t mbs;
     wchar_t *w;
     const char *str = s;
-    int len, width;
+    int len, wlen, width;
     
     if (s == NULL || *s == 0) return 0;
     len = strlen(s);
     w = (wchar_t *) malloc((len+1)*sizeof(wchar_t));
     memset(&mbs, 0, sizeof(mbs));
-    mbsrtowcs(w, &str, len+1, &mbs);
-    width = wstrwidth(w, wcslen(w));
+    wlen = mbsrtowcs(w, &str, len+1, &mbs);
+    if (wlen < 0) {
+        free(w);
+        return 0;
+    }
+    width = wstrwidth(w, wlen);
     free(w);
     return width;
 }
@@ -123,8 +126,8 @@ int widthoffset(char *s, int width)
     if (len == 0) return 0;
     w = (wchar_t *) malloc((len+1)*sizeof(wchar_t));
     memset(&mbs, 0, sizeof(mbs));
-    mbsrtowcs(w, &str, len+1, &mbs);
-    wlen = wcslen(w);
+    wlen = mbsrtowcs(w, &str, len+1, &mbs);
+    /* wlen = wcslen(w); */
     for (i = 0; i < wlen; i++) {
         if (wstrwidth(w, i+1) > width) {
             free(w);

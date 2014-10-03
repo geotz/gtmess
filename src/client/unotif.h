@@ -29,5 +29,6 @@ void unotif_done();
 void playsound(char snd);
 void unotify(char *mesg, char effect);
 int  need_beep(char *nick);
+int can_notif(char *login);
 
 #endif

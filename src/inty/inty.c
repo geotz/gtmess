@@ -2,7 +2,7 @@
  *    inty.c
  *
  *    Inty Library - Simple library for network applications
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2003,2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -261,6 +261,7 @@ void *DaemonThread(void *d_args)
 	if ((csd = accept(lsd, (struct sockaddr *) NULL, NULL)) < 0) {
 /*	    perror("DaemonThread(): accept()");*/
             close(lsd);
+	    d->status = -4;
             return (void *) -4;
 	}
         pthread_create(&th_lastclient, NULL, d->server_thread, (void *) csd);

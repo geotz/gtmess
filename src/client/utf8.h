@@ -37,7 +37,7 @@ int wstrwidth(const wchar_t *s, size_t n);
 #define wcwidth(c) (1)
 #endif
 
-#define wcwidth_nl(c) ((c) == '\n'? 1: wcwidth(c))
+#define wcwidth_nl(c) ((c) == '\n' ? 1: wcwidth(c))
 
 #ifndef HAVE_MBSRTOWCS
 

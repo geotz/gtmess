@@ -33,22 +33,30 @@
 #include"queue.h"
 #include"gtmess.h"
 
-int attrs[] = {A_NORMAL, A_UNDERLINE, A_BOLD, A_NORMAL, A_REVERSE, A_NORMAL, A_NORMAL};
+int C_NORMAL = A_NORMAL;
+int C_ERR    = A_UNDERLINE;
+int C_DBG    = A_BOLD;
+int C_MSG    = A_NORMAL;
+int C_MNU    = A_REVERSE;
+int C_EBX    = A_NORMAL;
+int C_GRP    = A_UNDERLINE;
+
 int statattrs[] = {A_REVERSE, A_REVERSE, A_STANDOUT, A_REVERSE,
         A_REVERSE, A_REVERSE, A_REVERSE, A_REVERSE, A_REVERSE, A_REVERSE};
-int lstatattrs[] = {A_NORMAL, A_NORMAL, A_REVERSE, A_BOLD, A_BOLD,
-        A_BOLD | A_UNDERLINE, A_BOLD, A_BOLD | A_UNDERLINE, A_BOLD, A_STANDOUT};
+int lstatattrs[] = {A_NORMAL, A_NORMAL, A_BOLD, A_BOLD, A_BOLD,
+        A_BOLD, A_BOLD, A_BOLD, A_BOLD, A_UNDERLINE};
 
 TWindow w_msg, w_lst, w_back, w_xfer;
 pthread_mutex_t scr_lock;
 int scr_shutdown = 0;
 
 int wvis; /* 0 = sb window visible, 1 = transfers window visible */
+int clmenu; /* CL menu active */
 int w_msg_top = 0;
 
 /* last arguments to msg2() */
 char msg2_str[SML] = {0};
-cattr_t msg2_attr = C_MNU;
+int msg2_attr;
 
 time_t msg_now = 0;
 
@@ -120,27 +128,27 @@ void wprintx(WINDOW *w, char *txt, int indent)
     for (; nlines > 0; --nlines) waddch(w, '\n');
 }
 
-void gs_draw_prompt(cattr_t attr, const char *prompt)
+void gs_draw_prompt(int attr, const char *prompt)
 {
     move(SLINES - 1, 0);
-    bkgdset(' ' | attrs[attr]);
+    bkgdset(' ' | attr);
     clrtoeol();
-    bkgdset(' ' | attrs[C_NORMAL]);
+    bkgdset(' ' | C_NORMAL);
     move(SLINES - 1, 0);
-    attrset(attrs[attr] ^ A_REVERSE);
+    attrset(attr ^ A_REVERSE);
     addstr(prompt);
-    attrset(attrs[C_NORMAL]);
+    attrset(C_NORMAL);
 }
 
-void gs_draw_ebox(ebox_t *e, cattr_t attr, int pl)
+void gs_draw_ebox(ebox_t *e, int attr, int pl)
 {
     move(SLINES - 1, pl);
-    attrset(attrs[attr]);
+    attrset(attr);
     eb_draw(e, stdscr);
-    attrset(attrs[C_NORMAL]);
+    attrset(C_NORMAL);
 }
 
-int get_string(cattr_t attr, int mask, const char *prompt, char *dest, size_t n)
+int get_string(int attr, int mask, const char *prompt, char *dest, size_t n)
 {
     int r;
     int c, pl;
@@ -178,13 +186,14 @@ int get_string(cattr_t attr, int mask, const char *prompt, char *dest, size_t n)
 }
 
 /* print a message */
-void vwmsg(TWindow *w, int size, time_t *sbtime, time_t *real_sbtime, cattr_t attr, 
+int vwmsg(TWindow *w, int size, time_t *sbtime, time_t *real_sbtime, int attr, 
         FILE *fp_log, const char *fmt, va_list ap)
 {
     char tmpbuf[SXL], *tmp, *s;
     int alloc;
     time_t now2;
     int indent = 0;
+    int trunc;
 
     if (size < SXL) {
         tmp = tmpbuf;
@@ -194,21 +203,19 @@ void vwmsg(TWindow *w, int size, time_t *sbtime, time_t *real_sbtime, cattr_t at
         alloc = 1;
     }
 
-    vsprintf(tmp, fmt, ap);
+    trunc = vsnprintf(tmp, size, fmt, ap);
+    if (trunc < size) trunc = 0; else tmp[size-1] = 0;
 
     for (s = tmp; *s; s++) if (*s == '\r') *s = ' ';
 
     LOCK(&w->lock);
-    wattrset(w->wh, attrs[attr]);
+    wattrset(w->wh, attr);
     if (fp_log != NULL) {
-        switch (attr) {
-            case C_DBG: 
-                fprintf(fp_log, "(--) "); break;
-            case C_ERR: 
-                fprintf(fp_log, "(!!) "); break;
-            default:
-                fprintf(fp_log, "     "); break;
-        }
+        if (attr == C_DBG)
+            fprintf(fp_log, "(--) "); 
+        else if (attr == C_ERR)
+            fprintf(fp_log, "(!!) ");
+        else fprintf(fp_log, "     ");
         fflush(fp_log);
     }
 /*    waddstr(w->wh, tmp);*/
@@ -228,7 +235,7 @@ void vwmsg(TWindow *w, int size, time_t *sbtime, time_t *real_sbtime, cattr_t at
     } else indent = 0;
     UNLOCK(&time_lock);
     wprintx(w->wh, tmp, indent);
-    wattrset(w->wh, attrs[C_NORMAL]);
+    wattrset(w->wh, C_NORMAL);
     UNLOCK(&w->lock);
     if (fp_log != NULL) {
         fputs(tmp, fp_log);
@@ -236,25 +243,30 @@ void vwmsg(TWindow *w, int size, time_t *sbtime, time_t *real_sbtime, cattr_t at
     }
     
     if (alloc && tmp != NULL) free(tmp);
+    return trunc;
 }
 
 /* message window */
-void msg(cattr_t attr, const char *fmt, ...)
+void msg(int attr, const char *fmt, ...)
 {
     va_list ap;
+    int r;
     
     va_start(ap, fmt);
-    vmsg(attr, SML, fmt, ap);
+    r = vmsg(attr, SML, fmt, ap);
     va_end(ap);
+    if (r) vmsg(C_ERR, SML, "msg(): output truncated\n", NULL);
 }
 
-void msgn(cattr_t attr, int size, const char *fmt, ...)
+void msgn(int attr, int size, const char *fmt, ...)
 {
     va_list ap;
+    int r;
     
     va_start(ap, fmt);
-    vmsg(attr, size, fmt, ap);
+    r = vmsg(attr, size, fmt, ap);
     va_end(ap);
+    if (r) vmsg(C_ERR, SML, "msgn(): output truncated\n", NULL);
 }
 
 int screen_shut()
@@ -266,7 +278,7 @@ int screen_shut()
     return v;
 }
 
-void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
+int vmsg(int attr, int size, const char *fmt, va_list ap)
 {
     char txtbuf[SML], *txt;
     int alloc;
@@ -274,8 +286,9 @@ void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
     int y, x, newtop;
     time_t now2;
     int indent = 0;
+    int trunc = 0;
     
-    if (screen_shut()) return;
+    if (screen_shut()) return 0;
     
     if (size < SML) {
         txt = txtbuf;
@@ -284,27 +297,26 @@ void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
         txt = (char *) malloc(size);
         alloc = 1;
     }
-    vsprintf(txt, fmt, ap);
+    trunc = vsnprintf(txt, size, fmt, ap);
+    if (trunc < size) trunc = 0; else txt[size-1] = 0;
+
     for (s = txt; *s; s++) if (*s == '\r') *s = ' ';
     
     if (!fullscreen) {
-        queue_put(&msg_q, 0, strdup(txt), strlen(txt) + 1);
+        queue_put(&msg_q, 0, txt, strlen(txt) + 1);
         fprintf(stderr, "%s\n", txt);
         if (alloc && txt != NULL) free(txt);
-        return;
+        return 0;
     }
     
     LOCK(&w_msg.lock);
-    wattrset(w_msg.wh, attrs[attr]);
+    wattrset(w_msg.wh, attr);
     if (msn.fp_log != NULL) {
-        switch (attr) {
-            case C_DBG: 
-                fprintf(msn.fp_log, "(--) "); break;
-            case C_ERR: 
-                fprintf(msn.fp_log, "(!!) "); break;
-            default:
-                fprintf(msn.fp_log, "     "); break;
-        }
+        if (attr == C_DBG)
+            fprintf(msn.fp_log, "(--) ");
+        else if (attr == C_ERR)
+            fprintf(msn.fp_log, "(!!) ");
+        else fprintf(msn.fp_log, "     ");
         fflush(msn.fp_log);
     }
     time(&now2);
@@ -325,7 +337,7 @@ void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
         fputs(txt, msn.fp_log);
         fflush(msn.fp_log);
     }
-    wattrset(w_msg.wh, attrs[C_NORMAL]);
+    wattrset(w_msg.wh, C_NORMAL);
     getyx(w_msg.wh, y, x);
     newtop = y - w_msg.h + 1;
     if (w_msg_top < newtop) w_msg_top = newtop;
@@ -339,9 +351,10 @@ void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
     refresh();
     UNLOCK(&scr_lock);
     if (alloc && txt != NULL) free(txt);
+    return trunc;
 }
 
-void msg2(cattr_t attr, const char *fmt, ...)
+void msg2(int attr, const char *fmt, ...)
 {
     va_list ap;
     char txt[SML];
@@ -359,12 +372,12 @@ void msg2(cattr_t attr, const char *fmt, ...)
     LOCK(&scr_lock);
     getyx(stdscr, y, x);
     move(SLINES - 1, 0);
-    bkgdset(' ' | attrs[attr]);
+    bkgdset(' ' | attr);
     clrtoeol();
-    bkgdset(' ' | attrs[C_NORMAL]);
-    attrset(attrs[attr]);
+    bkgdset(' ' | C_NORMAL);
+    attrset(attr);
     addstr(txt);
-    attrset(attrs[C_NORMAL]);
+    attrset(C_NORMAL);
     move(y, x);
     refresh();
     UNLOCK(&scr_lock);
@@ -395,13 +408,13 @@ void draw_status(int r)
     printw("%*c", SCOLS-5, ' ');
 /*    bkgdset(' ' | statattrs[msn.status]);
     clrtoeol();
-    bkgdset(' ' | attrs[C_NORMAL]);*/
+    bkgdset(' ' | C_NORMAL);*/
     move(0, 0);
     addstr(txt); 
 /*    addch(' ');
     addch(ACS_VLINE); 
     printw(" gtmess %s", VERSION);*/
-    attrset(attrs[C_NORMAL]);
+    attrset(C_NORMAL);
     move(y, x);
     draw_time(r);
 }
@@ -414,17 +427,18 @@ void draw_time(int r)
     move(0, SCOLS-5);
     bkgdset(' ' | statattrs[msn.status]);
     clrtoeol();
-    bkgdset(' ' | attrs[C_NORMAL]);
+    bkgdset(' ' | C_NORMAL);
     attrset(statattrs[msn.status]);
     LOCK(&time_lock);
     printw("%02d:%02d", now_tm.tm_hour, now_tm.tm_min);
     UNLOCK(&time_lock);
-    attrset(attrs[C_NORMAL]);
+    attrset(C_NORMAL);
     move(y, x);
     if (r) refresh();
 }
 
 
+/* VERY tricky drawing routine, since data are not static :-/ */
 void draw_lst(int r)
 {
     msn_contact_t *p;
@@ -432,39 +446,117 @@ void draw_lst(int r)
     time_t now;
     char ch;
     int lines, total;
-    int y, x;
+    int y, x, i, j, ingroup;
+    int cur_grp, cur_con;
+    msn_group_t *b[msn.GL.count];
+    msn_contact_t **a[msn.GL.count];
+    int gsize[msn.GL.count];
+    int found;
+    
+    total = msn.GL.count;
+    cur_grp = 0;
+    cur_con = 0;
+    found = 0;
+    if (Config.online_only == 0) {
+        for (p = msn.CL.head; p != NULL; p = p->next)
+            if ((p->lflags & msn_FL) == msn_FL) total += p->groups;
+    } else {
+        for (p = msn.CL.head; p != NULL; p = p->next)
+            if ((p->lflags & msn_FL) == msn_FL && p->status >= MS_NLN) total += p->groups;
+    }
+    
+    /* create arrays for random access */
+    for (i = 0, g = msn.GL.head; g != NULL; g = g->next, i++) {
+        b[i] = g;
+        gsize[i] = 0;
+        for (p = msn.CL.head; p != NULL; p = p->next) { /* first pass to compute size :-/ */
+            if ((p->lflags & msn_FL) == 0 || (Config.online_only && p->status < MS_NLN)) continue;
+            for (j = 0; j < p->groups; j++) gsize[i] += (p->gid[j] == g->gid);
+        }
+        if (gsize[i]) {
+            /* is there an easy way to avoid malloc() all the time? perhaps a custom malloc :-) */
+            a[i] = (msn_contact_t **) malloc(gsize[i] * sizeof(msn_contact_t *));
+            ingroup = 0;
+            for (p = msn.CL.head; p != NULL; p = p->next) {
+                if ((p->lflags & msn_FL) == 0 || (Config.online_only && p->status < MS_NLN)) continue;
+                for (j = 0; j < p->groups; j++) if (p->gid[j] == g->gid) {
+                    a[i][ingroup] = p;
+                    if (msn.hgid == g->gid && strcmp(p->login, msn.hlogin) == 0)
+                        cur_grp = i, cur_con = ingroup, found = 1;
+                    ingroup++;
+                }
+            }
+        }
+    }
+    lines = 0;
+    
+    /* handle selection */
+    if (found) {
+        if (msn.dhid > 0) {
+            cur_con++;
+            while (1) {
+                if (cur_con >= gsize[cur_grp]) {
+                    cur_grp++;
+                    if (cur_grp >= msn.GL.count) cur_grp = 0;
+                    cur_con = 0; 
+                } else break;
+            }
+            msn.dhid = 0;
+        } else if (msn.dhid < 0) {
+            cur_con--;
+            while (1) {
+                if (cur_con < 0) {
+                    cur_grp--; 
+                    if (cur_grp < 0) cur_grp = msn.GL.count - 1;
+                    cur_con = gsize[cur_grp] - 1;
+                } else break;
+            }
+            msn.dhid = 0;
+        }
+    } else while (cur_grp < msn.GL.count) {
+        if (cur_con < gsize[cur_grp]) break;
+        else cur_grp++, cur_con = 0;
+    }
 
+    if (cur_grp >= msn.GL.count) {
+        clmenu = 0;
+    }
+    
+    if (clmenu) {
+        msn.hgid = b[cur_grp]->gid;
+        strcpy(msn.hlogin, a[cur_grp][cur_con]->login);
+    }
+
+    /* do the drawing */
     LOCK(&w_lst.lock);
     wclear(w_lst.wh);
-
-    lines = 0;
-    total = msn.GL.count;
-    if (Config.online_only == 0) total += msn.FL.count;
-    else 
-        for (p = msn.FL.head; p != NULL; p = p->next)
-            if (p->status >= MS_NLN) total++;
+    
     time(&now);
-    for (g = msn.GL.head; g != NULL; g = g->next) {
+    for (i = 0; i < msn.GL.count; i++) {
         if (lines >= msn.flskip && lines < total + msn.flskip) {
-            wattrset(w_lst.wh, attrs[C_GRP]);
-            wprintw(w_lst.wh, "%s\n", g->name);
+            wattrset(w_lst.wh, C_GRP);
+            wprintw(w_lst.wh, "%s\n", b[i]->name);
         }
         lines++;
-        for (p = msn.FL.head; p != NULL; p = p->next)
-            if (p->gid == g->gid) {
-                if (Config.online_only && p->status < MS_NLN) continue;
-                if (lines >= msn.flskip && lines < total + msn.flskip) {
-                    wattrset(w_lst.wh, lstatattrs[p->status]);
-                    if (now - p->tm_last_char <= Config.time_user_types) ch = '!';
-                    else if (p->blocked) ch = '+';
-                    else if (p->ignored) ch = ':';
-                    else ch = ' ';
-                    wprintw(w_lst.wh, "%c%c %s\n", ch, msn_stat_char[p->status], 
-                            getnick(p->login,p->nick, Config.aliases));
-                }
-                lines++;
+        for (j = 0; j < gsize[i]; j++) {
+            if (lines >= msn.flskip && lines < total + msn.flskip) {
+                p = a[i][j];
+                if (clmenu && i == cur_grp && j == cur_con)
+                    wattrset(w_lst.wh, statattrs[p->status]);
+                else wattrset(w_lst.wh, lstatattrs[p->status]);
+                if (now - p->tm_last_char <= Config.time_user_types) ch = '!';
+                else if ((p->lflags & msn_BL) == msn_BL) ch = '+'; /* blocked */
+                else if (p->ignored) ch = ':';
+                else ch = ' ';
+                wprintw(w_lst.wh, "%c%c %s\n", ch, msn_stat_char[p->status], 
+                        getnick(p->login, p->nick, Config.aliases));
             }
+            lines++;
+        }
     }
+
+    for (i = 0; i < msn.GL.count; i++) if (gsize[i]) free(a[i]);
+
     getyx(stdscr, y, x);
     copywin(w_lst.wh, stdscr, 0, 0, w_lst.y, w_lst.x,
             w_lst.y + w_lst.h - 1, w_lst.x + w_lst.w - 1, FALSE);
@@ -529,7 +621,7 @@ void draw_plst(msn_sboard_t *sb, int r)
         lines = 0;
         total = sb->PL.count + 1;
         if (lines >= sb->plskip && lines < total + sb->plskip) {
-            wattrset(w->wh, attrs[C_GRP]);
+            wattrset(w->wh, C_GRP);
             wprintw(w->wh, "[%s]\n\n", getnick(sb->master, sb->mnick, Config.aliases));
         }
         lines++;
@@ -564,7 +656,7 @@ void draw_sbbar(int r)
     int y, x, w;
     
     ch = &txt[0];
-    attr = attrs[C_NORMAL];
+    attr = C_NORMAL;
     
     s = SL.start;
     c = SL.count;
@@ -610,33 +702,38 @@ void draw_sbbar(int r)
     if (r) refresh();
 }
 
-void dlg(cattr_t attr, const char *fmt, ...)
+void dlg(int attr, const char *fmt, ...)
 {
     va_list ap;
+    int r;
     
     va_start(ap, fmt);
-    vdlg(attr, SXL, fmt, ap);
+    r = vdlg(attr, SXL, fmt, ap);
     va_end(ap);
+    if (r) msg(C_ERR, "dlgn(): output truncated\n");
 }
 
-void dlgn(cattr_t attr, int size, const char *fmt, ...)
+void dlgn(int attr, int size, const char *fmt, ...)
 {
     va_list ap;
+    int r;
     
     va_start(ap, fmt);
-    vdlg(attr, size, fmt, ap);
+    r = vdlg(attr, size, fmt, ap);
     va_end(ap);
+    if (r) msg(C_ERR, "dlgn(): output truncated\n");
 }
 
 
 /* switchboard conversation window */
-void vdlg(cattr_t attr, int size, const char *fmt, va_list ap)
+int vdlg(int attr, int size, const char *fmt, va_list ap)
 {
     msn_sboard_t *sb = (msn_sboard_t *) pthread_getspecific(key_sboard);
     int y, x, newtop;
+    int r;
 
-    if (sb == NULL) return;
-    vwmsg(&sb->w_dlg, size, &sb->dlg_now, &sb->real_dlg_now, attr, sb->fp_log, fmt, ap);
+    if (sb == NULL) return 0;
+    r = vwmsg(&sb->w_dlg, size, &sb->dlg_now, &sb->real_dlg_now, attr, sb->fp_log, fmt, ap);
     
     getyx(sb->w_dlg.wh, y, x);
     newtop = y - sb->w_dlg.h + 1;
@@ -645,6 +742,7 @@ void vdlg(cattr_t attr, int size, const char *fmt, va_list ap)
 
     draw_dlg(sb, 0);
     draw_sbbar(1);
+    return r;
 }
 
 void draw_sbebox(msn_sboard_t *sb, int r)
@@ -654,14 +752,15 @@ void draw_sbebox(msn_sboard_t *sb, int r)
     
     move(w_msg.y - 2, 0);
     if (sb != NULL) {
-        attrset(attrs[C_EBX]);
+        attrset(C_EBX);
         eb_draw(&sb->EB, stdscr);
     } else {
-        attrset(attrs[C_NORMAL]);
+        attrset(C_NORMAL);
         printw("%*c", w_msg.w, ' ');
         move(SLINES - 1, SCOLS - 1);
     }
-    attrset(attrs[C_NORMAL]);
+    /* if (sb == NULL || clmenu == 1)  ... */
+    attrset(C_NORMAL);
     
     if (r) refresh();
 }
@@ -683,6 +782,25 @@ void draw_all()
     draw_lst(0);
     draw_sb(SL.head, 0);
     draw_rest(1);
+}
+
+void color_test()
+{
+    int i;
+    msg(C_NORMAL, "Normal text\n");
+    msg(C_ERR, "Error message\n");
+    msg(C_DBG, "Debugging message\n");
+    msg(C_MSG, "Server message\n");
+    msg(C_MNU, "Menu entry\n");
+    msg(C_EBX, "Editbox\n");
+    msg(C_GRP, "Group name\n");
+    
+    msg(C_NORMAL, "\nContact colors:\n");
+    for (i = MS_FLN; i <= MS_UNK; i++)
+        msg(lstatattrs[i], "%s\n", msn_stat_name[i]);
+    msg(C_NORMAL, "\nStatus colors:\n");
+    for (i = MS_FLN; i <= MS_UNK; i++)
+        msg(statattrs[i], "%s\n", msn_stat_name[i]);
 }
 
 void screen_resize()
@@ -762,20 +880,20 @@ void screen_init(int colors)
 #endif
         init_pair(1, COLOR_RED, COLOR_BG);
         lstatattrs[MS_FLN] = lstatattrs[MS_HDN] =
-                attrs[C_ERR] = COLOR_PAIR(1);
+                C_ERR = COLOR_PAIR(1);
 
         init_pair(2, COLOR_GREEN, COLOR_BG);
-        lstatattrs[MS_NLN] = attrs[C_DBG] = COLOR_PAIR(2);
+        lstatattrs[MS_NLN] = C_DBG = COLOR_PAIR(2);
 
         init_pair(3, COLOR_CYAN, COLOR_BG);
-        lstatattrs[MS_BRB] = attrs[C_MSG] = COLOR_PAIR(3);
+        lstatattrs[MS_BRB] = C_MSG = COLOR_PAIR(3);
 
         init_pair(4, COLOR_WHITE, COLOR_RED);
         statattrs[MS_FLN] = COLOR_PAIR(4);
 
         init_pair(5, COLOR_BLUE, COLOR_CYAN);
-        statattrs[MS_NLN] = attrs[C_MNU] = COLOR_PAIR(5);
-        statattrs[MS_HDN] = attrs[C_EBX] = COLOR_PAIR(5) | A_REVERSE;
+        statattrs[MS_NLN] = C_MNU = COLOR_PAIR(5);
+        statattrs[MS_HDN] = C_EBX = COLOR_PAIR(5) | A_REVERSE;
 
         init_pair(6, COLOR_MAGENTA, COLOR_BG);
         lstatattrs[MS_BSY] = lstatattrs[MS_PHN] = COLOR_PAIR(6);
@@ -795,11 +913,13 @@ void screen_init(int colors)
                 lstatattrs[MS_LUN] = COLOR_PAIR(10) | A_BOLD;
 
         init_pair(11, COLOR_BLUE, COLOR_BG);
-        attrs[C_GRP] = COLOR_PAIR(11);
+        C_GRP = COLOR_PAIR(11);
         
         init_pair(12, COLOR_WHITE, COLOR_BG);
-        attrs[C_NORMAL] = lstatattrs[MS_UNK] = COLOR_PAIR(12);
+        C_NORMAL = lstatattrs[MS_UNK] = COLOR_PAIR(12);
     }
+    msg2_attr = C_MNU;
+    
     cbreak();
     noecho();
     nonl();
@@ -807,7 +927,7 @@ void screen_init(int colors)
     keypad(stdscr, TRUE);
     meta(stdscr, TRUE);
     scrollok(stdscr, TRUE);
-    attrset(attrs[C_NORMAL]);
+    attrset(C_NORMAL);
 
     clear();
     
@@ -848,6 +968,7 @@ void screen_init(int colors)
     w_back.y = 0;
     
     wvis = 0;
+    clmenu = 0;
 
     pthread_mutex_init(&w_back.lock, NULL);
 
@@ -856,6 +977,13 @@ void screen_init(int colors)
     fullscreen = 1;
     while ((q = queue_get(&msg_q)) != NULL) {
         msg(C_ERR, "%s", q->data);
-        free(q->data);
+        qelem_free(q);
     }
+}
+
+void screen_done()
+{
+    delwin(w_msg.wh);
+    erase(); refresh();
+    endwin();
 }

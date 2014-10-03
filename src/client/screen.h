@@ -53,8 +53,8 @@ typedef struct {
 #define W_MSG_LBUF 256
 #define W_DLG_LBUF 512
 
-typedef enum {C_NORMAL, C_ERR, C_DBG, C_MSG, C_MNU, C_EBX, C_GRP} cattr_t;
-
+extern int C_NORMAL, C_ERR, C_DBG, C_MSG, C_MNU, C_EBX, C_GRP;
+extern int msg2_attr;
 extern int statattrs[], lstatattrs[], attrs[];
 
 extern TWindow w_msg, w_lst, w_back, w_xfer;
@@ -66,17 +66,17 @@ extern int utf8_mode;
 
 extern xqueue_t msg_q;
 
-int  get_string(cattr_t attr, int mask, const char *prompt, char *dest, size_t n);
-void vwmsg(TWindow *w, int size, time_t *sbtime, time_t *real_sbtime, cattr_t attr, 
+int  get_string(int attr, int mask, const char *prompt, char *dest, size_t n);
+int  vwmsg(TWindow *w, int size, time_t *sbtime, time_t *real_sbtime, int attr, 
         FILE *fp_log, const char *fmt, va_list ap);
 
-void msg(cattr_t attr, const char *fmt, ...);
-void msgn(cattr_t attr, int size, const char *fmt, ...);
-void vmsg(cattr_t attr, int size, const char *fmt, va_list ap);
-void msg2(cattr_t attr, const char *fmt, ...);
-void dlg(cattr_t attr, const char *fmt, ...);
-void dlgn(cattr_t attr, int size, const char *fmt, ...);
-void vdlg(cattr_t attr, int size, const char *fmt, va_list ap);
+void msg(int attr, const char *fmt, ...);
+void msgn(int attr, int size, const char *fmt, ...);
+int  vmsg(int attr, int size, const char *fmt, va_list ap);
+void msg2(int attr, const char *fmt, ...);
+void dlg(int attr, const char *fmt, ...);
+void dlgn(int attr, int size, const char *fmt, ...);
+int  vdlg(int attr, int size, const char *fmt, va_list ap);
 
 void draw_all();
 void draw_rest();
@@ -85,10 +85,14 @@ void draw_time(int r);
 void draw_lst(int r);
 void draw_msg(int r);
 
+void color_test();
+
 void screen_resize();
 void screen_init();
+void screen_done();
 
 extern int wvis;
+extern int clmenu;
 extern pthread_mutex_t scr_lock;
 extern int scr_shutdown;
 

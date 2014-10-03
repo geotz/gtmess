@@ -40,5 +40,6 @@ typedef struct {
 extern int snd_pfd[];
 
 void sound_init();
+void sound_done();
 
 #endif

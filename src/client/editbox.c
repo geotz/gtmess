@@ -63,7 +63,7 @@ void eb_flush(ebox_t *e)
         memset(&mbs, 0, sizeof(mbs));
         s = e->wtext;
         wcsrtombs((char *) e->text, &s, e->nb, &mbs);
-        e->text[e->nb+1] = 0;
+        e->text[e->nb] = 0;
     } else {
         for (i = 0; i < e->sl; i++) e->text[i] = (unsigned char) e->wtext[i];
         e->text[i] = (unsigned char) 0;

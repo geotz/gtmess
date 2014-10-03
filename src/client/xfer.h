@@ -85,8 +85,9 @@ xfer_t *xfl_add_url(xfer_l *l, char *local, char *remote,
 xfer_t *xfl_find(xfer_l *l, unsigned int inv_cookie);
 void xfl_rem(xfer_l *l, xfer_t *x);
 void draw_xfer(int r);
-void xf_keydown(int c);
+int  xf_keydown(int c);
 
 void *msnftp_client(void *arg);
 void msnftp_init();
+void msnftp_done();
 #endif

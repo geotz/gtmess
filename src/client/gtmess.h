@@ -72,9 +72,11 @@ typedef struct {
     char snd_exec[SCL];
     char url_exec[SCL];
     int keep_alive;
-    int nonotif_status;
+    int nonotif_mystatus;
     int skip_says;
     int safe_msg;
+    int err_connreset;
+    int auto_cl;
     
     char cfgdir[SCL];
     char datadir[SCL];
@@ -101,4 +103,6 @@ void sched_draw_lst(time_t after);
 void redraw_screen(int resize);
 
 void do_ping();
+void cl_toggle(int enable);
+
 #endif
