@@ -2,7 +2,7 @@
  *    msn.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -45,6 +45,8 @@ typedef struct msn_contact_s {
                            total number of groups user belongs to) */
     int blocked;        /* FL only */
     time_t tm_last_char; /* FL only: time of last typing notification */
+    
+    int notify, ignored; /* per-user settings */
     struct msn_contact_s *next;
 } msn_contact_t;
 

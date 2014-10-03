@@ -2,7 +2,7 @@
  *    nserver.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -19,19 +19,18 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include<stdio.h>
-#include<stdlib.h>
-#include<errno.h>
-#include<pthread.h>
-#include<sys/time.h>
-#include<string.h>
+#include <stdio.h>        
+#include <stdlib.h>       
+#include <errno.h>        
+#include <pthread.h>      
+#include <sys/time.h>     
+#include <string.h>       
 
-#include"../inty/inty.h"
-#include"gtmess.h"
-#include"nserver.h"
-#include"unotif.h"
-#include"screen.h"
-#include"sboard.h"
+#include "../inty/inty.h" 
+#include "gtmess.h"       
+#include "unotif.h"       
+#include "screen.h"       
+#include "sboard.h"       
 
 msn_t msn;
 
@@ -42,7 +41,9 @@ FILE *flog;
 
 extern pthread_cond_t cond_out;
 extern struct timeval tv_ping;
-extern show_ping_result;
+extern int show_ping_result;
+
+extern int skip_pcs;
 
 void notif_openlog()
 {
@@ -163,7 +164,7 @@ void msn_handle_msgbody(char *msgdata, int len)
         s = strafter(msgdata, "\nClientIP: ");
         sscanf(s, "%[^\r]", tmp);
         if (strlen(tmp) > 7 && strcmp(MyIP, tmp) != 0) {
-            strcpy(MyIP, tmp);
+            Strcpy(MyIP, tmp, SML);
             msg(C_MSG, "Client IP: %s\n", MyIP);
         }
         
@@ -310,7 +311,7 @@ void *msn_ndaemon(void *dummy)
             LOCK(&msn.lock);
             url2str(arg2, nick);
             if ((pg = msn_glist_find(&msn.GL, gid)) != NULL) {
-                strcpy(pg->name, nick);
+                Strcpy(pg->name, nick, SML);
                 draw_lst(1);
                 msg(C_MSG, "Group %d renamed to %s\n", gid, nick);
             }
@@ -382,7 +383,7 @@ void *msn_ndaemon(void *dummy)
             if ((p = msn_clist_find(&msn.FL, arg1)) != NULL) old = p->status;
             if (old < MS_NLN) {
                 sprintf(nf, "%s is %s\n", getnick(arg1, nick, Config.aliases), msn_stat_name[msn_stat_id(stat)]);
-                unotify(nf, SND_ONLINE);
+                if (can_notif(arg1)) unotify(nf, SND_ONLINE);
             }
             if (msn_clist_update(&msn.FL, arg1, nick, msn_stat_id(stat), -1, -1) > 0) {
                 draw_lst(1);
@@ -403,7 +404,7 @@ void *msn_ndaemon(void *dummy)
                 draw_lst(1);
                 msg(C_MSG, "%s <%s> is %s\n", getnick(arg1, p->nick, Config.notif_aliases), arg1, msn_stat_name[MS_FLN]);
                 sprintf(nf, "%s is Offline\n", getnick(arg1, p->nick, Config.aliases));
-                unotify(nf, SND_OFFLINE);
+                if (can_notif(arg1)) unotify(nf, SND_OFFLINE);
             }
             UNLOCK(&msn.lock);
         } else if (is3(com, "REM")) {
@@ -466,7 +467,7 @@ void *msn_ndaemon(void *dummy)
                     q = msn_clist_add(&msn.FL, gid, arg1, nick);
                     if (p != NULL) {
                         q->status = p->status;
-                        strcpy(q->nick, p->nick);
+                        Strcpy(q->nick, p->nick, SML);
                     }
                     if ((p = msn_clist_find(&msn.RL, arg1)) != NULL)
                         p->gid++;
@@ -546,6 +547,31 @@ void *msn_ndaemon(void *dummy)
             if (--msn.list_count == 0) {
             /* end of sync -- last LST rmember */
                 int match_color = C_MSG;
+                int ignored, notify, count = 0;
+                char name[SML], fn[SML];
+                FILE *f; 
+                
+                /* loading per-user settings */                
+                sprintf(fn, "%s/%s/per_user", Config.cfgdir, msn.login);
+                f = fopen(fn, "r");
+                if (f != NULL) {
+                    char ver[SNL] = {0};
+                    fscanf(f, "#GTMESS:%[^:]s:PCS\n", ver);
+                    if (strcmp(ver, VERSION) != 0) {
+                        msg(C_ERR, "%s: version mismatch -- delete to recreate with defaults\n", fn);
+                        skip_pcs = 1;
+                    } else {                    
+                        while (!feof(f))
+                            if (fscanf(f, "%s\t%d\t%d\n", name, &notify, &ignored) == 3)
+                                if ((p = msn_clist_find(&msn.FL, name)) != NULL) {
+                                    p->notify = notify;
+                                    p->ignored = ignored;
+                                    count++;
+                                }
+                        fclose(f);
+                        if (count > 0) msg(C_DBG, "Loaded specific settings for %d contact%c\n", count, (count != 1)? 's': ' ');
+                    }
+                }
                 
                 msn.in_syn = 0;
                 
@@ -577,7 +603,7 @@ void *msn_ndaemon(void *dummy)
                 read_syn_cache_data();
                 msg(C_MSG, "Contacts loaded\n");
                 draw_lst(1);
-                /* initial status to log in *
+                * initial status to log in *
                 msn_chg(msn.nfd, nftid(), Config.initial_status);
                 UNLOCK(&msn.lock);
             } else {
@@ -617,7 +643,7 @@ void *msn_ndaemon(void *dummy)
             url2str(arg2, nick);
             LOCK(&msn.lock);
             if (strcmp(arg1, msn.login) == 0) {
-                strcpy(msn.nick, nick);
+                Strcpy(msn.nick, nick, SML);
                 draw_status(1);
             } else if (msn_clist_update(&msn.FL, arg1, nick, -1, -1, -1) > 0)
                 draw_lst(1);
@@ -633,7 +659,7 @@ void *msn_ndaemon(void *dummy)
                 msg(C_ERR, "SERVER: You must connect connect to a new notification server\n"
                            "NEW ADDRESS: %s\n", addr);
                 LOCK(&msn.lock);
-                strcpy(msn.notaddr, addr);
+                Strcpy(msn.notaddr, addr, SML);
                 UNLOCK(&msn.lock);
                 break;
             } else if (arg1[0] == 'S') {
@@ -661,8 +687,8 @@ void *msn_ndaemon(void *dummy)
                         SL.head = sb;
                     } else {
                         /* reuse disconnected switchboard */
-                        strcpy(sb->sbaddr, addr);
-                        strcpy(sb->hash, arg2);
+                        Strcpy(sb->sbaddr, addr, SML);
+                        Strcpy(sb->hash, arg2, SML);
                         sb->called = 0;
                         sb->sessid[0] = 0;
                         sboard_openlog(sb);
@@ -678,7 +704,7 @@ void *msn_ndaemon(void *dummy)
         /* invitation to switchboard */
             char sbaddr[SML], hash[SML], sessid[SML], nf[SML];
             msn_sboard_t *sb;
-            int found;
+            int found, ignore;
 
             sbaddr[0] = hash[0] = 0;
             sscanf(s + 4, "%s %s %*s %s %s %s", sessid, sbaddr, hash, arg1, arg2);
@@ -691,8 +717,10 @@ void *msn_ndaemon(void *dummy)
             } else {
                 msg(C_MSG, "%s <%s> rings\n", getnick(arg1, nick, Config.notif_aliases), arg1);
                 sprintf(nf, "%s rings\n", getnick(arg1, nick, Config.aliases));
-                unotify(nf, SND_RING);
-                if (!Config.invitable) {
+                if (can_notif(arg1)) unotify(nf, SND_RING);
+                p = msn_clist_find(&msn.FL, arg1);
+                if (p != NULL) ignore = p->ignored; else ignore = 0;
+                if (!Config.invitable || ignore) {
                     UNLOCK(&msn.lock);
                     continue;
                 }
@@ -718,10 +746,10 @@ void *msn_ndaemon(void *dummy)
                         pthread_cancel(tmp);
                         pthread_join(tmp, NULL);
                     }
-                    strcpy(sb->sbaddr, sbaddr);
-                    strcpy(sb->hash, hash);
+                    Strcpy(sb->sbaddr, sbaddr, SML);
+                    Strcpy(sb->hash, hash, SML);
                     sb->called = 1;
-                    strcpy(sb->sessid, sessid);
+                    Strcpy(sb->sessid, sessid, SML);
                     sboard_openlog(sb);
                 }
 
@@ -767,7 +795,7 @@ void *msn_ndaemon(void *dummy)
 
 void msn_init(msn_t *msn)
 {
-    strcpy(msn->nick, msn->login);
+    Strcpy(msn->nick, msn->login, SML);
     msn->status = MS_FLN;
     msn->inbox = 0;
     msn->folders = 0;

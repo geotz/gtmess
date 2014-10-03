@@ -2,7 +2,7 @@
  *    xfer.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -46,6 +46,24 @@ char *xstat_str[] = { "???", "REQUEST", "ACCEPTED",
 
 char incoming_dir[SML];
 
+int top = 0;
+int left = 0;
+
+void xf_focus(int i)
+{
+    xfer_t *x;
+    int old_i;
+
+    for (x = XL.head; x != NULL; x = x->next)
+        if (x->index == i) {
+            old_i = XL.cur->index;
+            XL.cur = x;
+            if (i < top) top = i;
+            else if (i - top + 2 > w_xfer.h) top = i - w_xfer.h + 2;
+            break;
+        }
+}
+
 xfer_t *xfl_add(xfer_l *l, xclass_t xclass, xstat_t status, char *local, char *remote, 
                 int incoming, unsigned int inv_cookie, msn_sboard_t *sb)
 {
@@ -55,8 +73,8 @@ xfer_t *xfl_add(xfer_l *l, xclass_t xclass, xstat_t status, char *local, char *r
     
     x->xclass = xclass;
     x->status = status;
-    strcpy(x->local, local);
-    strcpy(x->remote, remote);
+    Strcpy(x->local, local, SML);
+    Strcpy(x->remote, remote, SML);
     x->incoming = incoming;
     x->inv_cookie = inv_cookie;
     x->sb = sb;
@@ -73,6 +91,9 @@ xfer_t *xfl_add(xfer_l *l, xclass_t xclass, xstat_t status, char *local, char *r
         l->tail = x;
     }
     x->index = l->count++;
+    
+    xf_focus(x->index);
+    
     return x;
 }
 
@@ -83,12 +104,24 @@ xfer_t *xfl_add_file(xfer_l *l, xstat_t status, char *local, char *remote, int i
     xfer_t *x = xfl_add(l, XF_FILE, status, local, remote, incoming, inv_cookie, sb);
     if (x == NULL) return NULL;
     
-    strcpy(x->data.file.fname, fname);
+    Strcpy(x->data.file.fname, fname, SML);
     x->data.file.size = fsize;
     x->data.file.sofar = 0;
     x->data.file.port = -1;
     x->data.file.auth_cookie = -1;
     x->data.file.ipaddr[0] = 0;
+    
+    return x;
+}
+
+xfer_t *xfl_add_url(xfer_l *l, char *local, char *remote,
+                    unsigned int inv_cookie, msn_sboard_t *sb, 
+                    char *url)
+{
+    xfer_t *x = xfl_add(l, XF_URL, XS_INVITE, local, remote, 1, inv_cookie, sb);
+    if (x == NULL) return NULL;
+    
+    Strcpy(x->data.url.name, url, SML);
     
     return x;
 }
@@ -134,30 +167,29 @@ void xf_print(xfer_t *x, char *dest)
     char cc;
     char *status, *inc, *s;
     char sgen[SML], sspec[SML], remote[SML];
-    char ckilo[2] = {' ', 'k'};
-    unsigned int kilo = 0; 
     
     if (x->xclass == XF_FILE) cc = 'F'; else cc = '?';
     if (x->incoming) inc = "<<"; else inc = ">>";
     status = xstat_str[x->status];
-    strcpy(remote, x->remote);
+    Strcpy(remote, x->remote, SML);
     if ((s = strstr(remote, "@hotmail.com")) != NULL) {
         s[1] = 0;
     }
     sprintf(sgen, "%c %s <%s> %s [%u] ", cc, inc, remote, status, x->inv_cookie);
     if (x->xclass == XF_FILE) {
         unsigned int percent;
+        char ckilo[2] = {' ', 'k'};
+        unsigned int kilo = 0; 
         if (x->data.file.size == 0) percent = 100; 
         else percent = (unsigned int) (x->data.file.sofar*100.0/x->data.file.size);
         if (x->data.file.size >= 10240) kilo = 10;
         sprintf(sspec, "%s (%u/%u%c) %3u%%", x->data.file.fname, 
                 x->data.file.sofar >> kilo, x->data.file.size >> kilo, ckilo[kilo != 0], percent);
+    } else if (x->xclass == XF_URL) {
+        sprintf(sspec, "%s", x->data.url.name);
     } else sspec[0] = 0;
     sprintf(dest, "%s | %s", sspec, sgen);
 }
-
-int top = 0;
-int left = 0;
 
 void xf_draw(TWindow *w)
 {
@@ -235,17 +267,16 @@ void tm_draw_xfer(int r)
     if (now - tm_last_draw >= TM_DRAW) draw_xfer(r);
 }
 
-
 void xf_keydown(int c)
 {
     xfer_t *x;
-    LOCK(&XX);
 /*    switch (c) {
         case '1': 
             xfl_add_file(&XL, XS_INVITE, "me@hotmail.com", "sue@hotmail.com", 1, 1234, NULL, "readme.txt", 10240);
             break;
         case '2':    
             xfl_add_file(&XL, XS_INVITE, "me@hotmail.com", ZS, 0, 3433, NULL, "dd", 3576);
+            xfl_add_url(&XL, "me@hotmail.com", ZS, 3433, NULL, "http://www.google.com/");
             break;
         case '3': 
             if (x != NULL) XL.cur->data.file.sofar++; 
@@ -254,6 +285,7 @@ void xf_keydown(int c)
             msg(C_ERR, "%s\n", MyIP);
             break;
     }*/
+    LOCK(&XX);
     x = XL.cur;
     if (x == NULL) {
         UNLOCK(&XX);
@@ -262,15 +294,23 @@ void xf_keydown(int c)
     switch (c) {
         case 'a':
         /* accept incoming file */
-            if (!x->incoming || x->xclass != XF_FILE) {
+            if (!x->incoming || x->status != XS_INVITE) {
                 beep();
                 break;
             }
-            if (x->status == XS_INVITE) {
+            if (x->xclass == XF_FILE) {
                 LOCK(&SX);
                 msn_msg_accept(x->sb->sfd, x->sb->tid++, x->inv_cookie);
                 UNLOCK(&SX);
-            } else beep();
+                break;
+            }
+            if (x->xclass == XF_URL) {
+                char s[SML+80];
+                sprintf(s, Config.url_exec, x->data.url.name);
+                system(s);
+                break;
+            }
+            beep();
             break;
             
         case 'r':
@@ -324,12 +364,16 @@ void xf_keydown(int c)
                     x->data.file.fname, x->data.file.size,
                     x->data.file.sofar, x->data.file.ipaddr,
                     x->data.file.port, x->data.file.auth_cookie);
+            } else if (x->xclass == XF_URL) {
+                msg(C_NORMAL,
+                    "--url transfer details--\n%s", x->data.url.name);
             }
             break;
         
+        case 13:
         case '?':
         /* mini help */
-            msg(C_NORMAL, "(A)ccept, (R)eject, (C)ancel\n");
+            msg(C_DBG, "A = Accept, R = Reject, C = Cancel, Q = Quick info\n");
             break;
             
         case ']':
@@ -374,7 +418,7 @@ void xf_keydown(int c)
     draw_xfer(1);
 }
 
-char *fnuniq(char *dest, char *prefix, char *src)
+char *fnuniq(char *dest, char *prefix, char *src, size_t n)
 {
     struct stat s;
     int k;
@@ -385,7 +429,7 @@ char *fnuniq(char *dest, char *prefix, char *src)
     if (e == NULL) e = &nul; else *e = 0, e = src + (e-base);
     if (prefix != NULL) {
         sprintf(dest, "%s/%s", prefix, src);
-    } else strcpy(dest, src);
+    } else Strcpy(dest, src, n);
     for (k = 2; stat(dest, &s) == 0; k++) 
         if (prefix != NULL) sprintf(dest, "%s/%s_%d%s", prefix, base, k, e);
         else sprintf(dest, "%s_%d%s", base, k, e);
@@ -441,7 +485,7 @@ void *msnftp_client(void *arg)
     draw_xfer(1);
     pthread_cleanup_push((void (*)(void *)) close, (void *) fd);
             
-    strcpy(s, "VER MSNFTP\r\n");
+    Strcpy(s, "VER MSNFTP\r\n", SML);
     write(fd, s, 12);
     pthread_testcancel();
     inp[0] = 0;
@@ -468,7 +512,7 @@ void *msnftp_client(void *arg)
     }
     
     write(fd, "TFR\r\n", 5);
-    ofnamep = fnuniq(ofname, incoming_dir, x->data.file.fname);
+    ofnamep = fnuniq(ofname, incoming_dir, x->data.file.fname, SML);
     if (strcmp(ofnamep, x->data.file.fname) != 0) msnftp_error(x, ofname);
     of = fopen(ofname, "w");
     if (of == NULL) {
@@ -604,7 +648,7 @@ void *msnftp_server(void *arg)
     }
     
     rem = x->data.file.size;
-    hdr = fbuf;
+    hdr = (unsigned char *) fbuf;
     while (rem > 0) {
         FD_ZERO(&rfds);
         FD_SET(fd, &rfds);

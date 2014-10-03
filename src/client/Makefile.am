@@ -22,10 +22,10 @@ bin_PROGRAMS = gtmess
 AM_CFLAGS = -DDATADIR=\"${pkgdatadir}\"
 EXTRA_DIST = hash_cfg.inp
  
-gtmess_SOURCES = gtmess.c editbox.c hash_cfg.c hash_tbl.c hlist.c md5.c msn.c nserver.c\
-                pass.c queue.c sound.c sboard.c screen.c unotif.c utf8.c xfer.c\
-                editbox.h gtmess.h hash_cfg.h hash_tbl.h hlist.h md5.h msn.h nserver.h\
-                pass.h queue.h sound.h sboard.h screen.h unotif.h utf8.h xfer.h
+gtmess_SOURCES = gtmess.c editbox.c hash_cfg.c hash_tbl.c hlist.c md5.c menu.c msn.c nserver.c\
+                pass.c queue.c sound.c sboard.c screen.c unotif.c utf8.c util.c xfer.c\
+                editbox.h gtmess.h hash_cfg.h hash_tbl.h hlist.h md5.h menu.h msn.h\
+                nserver.h pass.h queue.h sound.h sboard.h screen.h unotif.h utf8.h util.h xfer.h
 
 #gtmess_LDFLAGS = -L../inty
 gtmess_LDADD = ../inty/libinty.a

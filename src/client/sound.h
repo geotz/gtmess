@@ -2,7 +2,7 @@
  *    sound.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -24,13 +24,20 @@
 
 #include<pthread.h>
 
-typedef enum {SND_NONE, SND_BEEP, SND_ONLINE, SND_OFFLINE, SND_NEWMAIL,
-        SND_PENDING, SND_RING, SND_LOGOUT, SND_MSG } snd_t;
+enum {SND_NONE, SND_BEEP, SND_ONLINE, SND_OFFLINE, SND_NEWMAIL,
+        SND_PENDING, SND_RING, SND_LOGOUT, SND_MSG };
 
-extern pthread_cond_t cond_snd;
-extern pthread_mutex_t lock_snd;
+typedef struct {
+    double freq;
+    int dur;
+} songnote_t;
 
-extern snd_t sound_effect;
+typedef struct {
+    int size;
+    songnote_t notes[8];
+} song_t;
+
+extern int snd_pfd[];
 
 void sound_init();
 

@@ -1,7 +1,7 @@
 /*
- *    pass.h
+ *    util.h
  *
- *    gtmess - MSN Messenger client
+ *    utility functions
  *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
@@ -19,12 +19,17 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _PASS_H_
-#define _PASS_H_
+#ifndef _UTIL_H_
+#define _UTIL_H_
 
-void pass_init();
-void pass_done();
-char *get_login_server(char *dest);
-int get_ticket(char *server, char *login, char *pass, char *param, char *dest, size_t n);
+#define SCL 256
+
+#include <string.h>
+
+void *Malloc(size_t size);
+int Write(int fd, void *buf, size_t count);
+void Strcpy(char *dest, const char *src, size_t n);
+int valid_shell_string(char *s);
+void cipher_string(unsigned char *s, unsigned char *key, int encode);
 
 #endif

@@ -2,7 +2,7 @@
  *    utf8.c
  *
  *    utf8 support routines
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -19,11 +19,11 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include<stdlib.h>
-#include<string.h>
-#include<wchar.h>
+#include <stdlib.h>
+#include <string.h>
+#include <wchar.h>
 
-#include"utf8.h"
+#include "utf8.h"
 
 
 int wstrwidth(const wchar_t *s, size_t n)
@@ -51,7 +51,7 @@ int strlen_utf8(char *s, int *len)
 int strnlen_utf8(char *s, int n, int *len)
 {
     unsigned char *t = (unsigned char *) s;
-    int k, i, m;
+    int k, i, m = 0;
     
     k = i = 0;
     while (*t) {

@@ -2,7 +2,7 @@
  *    screen.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@
 
 #include"editbox.h"
 #include"msn.h"
+#include"queue.h"
 
 #ifndef HAVE_WRESIZE
 #define KEY_RESIZE (-2)
@@ -60,8 +61,14 @@ extern TWindow w_msg, w_lst, w_back, w_xfer;
 extern int w_msg_top;
 extern char copyright_str[];
 
-int  get_string(cattr_t attr, int mask, const char *prompt, char *dest);
-void vwmsg(TWindow *w, int size, time_t *sbtime, cattr_t attr, FILE *fp_log, const char *fmt, va_list ap);
+extern int SCOLS, SLINES;
+extern int utf8_mode;
+
+extern xqueue_t msg_q;
+
+int  get_string(cattr_t attr, int mask, const char *prompt, char *dest, size_t n);
+void vwmsg(TWindow *w, int size, time_t *sbtime, time_t *real_sbtime, cattr_t attr, 
+        FILE *fp_log, const char *fmt, va_list ap);
 
 void msg(cattr_t attr, const char *fmt, ...);
 void msgn(cattr_t attr, int size, const char *fmt, ...);
@@ -82,5 +89,7 @@ void screen_resize();
 void screen_init();
 
 extern int wvis;
+extern pthread_mutex_t scr_lock;
+extern int scr_shutdown;
 
 #endif

@@ -2,7 +2,7 @@
  *    unotif.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -19,18 +19,20 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include<stdlib.h>
-#include<stdio.h>
-#include<string.h>
-#include<unistd.h>
-#include<sys/types.h>
-#include<sys/stat.h>
-#include<fcntl.h>
-#include<curses.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <curses.h>
 
-#include"unotif.h"
-#include"sound.h"
-#include"gtmess.h"
+#include "unotif.h"
+#include "sound.h"
+#include "gtmess.h"
+#include "nserver.h"
+#include "screen.h"
 
 int pfd;    /* pipe file descriptor */
 
@@ -40,7 +42,7 @@ void unotif_init(int asound, int apopup)
     
     if (asound == 2) sound_init();
     sprintf(tmp, "%s/notify.pip", Config.cfgdir);
-    if (apopup) pfd = open(tmp, O_WRONLY | O_NONBLOCK);
+    if (apopup) pfd = open(tmp, O_RDWR);
     else pfd = -1;
 }
 
@@ -49,24 +51,17 @@ void unotif_done()
     if (pfd >= 0) close(pfd);
 }
 
-
-void playsound(snd_t snd)
+void unotify(char *mesg, char effect)
 {
-    if (Config.sound == 0) return;
-    if (snd < SND_BEEP || snd > SND_LOGOUT) return;
-    if (Config.sound == 1 || snd == SND_BEEP) {
-        beep();
-        return;
-    }
-    LOCK(&lock_snd);
-    sound_effect = snd;
-    pthread_cond_signal(&cond_snd);
-    UNLOCK(&lock_snd);
-}
-
-void unotify(char *msg, snd_t effect)
-{
+    if ((Config.nonotif_status & (1 << msn.status)) == (1 << msn.status)) return;
     playsound(effect);
     if (pfd == -1) return;
-    write(pfd, msg, strlen(msg));
+    write(pfd, mesg, strlen(mesg));
+}
+
+int can_notif(char *login) 
+{
+    msn_contact_t *p = msn_clist_find(&msn.FL, login);
+    if (p != NULL) return p->notify;
+    else return 1;
 }

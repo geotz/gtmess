@@ -2,7 +2,7 @@
  *    hlist.c
  *
  *    history list
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -22,7 +22,8 @@
 #include<stdlib.h>
 #include<string.h>
 
-#include"hlist.h"
+#include "hlist.h"
+#include "util.h"
 
 void hlist_init(hlist_t *h, int limit)
 {
@@ -79,7 +80,7 @@ hline_t *hlist_add(hlist_t *h, char *s, int len, int attr)
     
     l->len = len;
     l->attr = attr;
-    strcpy(l->text, s);
+    Strcpy(l->text, s, len+1);
     
     if (h->start == NULL) {
         /* empty list */

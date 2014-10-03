@@ -2,7 +2,7 @@
  *    pass.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -184,13 +184,13 @@ int http_get(char *purl, char version, char*headers, char *response, int size, i
     int code, redir = 2;
     
     code = 0;
-    strcpy(url, purl);
+    Strcpy(url, purl, SXL);
     while (redir > 0) {
         host = strafter(url, "://");
         if (host == NULL) host = strdup(url); else host = strdup(host);
         s = strchr(host, '/');
-        if (s == NULL) strcpy(rsrc, "/index.html"); else {
-            strcpy(rsrc, s);
+        if (s == NULL) Strcpy(rsrc, "/index.html", SML); else {
+            Strcpy(rsrc, s, SML);
             *s = 0;
         }
         if (strncmp(url, "https:", 6) == 0) port = 443;
@@ -253,13 +253,13 @@ int http_get(char *purl, char version, char*headers, char *response, int size, i
         /* redirection */
         s = strafter(response, "Location: ");
         if (s == NULL) break;
-        strcpy(nurl, s);
+        Strcpy(nurl, s, SXL);
         s = strchr(nurl, '\r');
         if (s == NULL) break;
         *s = 0;
         /* redirect --> nurl */
         if (strcmp(url, nurl) == 0) break;
-        strcpy(url, nurl);
+        Strcpy(url, nurl, SXL);
         redir--;
     }
     if (rcode != NULL) *rcode = code;
@@ -293,7 +293,7 @@ char *get_login_server(char *dest)
     return NULL;
 }
 
-int get_ticket(char *server, char *login, char *pass, char *param, char *dest)
+int get_ticket(char *server, char *login, char *pass, char *param, char *dest, size_t n)
 {
     char head[SBL], buf[SBL];
     char userver[SML], ulogin[SML], upass[SML];
@@ -312,7 +312,7 @@ int get_ticket(char *server, char *login, char *pass, char *param, char *dest)
     if ((s = strafter(s, "from-PP='")) == NULL) return -2;
     if ((s2 = strchr(s, '\'')) == NULL) return -2;
     *s2 = 0;
-    strcpy(dest, s);
+    Strcpy(dest, s, n);
     return 0;
 }
 

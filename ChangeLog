@@ -1,4 +1,29 @@
 *******************************
+* Version 0.93 (? ??? 2007)   *
+*******************************
+* improved handling of `notify.pip'
+! clear screen on exit
++ menu bars
+* reorganized menus
++ url parsing and handling [url_exec]
+! proper redraw of xfer window (was missing in some cases)
+- removed option -- no longer used [snd_redirect]
+* system() call for sound [snd_exec]
++ obfuscated stored password & tool
++ xfer list auto-focus
++ disable snd/popup in certain statuses [nonotif_status]
+! window bar drawing (utf8)
++ queue text messages preceding screen init.
++ toggle display of online-only contacts (^F)
++ per-contact settings {Tibor}
+* simplified sound daemon (with pipes)
++ pcspeaker tunes [sound]
++ internal pcspeaker support (linux-specific) {Tibor}
++ skip redundant 'says:' messages [skip_says]
++ acknowledge variable changes
++ don't close chat win after too recent msg (possibly unread!) [safe_msg]
+
+*******************************
 * Version 0.92 (7 Nov 2006)   *
 *******************************
 ! display empty string when ctime_r() fails

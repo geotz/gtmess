@@ -2,7 +2,7 @@
  *    msn.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -19,17 +19,18 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include<unistd.h>
-#include<stdlib.h>
-#include<stdio.h>
-#include<string.h>
-#include<iconv.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <iconv.h>
 
-#include"../config.h"
+#include "../config.h"
 
-#include"md5.h"
-#include"msn.h"
-#include"../inty/inty.h"
+#include "md5.h"
+#include "msn.h"
+#include "../inty/inty.h"
+#include "util.h"
 
 char *msn_stat_name[] = {
     "Offline", "Appear Offline", "Online", "Idle",
@@ -78,7 +79,7 @@ int msn_clist_update(msn_clist_t *q, char *login,
             f++;
             if (nick != NULL) {
                 if (strcmp(p->nick, nick) != 0) p->dirty = 1;
-                strcpy(p->nick, nick);
+                Strcpy(p->nick, nick, SML);
                 r = 1;
             }
             if (status >= 0) p->status = status, r = 1;
@@ -194,10 +195,12 @@ msn_contact_t *msn_clist_add(msn_clist_t *q, int gid, char *login, char *nick)
     p->gid = gid;
     p->blocked = 0;
     p->tm_last_char = 0;
-    strcpy(p->login, login);
-    strcpy(p->nick, nick);
+    Strcpy(p->login, login, SML);
+    Strcpy(p->nick, nick, SML);
     p->dirty = 0;
     p->status = MS_FLN;
+    p->notify = 1;
+    p->ignored = 0;
 
     /* sorted insertion */
     cur = q->head;
@@ -270,7 +273,7 @@ void msn_glist_ren(msn_glist_t *q, int gid, char *newname)
 
     while (p != NULL && p->gid != gid) p = p->next;
     if (p != NULL) {
-        strcpy(p->name, newname);
+        Strcpy(p->name, newname, SML);
     }
 }
 
@@ -335,7 +338,7 @@ void msn_glist_add(msn_glist_t *q, int gid, char *name)
     p = (msn_group_t *) calloc(1, sizeof(msn_group_t));
     if (p == NULL) return;
     p->gid = gid;
-    strcpy(p->name, name);
+    Strcpy(p->name, name, SML);
 
     cur = q->head;
     last = NULL;
@@ -404,7 +407,7 @@ void utf8decode(iconv_t ic, char *src, char *dest)
     }
 }
 
-void utf8encode(iconv_t ic, char *src, char *dest, int obl)
+void utf8encode(iconv_t ic, char *src, char *dest, size_t obl)
 {
     size_t ibl;
     
@@ -450,7 +453,8 @@ void str2url(char *src, char *dest)
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     char textubuf[2*SXL], *textu;
-    int alloc = 0, size, len;
+    int alloc = 0;
+    size_t size, len;
 
     len = strlen(src);
     if (msn_ic[1] != (iconv_t) -1) {
@@ -781,7 +785,7 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
 
     if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
     if (sscanf(rep, "XFR %*u %*s %s", tmp) == 1) {
-        if (dest != NULL) strcpy(dest, tmp);
+        if (dest != NULL) Strcpy(dest, tmp, SML);
         close(fd);
         return 1;
     }
@@ -851,7 +855,8 @@ int msn_msg_gtmess(int fd, unsigned int tid, char *cmd, char *args)
 int msn_msg_text(int fd, unsigned int tid, char *text)
 {
     char s[SNL], textubuf[2*SXL], *textu;
-    int alloc, size, len;
+    int alloc;
+    size_t size, len;
 
     len = strlen(text);
     if (6*len < 2*SXL) {

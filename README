@@ -13,6 +13,7 @@ Keys:
 ^X	leave sb session, but leave window open
 ^L	redraw screen (in case it gets garbled)
 ^G	test console beep
+^F	toggle display of offline contacts
 
 F1	previous sb session
 F2	next sb session
@@ -22,7 +23,7 @@ F5	message window scroll down
 F6	message window scroll up
 F7	contact list scroll down
 F8	contact list scroll up
-F9	send RAW data to server
+F9	menu bar
 F10	exit
 
 PgUp	switchboard (chat) window scroll down
@@ -30,24 +31,31 @@ PgDn	switchboard window scroll up
 @F7	participant list scroll down (chat session)
 @F8	participant list scroll up
 
-NOTÅ: Instead of F1-F10 you can use ESC-1 to ESC-0
+NOTE: Instead of F1-F10 you can use ESC-1 to ESC-0
 F7 = ESC-7, @F7 = ESC-&, @F8 = ESC-* 
 Also, try ALT-1..ALT-0, ALT-&, ALT-*
 
-ESC first, or ALT down:
-------------------------
-A	add
+ESC first, or ALT down: shortcut of main menu
+----------------------------------------------
 C	connect
-D	logout
 S	change status
 L	contact lists
-N	change name
+V	server
 O	options
-M	mailbox status
-P	ping
 I	invite
 T	enter note
+Q	quit
 /	enter special client command (none for now)
+
+Menu navigation (F9)
+--------------------
+[] or arrow left/right	navigation left/right
+{} or home/end		navigation home/end
+<> or pgup/pgdn		page up/down (skip many entries)
+ENTER / SPACE		select
+-/ESC/BACKSPACE		cancel or return to parent menu
+undelined entry letter	shortcut for selection
+F9			cancel all menus (no return to parent)
 
 Switchboard (chat) text input:
 ------------------------------
@@ -57,7 +65,7 @@ Switchboard (chat) text input:
   (and typing notifications are not being sent while you are typing it).
 * use // if you want to send one "/" in the beginning
 
-switchboard commands:
+Switchboard commands:
 ---------------------
 / <text>
 	(there is space after slash!)  

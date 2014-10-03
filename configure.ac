@@ -24,8 +24,8 @@ dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT
 PACKAGE="gtmess"
-VERSION="0.92"
-VDATE="7 Nov 2006"
+VERSION="0.93"
+VDATE="? Feb 2007"
 AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
 AM_CONFIG_HEADER(src/config.h)
 AC_CONFIG_SRCDIR(src/client/gtmess.c)

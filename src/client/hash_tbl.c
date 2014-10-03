@@ -2,7 +2,7 @@
  *    hash_tbl.c
  *
  *    hash table data structure
- *    Copyright (C) 2003-2004  George M. Tzoumas
+ *    Copyright (C) 2003-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -19,11 +19,12 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include<stdlib.h>
-#include<string.h>
-#include"hash_tbl.h"
+#include <stdlib.h>
+#include <string.h>
+#include "hash_tbl.h"
+#include "util.h"
 
-/* Chris Torek */
+/* by Chris Torek */
 int hash_string(char *s)
 {
     unsigned int v = 0;
@@ -59,14 +60,14 @@ int hash_tbl_update(hash_table_t *tbl, char *key, char *value)
     
     s = hash_tbl_find(tbl, key);
     if (s != NULL) {
-        strcpy(s, value);
+        Strcpy(s, value, HDATASZ);
         return 0;
     } else {
         index = hash_string(key);
         p = (hash_entry_t *) malloc(sizeof(hash_entry_t));
         if (p == NULL) return -1;
-        strcpy(p->key, key);
-        strcpy(p->value, value);
+        Strcpy(p->key, key, HDATASZ);
+        Strcpy(p->value, value, HDATASZ);
         p->next = tbl->bucket[index];
         tbl->bucket[index] = p;
         return 1;

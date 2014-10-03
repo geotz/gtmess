@@ -20,8 +20,7 @@ APP="gtmess"
 which $APP 2>/dev/null || exit 1
 
 NAMETITLE="-name $APP -title $APP"
-URXVT_FLAGS="-tn rxvt -fg gray -bg black -geometry 112x40 \
--fn xft:monospace:pixelsize=13 -ip -sh 30 -tint white $NAMETITLE"
+URXVT_FLAGS="-tn rxvt -fg gray -bg black -geometry 112x40 $NAMETITLE"
 XTERM_FLAGS="-fg gray -bg black -geometry 112x40 $NAMETITLE"
 RXVT_FLAGS="-fg gray -bg black -geometry 112x40 $NAMETITLE"
 WTERM_FLAGS="-tr $RXVT_FLAGS"
@@ -48,7 +47,7 @@ done
 test -z "$TERMPROG" && exit 2
 
 ps -U $UID | grep -q "gtmess-notify" || gtmess-notify &
-sleep 0.5
+#sleep 2
 
 case "$TERMPROG" in
 

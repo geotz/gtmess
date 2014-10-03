@@ -2,7 +2,7 @@
  *    sboard.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -19,20 +19,21 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include<curses.h>
-#include<pthread.h>
-#include<stdlib.h>
-#include<iconv.h>
-#include<errno.h>
-#include<sys/stat.h>
-#include<string.h>
-#include<time.h>
+#include <curses.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <iconv.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <time.h>
 
-#include"sboard.h"
-#include"xfer.h"
-#include"unotif.h"
-#include"../inty/inty.h"
-#include"gtmess.h"
+#include "sboard.h"
+#include "xfer.h"
+#include "unotif.h"
+#include "../inty/inty.h"
+#include "gtmess.h"
+#include "hash_tbl.h"
 
 pthread_mutex_t SX; /* switchboard mutex */
 msn_sblist_t SL; /* switchboard */
@@ -84,7 +85,15 @@ int sboard_leave()
 int _sboard_kill()
 {
     int r;
+    time_t now;
+
+    time(&now);
     LOCK(&SX);
+    if (difftime(now, SL.head->real_dlg_now) < Config.safe_msg) {
+        UNLOCK(&SX);
+        flash();
+        return -1; /* too soon */
+    }
     if ((r = msn_sblist_rem(&SL))) draw_sb(SL.head, 1);
     UNLOCK(&SX);
     return r;
@@ -100,7 +109,7 @@ int sboard_kill()
         pthread_cond_timedwait(&SL.out_cond, &SX, &timeout);
         UNLOCK(&SX);
     }
-    return _sboard_kill();;
+    return _sboard_kill();
 }
 
 
@@ -144,6 +153,26 @@ void sboard_next_pending()
     UNLOCK(&SX);
 }
 
+int says_ok(msn_sboard_t *sb, char *nick)
+{
+    time_t now;
+    
+    if (strcmp(sb->last_nick, nick) != 0) {
+        time(&sb->last_spoken);
+        strcpy(sb->last_nick, nick);
+        return 1;
+    }
+    time(&now);
+    if (difftime(now, sb->last_spoken) >= Config.skip_says) {
+        sb->last_spoken = now;
+        strcpy(sb->last_nick, nick);
+        return 1;
+    } else {
+        sb->last_spoken = now;
+        return 0;
+    }
+}
+
 void sb_blah()
 {
     msn_sboard_t *sb;
@@ -152,9 +181,9 @@ void sb_blah()
     LOCK(&msn.lock);
     LOCK(&SX);
     sb = SL.head;
-    if (sb != NULL && strlen(sb->EB.text) > 0) {
+    if (sb != NULL && strlen((char *) sb->EB.text) > 0) {
         if (sb->sfd > -1) {
-            sp = sb->EB.text;
+            sp = (char *) sb->EB.text;
             pthread_setspecific(key_sboard, (void *) sb);
             if (sp[0] == '/') {
                 if (sp[1] == '/') sp++;
@@ -163,7 +192,7 @@ void sb_blah()
                     /* special command */
                     char cmd[SXL], args[SXL];
 
-                    eb_history_add(&SL.head->EB, SL.head->EB.text, strlen(SL.head->EB.text));
+                    eb_history_add(&SL.head->EB, (char *) SL.head->EB.text, strlen((char *) SL.head->EB.text));
 
                     cmd[0] = args[0] = 0;
                     sscanf(sp, "%s %[^\n]", cmd, args);
@@ -203,6 +232,7 @@ void sb_blah()
                                 cookie = lrand48();
                                 xfl_add_file(&XL, XS_INVITE, msn.login, ZS, 0, cookie, sb, args, st.st_size);
                                 msn_msg_finvite(sb->sfd, sb->tid++, cookie, args, st.st_size);
+                                draw_xfer(1);
                             } else msg(C_ERR, "Could not stat file '%s'\n", args);
                         } else msg(C_ERR, "Cannot send file: MSNFTP server is not running\n");
                     } else msg(C_ERR, "Invalid command\n");
@@ -227,9 +257,10 @@ void sb_blah()
                 }
             }
             msn_msg_text(sb->sfd, sb->tid++, sp);
-            dlg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick, Config.aliases));
+            if (says_ok(sb, msn.login))
+                dlg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick, Config.aliases));
             dlgn(C_MSG, strlen(sp)+2, "%s\n", sp);
-            eb_history_add(&SL.head->EB, SL.head->EB.text, strlen(SL.head->EB.text));
+            eb_history_add(&SL.head->EB, (char *) SL.head->EB.text, strlen((char *) SL.head->EB.text));
             eb_settext(&SL.head->EB, ZS);
             draw_sbebox(SL.head, 1);
         } else  if (sb->multi == 0) { /* reconnect only if not multiuser */
@@ -364,15 +395,25 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
     if (strstr(contype, "text/plain") != NULL) {
         
     /* user chats */
-        char *text;
+        char *text, *e;
         
         s = strafter(msgdata, "\r\n\r\n");
         text = (char *) Malloc(len - (s - msgdata) + 1);
         sb->pending = 1;
         
         utf8decode(sb->ic, s, text);
-        dlg(C_DBG, "%s says:\n", getnick(arg1, nick, Config.aliases));
+        if (says_ok(sb, arg1))
+            dlg(C_DBG, "%s says:\n", getnick(arg1, nick, Config.aliases));
         dlgn(C_MSG, len+2, "%s\n", text);
+        if ((e = strstr(text, "http://")) != NULL) {
+            char url[SML];
+            int len = 7;
+            strncpy(url, e, 7); e += 7;
+            while (*e > 32 && len < SML) url[len++] = *(e++); /* clumsy parsing? :-) */
+            url[len] = 0;
+            xfl_add_url(&XL, msn.login, arg1, lrand48(), NULL, url);
+            draw_xfer(1);
+        }
 /*        playsound(SND_MSG); */
         free(text);
         
@@ -467,6 +508,7 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
                     UNLOCK(&XX);
                     sb->pending = 1;
                     dlg(C_DBG, "%s wants to send you the file '%s', %u bytes long\n", getnick(arg1, nick, Config.aliases), fname, size);
+                    draw_xfer(1);
                 } else {
                 /* reject all other types of invitations */
                     dlgn(C_DBG, len+2, "%s\n", msgdata);
@@ -500,14 +542,14 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
 
                     x->data.file.port = port;
                     x->data.file.auth_cookie = auth;
-                    strcpy(x->data.file.ipaddr, ip);
+                    Strcpy(x->data.file.ipaddr, ip, SML);
                     x->status = xs;
                     pthread_create(&thr, NULL, msnftp_client, (void *) x);
                     pthread_detach(thr);
                 } else {
                     x->status = xs;
-                    strcpy(x->data.file.ipaddr, MyIP);
-                    strcpy(x->remote, arg1);
+                    Strcpy(x->data.file.ipaddr, MyIP, SML);
+                    Strcpy(x->remote, arg1, SML);
                     x->data.file.port = Config.msnftpd;
                     x->data.file.auth_cookie = lrand48();
                     msn_msg_accept2(sb->sfd, sb->tid++, x->inv_cookie, x->data.file.ipaddr, 
@@ -646,8 +688,8 @@ void *msn_sbdaemon(void *arg)
             msn_clist_add(&sb->PL, -1, arg1, nick);
             if (sb->PL.count > 1) sb->multi = 1;
             if (sb->PL.count == 1) {
-                strcpy(sb->master, arg1);
-                strcpy(sb->mnick, nick);
+                Strcpy(sb->master, arg1, SML);
+                Strcpy(sb->mnick, nick, SML);
             }
             draw_plst(sb, 0);
             dlg(C_DBG, "%s <%s> has joined the conversation\n", getnick(arg1, nick, Config.aliases), arg1);
@@ -685,7 +727,7 @@ void *msn_sbdaemon(void *arg)
 
             sscanf(s + 4, "%*u %*s %s", arg1);
             LOCK(&SX);
-            strcpy(sb->sessid, arg1);
+            Strcpy(sb->sessid, arg1, SML);
             dlg(C_DBG, "Calling other party ...\n");
             UNLOCK(&SX);
         } else if (is3(com, "BYE")) {
@@ -757,16 +799,16 @@ msn_sboard_t *msn_sblist_add(msn_sblist_t *q, char *sbaddr, char *hash,
     msn_sboard_t *p;
 
     p = (msn_sboard_t *) Malloc(sizeof(msn_sboard_t));
-    strcpy(p->sbaddr, sbaddr);
-    strcpy(p->hash, hash);
+    Strcpy(p->sbaddr, sbaddr, SML);
+    Strcpy(p->hash, hash, HDATASZ);
     p->called = called;
     sboard_openlog(p);
 
     p->sessid[0] = 0;
-    if (sessid != NULL) strcpy(p->sessid, sessid);
+    if (sessid != NULL) Strcpy(p->sessid, sessid, SML);
     p->PL.head = NULL; p->PL.count = 0;
-    strcpy(p->master, master);
-    strcpy(p->mnick, mnick);
+    Strcpy(p->master, master, SML);
+    Strcpy(p->mnick, mnick, SML);
     p->multi = 0;
 
     p->w_dlg.w = W_DLG_W;
@@ -801,6 +843,9 @@ msn_sboard_t *msn_sblist_add(msn_sblist_t *q, char *sbaddr, char *hash,
     p->tm_last_char = 0;
     p->plskip = 0;
     p->dlg_now = 0;
+    p->real_dlg_now = 0;
+    p->last_nick[0] = 0;
+    p->last_spoken = 0;
 
     if (q->head == NULL) {
         /* empty list */

@@ -19,6 +19,8 @@
  *    along with this program; if not, write to the Free Software
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+ 
+#include <string.h>
 %}
 struct hct_entry {
     char name[256];
@@ -54,5 +56,8 @@ notif_aliases, 25
 update_nicks, 26
 snd_dir, 27
 snd_exec, 28
-snd_redirect, 29
+url_exec, 29
 keep_alive, 30
+nonotif_status, 31
+skip_says, 32
+safe_msg, 33

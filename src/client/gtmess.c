@@ -2,7 +2,7 @@
  *    gtmess.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -27,20 +27,27 @@ TODO LIST
 DELETE EVERYTHING AND WRITE THE CLIENT FROM SCRATCH IN C++ :-)
 
 
-
 NEXT VERSION
 -------------
-
+update manpage with cfg vars (and built-in help)
 soft-logout
-
-pcspeaker support <Tibor>
-per-contact settings <Tibor>
 more colors in sb win <Tibor>
+
+Contact-list menu!
+
+sprintf --> Sprintf (safe!)
+add URL... (xfers / strNcpy!!! -- play HOSTILE to others! :->)
+check menu cancellations...  update manpage with structure
+
+and keys: F9, backspace/minus ...
+
+resize sub-windows!
+restore check for online mode (msn.fd == -1)
+avatars!
+vertical menu?
 
 auto Be-Right-Back ---> Away
 uninvitable when busy
-ignore list (uninvitable)
-per-contact "ignore" (uninvitable)  + = blocked, - = ignored, blocked > ignored > none
 ^K-P = push immediately into history buffer and clear line
 
 Invite option on Reverse/Allow list
@@ -93,54 +100,56 @@ fix issue whether type notif is sent during history browsing
 histlen
 */
 
-#include<unistd.h>
-#include<stdlib.h>
-#include<stdio.h>
-#include<pthread.h>
-#include<signal.h>
-#include<string.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <pthread.h>
+#include <signal.h>
+#include <string.h>
 
-#include<sys/time.h>
-#include<sys/types.h>
-#include<sys/wait.h>
-#include<sys/stat.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/stat.h>
 
-#include<netdb.h>
-#include<sys/socket.h>
+#include <netdb.h>
+#include <sys/socket.h>
 
-#include<curses.h>
-#include<stdarg.h>
-#include<errno.h>
-#include<ctype.h>
-#include<time.h>
+#include <curses.h>
+#include <stdarg.h>
+#include <errno.h>
+#include <ctype.h>
+#include <time.h>
 
-#include<iconv.h>
-#include<locale.h>
+#include <iconv.h>
+#include <locale.h>
 
-#include"../config.h"
+#include "../config.h"
 
-#include"../inty/inty.h"
-#include"md5.h"
+#include "../inty/inty.h"
+#include "md5.h"
 
-#include"nserver.h"
-#include"screen.h"
-#include"editbox.h"
-#include"msn.h"
-#include"pass.h"
-#include"sboard.h"
-#include"unotif.h"
-#include"xfer.h"
-#include"hash_cfg.h"
-#include"hash_tbl.h"
+#include "nserver.h"
+#include "screen.h"
+#include "editbox.h"
+#include "menu.h"
+#include "msn.h"
+#include "pass.h"
+#include "sboard.h"
+#include "unotif.h"
+#include "xfer.h"
+#include "hash_cfg.h"
+#include "hash_tbl.h"
 
-#include"gtmess.h"
+#include "gtmess.h"
+#include "util.h"
 
 /* var, str_val, int_val, type, int_low, int_high */
 struct cfg_entry ConfigTbl[] =
   {
     {"log_traffic", "", 0, 1, 0, 1},
     {"colors", "", 0, 1, 0, 2},
-    {"sound", "", 1, 1, 0, 2},
+    {"sound", "", 1, 1, 0, 4},
     {"popup", "", 1, 1, 0, 1},
     {"time_user_types", "", 5, 1, 1, 60},
 /*    {"cvr", "0x0409 win 4.10 i386 MSNMSGR 5.0.0544 MSMSGS", 0, 0, 0, 0},*/
@@ -168,9 +177,12 @@ struct cfg_entry ConfigTbl[] =
     {"notif_aliases", "", 0, 1, 0, 1},
     {"update_nicks", "", 0, 1, 0, 2},
     {"snd_dir", "*data*", 0, 0, 0, 0},
-    {"snd_exec", "/usr/bin/aplay -Nq %", 0, 0, 0, 0},
-    {"snd_redirect", "", 3, 1, 0, 3},
-    {"keep_alive", "", 0, 1, 0, 7200}
+    {"snd_exec", "/usr/bin/aplay -Nq %s > /dev/null 2>&1 &", 0, 0, 0, 0},
+    {"url_exec", "opera --remote 'openURL(%s,new-page)' >/dev/null 2>&1 &", 0, 0, 0, 0},
+    {"keep_alive", "", 0, 1, 0, 7200},
+    {"nonotif_status", "", 368, 1, 0, 511},
+    {"skip_says", "", 0, 1, 0, 7200},
+    {"safe_msg", "", 3, 1, 0, 30}
   };
 
 struct cfg_entry *OConfigTbl;
@@ -183,7 +195,6 @@ extern FILE *syn_cache_fp;*/
 char *ZS = "";
 char MyIP[SML];
 char copyright_str[80];
-int utf8_mode;
 
 hash_table_t Aliases; /* alias list */
 
@@ -205,7 +216,6 @@ struct tm now_tm;
 int i_draw_lst_handled = 1;
 pthread_t ithrid;
 
-int SCOLS, SLINES;
 extern char msg2_str[SML];
 extern cattr_t msg2_attr;
 
@@ -215,6 +225,8 @@ void sboard_leave_all(int panic);
 
 unsigned int _nftid = 1;
 pthread_mutex_t nftid_lock;
+
+int ui_active = 0;
 
 unsigned int nftid()
 {
@@ -251,6 +263,9 @@ struct timespec nowplus(int seconds)
 
 void _gtmess_exit(int panic)
 {
+    LOCK(&scr_lock);
+    scr_shutdown = 1;
+    UNLOCK(&scr_lock);
     if (Config.log_traffic) fclose(flog);
     
     log_out(panic);
@@ -259,9 +274,13 @@ void _gtmess_exit(int panic)
     unotif_done();
     if (msn_ic[0] != (iconv_t) -1) iconv_close(msn_ic[0]);
     if (msn_ic[1] != (iconv_t) -1) iconv_close(msn_ic[1]);
-    usleep(500000);
+    if (msn.nfd != -1 || SL.count > 0) usleep(500000);
+    erase(); refresh();
     endwin();
+    wait(NULL); /* sanity, esp. for beeps! */
+/*    if (Config.sound >= 3) beep();*/
 }
+
 #ifndef RETSIGTYPE
 #define RETSIGTYPE void
 #endif
@@ -371,23 +390,6 @@ char *getnick(char *login, char *nick, int flag)
     }
 }
 
-int Write(int fd, void *buf, size_t count)
-{
-    int r;
-
-    r = write(fd, buf, count);
-    if (r < 0) msg(C_ERR, "write(): %s\n", strerror(errno));
-    return r;
-}
-
-void *Malloc(size_t size)
-{
-    void *p;
-
-    if ((p = malloc(size)) == NULL) panic("malloc(): out of memory");
-    return p;
-}
-
 /*int read_syn_cache_hdr()
 {
     char fn[SML];
@@ -423,10 +425,10 @@ void read_syn_cache_data()
     msg(C_MSG, "FL/AL/BL/RL contacts: %d/%d/%d/%d\n", msn.FL.count, msn.AL.count, msn.BL.count, msn.RL.count);
     for (p = msn.FL.head; p != NULL; p = p->next)
         if (msn_clist_find(&msn.RL, p->login) == NULL)
-            /* bug: multiple same warnings, when user on multiple groups! *
+            * bug: multiple same warnings, when user on multiple groups! *
             msg(C_MSG, "%s <%s> has removed you from his/her contact list\n",
                 getnick(p->login, p->nick), p->login);
-    /* update FL with IL *
+    * update FL with IL *
     for (p = msn.IL.head; p != NULL; p = p->next)
         msn_clist_update(&msn.FL, p->login, p->nick, p->status, -1, -1);
     msn_clist_free(&msn.IL);
@@ -481,7 +483,7 @@ int do_login()
     GetMyIP(msn.nfd, MyIP);
 
     if ((r = msn_login_init(msn.nfd, nftidn(3), msn.login, Config.cvr, hash)) == 1) {
-        strcpy(msn.notaddr, hash);
+        Strcpy(msn.notaddr, hash, SML);
         msg(C_MSG, "Notification server is %s\n", msn.notaddr);
         return 1;
     }
@@ -492,7 +494,7 @@ int do_login()
     }
 
     if (get_login_server(dalogin) != NULL) {
-        if ((r = get_ticket(dalogin, msn.login, msn.pass, hash, ticket)) == 0) {
+        if ((r = get_ticket(dalogin, msn.login, msn.pass, hash, ticket, SXL)) == 0) {
             if ((r = msn_login_twn(msn.nfd, nftid(), ticket, msn.nick)) != 0) {
                 msg(C_ERR, "%s\n", msn_ios_str(r));
                 return -3;
@@ -536,11 +538,13 @@ void redraw_screen(int resize)
 {
     LOCK(&msn.lock);
     LOCK(&SX);
+    LOCK(&scr_lock);
       erase();
       refresh();
 /*      redrawwin(curscr);*/
       if (resize) screen_resize();
       draw_all(); 
+    UNLOCK(&scr_lock);
     UNLOCK(&SX);
     UNLOCK(&msn.lock);
     msg2(msg2_attr, "%s", msg2_str);
@@ -572,6 +576,7 @@ void print_usage(char *argv0)
                     "\t\t\tOffline, Appear_Offline, Online, Idle, Away,\n"
                     "\t\t\tBusy, Be_Right_Back, On_the_Phone, Out_to_Lunch\n"
                     "invitable=<b>\t\tallow others to invite you to conversations [1]\n"
+                    "keep_alive=<n>\t\tkeep connection alive by regular PNG every <n> sec\n"
                     "login=<s>\t\tdefault login account\n"
                     "log_traffic=<b>\t\tlog network traffic [0]\n"
                     "log_console=<n>\t\tlog console messages [0], 0=none, 1=sb, 2=ns, 3=both\n"
@@ -581,29 +586,66 @@ void print_usage(char *argv0)
                     "msg_notify=<n>\t\textra notification on received messages [1],\n"
                     "\t\t\t0=never, 1=when idle, or when <n> seconds have passed\n"
                     "msnftpd=<n>\t\tport of msnftp server [6891], 0=disable\n"
+                    "nonotif_status=<n>\t\tdisable snd/popup notification in these statuses\n"
                     "notif_aliases=<n>\taliases in notif win [0], 0=never, 1=smart, 2=always\n"
                     "online_only=<b>\t\tshow only online contacts [0]\n"
                     "password=<s>\t\tdefault password\n"
                     "popup=<b>\t\tenable/disable popup notification window [1]\n"
+                    "safe_msg=<n>\t\tprevents inadvertently close chat window  with\n"
+                    "\t\t\ttoo recent messages (until <n>-seconds ago) [3]\n"
                     "server=<s>[:<n>]\tdispatch/notification server (optional port)\n"
+                    "skip_says=<n>\t\tskip redundant 'says:' messages if less than\n"
+                    "\t\t\t<n> seconds apart, 0 <= <n> <= 7200 [0]\n"
                     "snd_dir=<s>\t\tdirectory for sound effects [*data*]\n"
                     "snd_exec=<s>\t\tcommand line for sound player\n"
                     "\t\t\t[%s]\n"
-                    "snd_redirect=<s>\tredirect stdout/err of player to /dev/null [3]\n"
-                    "\t\t\t0=none, 1=stdout, 2=stderr, 3=both\n"
                     "sound=<n>\t\tsound mode [1]\n"
-                    "\t\t\t<n> = 0 for no sound, 1 for beep, 2 for sound effects\n"
+                    "\t\t\t<n> = 0:no snd, 1:beep, 2:sound effects, 3:pcspk, 4:pcspkr linux\n"
                     "syn_cache=<b>\t\tcache contact/group lists [0]\n"
                     "time_user_types=<n>\tinterval of typing notifications [%d]\n"
                     "update_nicks=<n>\tupdate nicknames on server [0]\n"
                     "\t\t\t0=never, 1=smart, 2=always\n"
+                    "url_exec=<s>\t\tcommand line for url browser\n"
                     "\n"
                     "EXAMPLE:\n"
                     "\t%s -Ologin=george -Opassword=secret123 -Oinitial_status=1\n",
              argv0, ConfigTbl[28].sval, ConfigTbl[4].ival, argv0);
 }
 
-int export_nicks()
+int play_menu(menu_t *m)
+{
+    int key, sel;
+
+    while (1) {
+        LOCK(&scr_lock);
+        mn_draw(m, SLINES-1, 0, stdscr);
+        UNLOCK(&scr_lock);
+    	key = getch();
+	sel = mn_keydown(m, key);
+        
+        /* accept choice or exit whole menu */
+        if ((sel == 2) || (key == KEY_F(9))) return 2;
+        
+        /* cancel menu */
+        if (sel == -1) return -1;
+        
+        /* special (redraw) event */
+        if (sel == 0) {
+            if (key == KEY_RESIZE) {
+                redraw_screen(1);
+                m->cur = m->left = 0;
+            } else {
+                if (key != ERR) beep();
+            }
+        }
+        
+        /* if sel == 1 then menu stays (exit submenu) */
+    }
+}
+
+menu_t menu_YN;
+
+int export_nicks(void *arg)
 {
     FILE *f;
     char fn[SML];
@@ -615,23 +657,21 @@ int export_nicks()
     if ((f = fopen(fn, "r")) != NULL) {
         fclose(f);
         msg(C_ERR, "Overwrite existing aliases file?\n");
-        msg2(C_MNU, "(Y)es  (N)o");
-        while (1) {
-            c = tolower(getch());
-            if (c == KEY_RESIZE) redraw_screen(1);
-            if (c == 'n') {
+        menu_YN.cur = 1;
+        if (play_menu(&menu_YN) == 2) switch(menu_YN.cur) {
+            case 1: /* No */
                 msg(C_ERR, "Alias export cancelled\n");
-                return -1;
-            }
-            if (c == 'y' || c == 'a') break;
-            beep();
-        }
-        msg2(C_MNU, copyright_str);
+                return 2;
+            case 0: /* Yes */
+                break;
+            default:
+                return 2;
+        } else return 2;
     }
     f = fopen(fn, "w");
     if (f == NULL) {
         msg(C_ERR, "Failed to create output file\n");
-        return -2;
+        return 2;
     }
     
     for (p = msn.FL.head, c = 0; p != NULL; p = p->next) {
@@ -641,9 +681,9 @@ int export_nicks()
         c++;
     }
     fclose(f);
-    msg(C_DBG, "Exported %d alias%s\n", c, (c>1)?"es": "");
+    msg(C_DBG, "Exported %d alias%s\n", c, (c!=1)?"es": "");
     
-    return 0;
+    return 2;
 }
 
 int parse_cfg_entry(char *s)
@@ -666,8 +706,19 @@ int parse_cfg_entry(char *s)
         if (h != NULL) {
             e = &ConfigTbl[h->id];
             if (e->type == 0) { /* string */
+                if (strcmp(variable, "password") == 0) 
+                    cipher_string((unsigned char *) eq+1, (unsigned char *) "gTme$$", 0);
+                else if ((strcmp(variable, "snd_exec") == 0) || (strcmp(variable, "url_exec") == 0)) {
+                    if (!valid_shell_string(eq+1)) {
+                        beep();
+                        msg(C_ERR, "parse_cfg_entry(%s): invalid string, should contain exactly one %%s\n", variable);
+                        return 0;
+                    }
+                }
                 strncpy(e->sval, eq+1, 255);
                 e->sval[255] = 0;
+                if (ui_active && strcmp(variable, "password") != 0) 
+                    msg(C_MSG, "Variable `%s' has been set to `%s'\n", variable, e->sval);
                 return 0;
             } else { /* integer */
                 if (sscanf(eq+1, "%d", &ival) == 1) {
@@ -679,6 +730,7 @@ int parse_cfg_entry(char *s)
                         ival = e->max;
                     }
                     e->ival = ival;
+                    if (ui_active) msg(C_MSG, "Variable `%s' has been set to %d\n", variable, ival);
                     return 0;
                 } else msg(C_ERR, "parse_cfg_entry(): integer format expected (%s=?)\n", variable);
             }
@@ -736,30 +788,30 @@ int file_exists(char *path)
     return stat(path, &buf) == 0;
 }
 
-void get_lc_ctype(char *dest)
+void get_lc_ctype(char *dest, size_t n)
 {
     char loc[SML], *s;
     
     s = setlocale(LC_CTYPE, "");
     if (s != NULL) {
-        strcpy(loc, s);
+        Strcpy(loc, s, SML);
         s = strchr(loc, '@');
         if (s != NULL) *s = 0;
         s = strchr(loc, '.');
         if (s != NULL) {
-            strcpy(dest, s+1);
+            Strcpy(dest, s+1, n);
             return;
         }
     }
-    strcpy(dest, "ISO8859-1");
+    Strcpy(dest, "ISO8859-1", n);
 }
 
-void get_home_dir(char *dest)
+void get_home_dir(char *dest, size_t n)
 {
     char *s;
     if ((s = getenv("HOME")) != NULL)
-        strcpy(dest, s);
-    else strcpy(dest, ".");
+        Strcpy(dest, s, n);
+    else Strcpy(dest, ".", n);
 }
 
 void config_init()
@@ -771,13 +823,13 @@ void config_init()
     Config.sound = ConfigTbl[c++].ival;
     Config.popup = ConfigTbl[c++].ival;
     Config.time_user_types = ConfigTbl[c++].ival;
-    strcpy(Config.cvr, ConfigTbl[c++].sval);
+    Strcpy(Config.cvr, ConfigTbl[c++].sval, SCL);
     Config.cert_prompt = ConfigTbl[c++].ival;
     Config.common_name_prompt = ConfigTbl[c++].ival;
-    strcpy(Config.console_encoding, ConfigTbl[c++].sval);
-    strcpy(Config.server, ConfigTbl[c++].sval);
-    strcpy(Config.login, ConfigTbl[c++].sval);
-    strcpy(Config.password, ConfigTbl[c++].sval);
+    Strcpy(Config.console_encoding, ConfigTbl[c++].sval, SCL);
+    Strcpy(Config.server, ConfigTbl[c++].sval, SCL);
+    Strcpy(Config.login, ConfigTbl[c++].sval, SCL);
+    Strcpy(Config.password, ConfigTbl[c++].sval, SCL);
     Config.initial_status = ConfigTbl[c++].ival;
     Config.online_only = ConfigTbl[c++].ival;
     Config.syn_cache = ConfigTbl[c++].ival;
@@ -788,15 +840,18 @@ void config_init()
     Config.idle_sec = ConfigTbl[c++].ival;
     Config.auto_login = ConfigTbl[c++].ival;
     Config.invitable = ConfigTbl[c++].ival;
-    strcpy(Config.gtmesscontrol_ignore, ConfigTbl[c++].sval);
+    Strcpy(Config.gtmesscontrol_ignore, ConfigTbl[c++].sval, SCL);
     Config.max_nick_len = ConfigTbl[c++].ival;
     Config.log_console = ConfigTbl[c++].ival;
     Config.notif_aliases = ConfigTbl[c++].ival;
     Config.update_nicks = ConfigTbl[c++].ival;
-    strcpy(Config.snd_dir, ConfigTbl[c++].sval);
-    strcpy(Config.snd_exec, ConfigTbl[c++].sval);
-    Config.snd_redirect = ConfigTbl[c++].ival;
+    Strcpy(Config.snd_dir, ConfigTbl[c++].sval, SCL);
+    Strcpy(Config.snd_exec, ConfigTbl[c++].sval, SCL);
+    Strcpy(Config.url_exec, ConfigTbl[c++].sval, SCL);
     Config.keep_alive = ConfigTbl[c++].ival;
+    Config.nonotif_status = ConfigTbl[c++].ival;
+    Config.skip_says = ConfigTbl[c++].ival;
+    Config.safe_msg = ConfigTbl[c++].ival;
     NumConfigVars = c;
     
     sprintf(Config.datadir, "%s", DATADIR);
@@ -804,7 +859,7 @@ void config_init()
     if (strcmp(Config.snd_dir, "*data*") == 0) 
         sprintf(Config.snd_dir, "%s/snd", Config.datadir);
     
-    strcpy(Config.ca_list, "./root.pem");
+    Strcpy(Config.ca_list, "./root.pem", SCL);
     if (!file_exists(Config.ca_list)) {
         sprintf(Config.ca_list, "%s/root.pem", Config.cfgdir);
         if (!file_exists(Config.ca_list)) 
@@ -813,16 +868,16 @@ void config_init()
 
     if (msn.nfd == -1) {
         if (Config.login[0] && strchr(Config.login, '@') == NULL) strcat(Config.login, "@hotmail.com");
-        strcpy(msn.notaddr, Config.server);
-        strcpy(msn.login, Config.login);
-        strcpy(msn.pass, Config.password);
+        Strcpy(msn.notaddr, Config.server, SML);
+        Strcpy(msn.login, Config.login, SML);
+        Strcpy(msn.pass, Config.password, SML);
     }
     
     if (msn_ic[0] != (iconv_t) -1) iconv_close(msn_ic[0]);
     if (msn_ic[1] != (iconv_t) -1) iconv_close(msn_ic[1]);
     
     if (strcmp(Config.console_encoding, "*locale*") == 0)
-        get_lc_ctype(Config.console_encoding);
+        get_lc_ctype(Config.console_encoding, SCL);
 
     if (strcmp(Config.console_encoding, "UTF-8") == 0) {
         msn_ic[0] = msn_ic[1] = (iconv_t) -1;
@@ -842,20 +897,21 @@ void config_init()
     }
 }
 
-void menu_change_status()
+int menu_status_CB(void *arg)
 {
-    msg2(C_MNU, "O(n)-line (I)dle (A)way Bu(s)y (B)RB (P)hone (L)unch (H)idden");
-    switch (tolower(getch())) {
-        case 'n': msn_chg(msn.nfd, nftid(), MS_NLN); break;
-        case 'i': msn_chg(msn.nfd, nftid(), MS_IDL); break;
-        case 'a': msn_chg(msn.nfd, nftid(), MS_AWY); break;
-        case 's': msn_chg(msn.nfd, nftid(), MS_BSY); break;
-        case 'b': msn_chg(msn.nfd, nftid(), MS_BRB); break;
-        case 'p': msn_chg(msn.nfd, nftid(), MS_PHN); break;
-        case 'l': msn_chg(msn.nfd, nftid(), MS_LUN); break;
-        case 'h': msn_chg(msn.nfd, nftid(), MS_HDN); break;
-        case KEY_RESIZE: redraw_screen(1); break;
+    menuitem_t *m = (menuitem_t *) arg;
+    switch (m->index) {
+        case 0: msn_chg(msn.nfd, nftid(), MS_NLN); return 2;
+        case 1: msn_chg(msn.nfd, nftid(), MS_IDL); return 2;
+        case 2: msn_chg(msn.nfd, nftid(), MS_AWY); return 2;
+        case 3: msn_chg(msn.nfd, nftid(), MS_BSY); return 2;
+        case 4: msn_chg(msn.nfd, nftid(), MS_BRB); return 2;
+        case 5: msn_chg(msn.nfd, nftid(), MS_PHN); return 2;
+        case 6: msn_chg(msn.nfd, nftid(), MS_LUN); return 2;
+        case 7: msn_chg(msn.nfd, nftid(), MS_HDN); return 2;
+        case 8: log_out(0); return 2;
     }
+    return 0;
 }
 
 int cfilt_online(msn_contact_t *p)
@@ -990,18 +1046,20 @@ void menu_change_gname(msn_group_t *q)
 {
     char newn[SML];
 
-    strcpy(newn, q->name);
-    if (get_string(C_EBX, 0, "New name: ", newn))
+    Strcpy(newn, q->name, SML);
+    if (get_string(C_EBX, 0, "New name: ", newn, SML))
         msn_reg(msn.nfd, nftid(), q->gid, newn);
 }
 
-void menu_change_name(char *login, char *old)
+int menu_change_name(char *login, char *old)
 {
     char newn[SML];
 
-    strcpy(newn, old);
-    if (get_string(C_EBX, 0, "New name: ", newn))
+    Strcpy(newn, old, SML);
+    if (get_string(C_EBX, 0, "New name: ", newn, SML)) {
         msn_rea(msn.nfd, nftid(), login, newn);
+        return 1;
+    } else return 0;
 }
 
 void do_invite(msn_contact_t *p)
@@ -1016,254 +1074,341 @@ void do_invite(msn_contact_t *p)
     }
 }
 
-void menu_invite()
+int menu_invite()
 {
     msn_contact_t p;
-    if (menu_clist(&msn.lock, &msn.FL, &p, 1, cfilt_online) >= 0) 
+    if (menu_clist(&msn.lock, &msn.FL, &p, 1, cfilt_online) >= 0) {
         do_invite(&p);
+        return 1;
+    }
+    return 0;
 }
 
-void menu_lists()
+menu_t menu_RLp;
+
+int menu_srv_RL(void *arg)
+{
+    if (msn.nfd == -1) {
+        msg(C_ERR, "You must be logged in for this option to work\n");
+        return 1;
+    } else if (play_menu(&menu_RLp) == 2) switch (menu_RLp.cur) {
+        case 0: /* Always */
+            msn_gtc(msn.nfd, nftid(), 'A');
+            break;
+        case 1: /* Never */
+            msn_gtc(msn.nfd, nftid(), 'N');
+            break;
+        case 2: /* Query */
+            msg(C_NORMAL, "Prompt when other users add you: %s\n", msn.GTC == 'N'? "NEVER": "ALWAYS");
+            break;
+    }
+    return 2;
+}
+
+menu_t menu_AO;
+
+int menu_srv_AO(void *arg)
+{
+    if (msn.nfd == -1) {
+        msg(C_ERR, "You must be logged in for this option to work\n");
+        return 1;
+    } else if (play_menu(&menu_AO) == 2) switch (menu_AO.cur) {
+        case 0: /* Allow */
+            msn_blp(msn.nfd, nftid(), 'A');
+            break;
+        case 1: /* Block */
+            msn_blp(msn.nfd, nftid(), 'B');
+            break;
+        case 2: /* Query */
+            msg(C_NORMAL, "All other users: %s\n", msn.BLP == 'B'? "BLOCKED": "ALLOWED");
+            break;
+    }
+    return 2;
+}
+
+int menu_opt_VAR(void *arg)
+{
+    char optline[SML];
+    optline[0] = 0;
+    if (get_string(C_EBX, 0, "<var>=<value>:", optline, SML)) {
+        parse_cfg_entry(optline);
+        config_init();
+        redraw_screen(0);
+    }
+    return 1;
+}
+
+int menu_opt_QRY(void *arg)
+{
+    int i;
+
+    msg(C_DBG, "-- begin cfg --\n");
+    for (i = 0; i < NumConfigVars; i++) {
+        if (strcmp(ConfigTbl[i].var, "password") == 0) continue; /* security */
+        if (ConfigTbl[i].type == 0) {/* string */
+            msg(C_DBG, "%s=%s\n", ConfigTbl[i].var, ConfigTbl[i].sval);
+            if (strcmp(ConfigTbl[i].var, "console_encoding") == 0 &&
+                strcmp(ConfigTbl[i].sval, "*locale*") == 0)
+                    msg(C_DBG, "*locale*=%s\n", Config.console_encoding);
+        } else                     /* int */ 
+            msg(C_DBG, "%s=%d\n", ConfigTbl[i].var, ConfigTbl[i].ival);
+    }
+    msg(C_DBG, "-- end cfg --\n");
+    return 2;
+}
+
+int menu_opt_WR(void *arg)
+{
+    char tmp[SML];
+    FILE *cfg_fp;
+
+    sprintf(tmp, "%s/config", Config.cfgdir);
+    cfg_fp = fopen(tmp, "w");
+    if (cfg_fp == NULL) msg(C_ERR, "Cannot open config file for writing\n");
+    else {
+        int i;
+        msg(C_DBG, "-- begin cfg (written) --\n");
+        for (i = 0; i < NumConfigVars; i++) {
+            if (strcmp(ConfigTbl[i].var, "password") == 0) continue; /* security */
+            if (ConfigTbl[i].type == 0) { /* string */
+                if(strcmp(ConfigTbl[i].sval, OConfigTbl[i].sval) != 0) {
+                    fprintf(cfg_fp, "%s=%s\n", ConfigTbl[i].var, ConfigTbl[i].sval);
+                    msg(C_DBG, "%s=%s\n", ConfigTbl[i].var, ConfigTbl[i].sval);
+                }
+            } else {                     /* int */ 
+                if (ConfigTbl[i].ival != OConfigTbl[i].ival) {
+                    fprintf(cfg_fp, "%s=%d\n", ConfigTbl[i].var, ConfigTbl[i].ival);
+                    msg(C_DBG, "%s=%d\n", ConfigTbl[i].var, ConfigTbl[i].ival);
+                }
+            }
+        }
+        fclose(cfg_fp);
+        msg(C_DBG, "-- end cfg (written) --\n");
+    }
+    return 2;
+}
+
+int menu_opt_SND(void *arg)
+{
+    msg(C_DBG, "Press 1-6 for this option\n");
+    return 1;
+}
+
+int menu_opt_PW(void *arg)
+{
+    char note[SML] = {0};
+    if (get_string(C_EBX, 1, "Password:", note, SML) && note[0]) {
+        cipher_string((unsigned char *) note, (unsigned char *) "gTme$$", 1);
+        msg(C_ERR, "%s\n", note);
+        return 2;
+    }
+    return 1;
+}
+
+int menu_opt_XTRA(void *arg)
+{
+    int key = (int) arg;
+    if (key >= '1' && key <= '6') {
+        playsound(key-'1' + 2);
+        return 1;
+    } return 0;
+}
+
+menu_t menu_FL, menu_percontact;
+
+int menu_list_FL(void *arg)
 {
     msn_contact_t p;
     msn_group_t pg;
     int inBL, inAL, inFL;
 
-    msg2(C_MNU, "(F)orward  (R)everse  (A)llow  (B)lock  (G)roup  E(x)port aliases  (C)lean up");
-    switch (tolower(getch())) {
-        case KEY_RESIZE: redraw_screen(1); break;
-        case 'f':
-            if (menu_clist(&msn.lock, &msn.FL, &p, 1, NULL) >= 0) {
-                LOCK(&msn.lock);
-                inBL = msn_clist_find(&msn.BL, p.login) != NULL;
-                inAL = msn_clist_find(&msn.AL, p.login) != NULL;
-                inFL = msn_clist_gcount(&msn.FL, p.login);
-                UNLOCK(&msn.lock);
-                msg2(C_MNU, "(B)lock (R)emove (U)nblock Re(n)ame (C)opy (M)ove (I)nvite");
-                switch (tolower(getch())) {
-                    case KEY_RESIZE: redraw_screen(1); break;
-                    case 'r':
+    if (menu_clist(&msn.lock, &msn.FL, &p, 1, NULL) >= 0) {
+        LOCK(&msn.lock);
+        inBL = msn_clist_find(&msn.BL, p.login) != NULL;
+        inAL = msn_clist_find(&msn.AL, p.login) != NULL;
+        inFL = msn_clist_gcount(&msn.FL, p.login);
+        UNLOCK(&msn.lock);
+        if (play_menu(&menu_FL) == 2) switch (menu_FL.cur) {
+            case 1: /* Remove */
+                msn_rem(msn.nfd, nftid(), 'F', p.login, p.gid);
+                if (inAL && inFL == 1) msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
+                break;
+            case 0: /* Block */
+                if (inBL)
+                    msg(C_ERR, "%s <%s> is already blocked\n", getnick(p.login, p.nick, Config.aliases), p.login);
+                else {
+                    if (inAL) msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
+                    msn_add(msn.nfd, nftid(), 'B', p.login, -1);
+                }
+                break;
+            case 2: /* Unblock */
+                if (!inBL)
+                    msg(C_ERR, "%s <%s> is not blocked\n", getnick(p.login, p.nick, Config.aliases), p.login);
+                else {
+                    msn_rem(msn.nfd, nftid(), 'B', p.login, -1);
+                    msn_add(msn.nfd, nftid(), 'A', p.login, -1);
+                }
+                break;
+            case 3: /* Rename */
+                menu_change_name(p.login, p.nick);
+                break;
+            case 4: /* Copy */
+                if (menu_glist(&msn.lock, &msn.GL, &pg) >= 0) {
+                    if (pg.gid != p.gid) {
+                        msn_add(msn.nfd, nftid(), 'F', p.login, pg.gid);
+                    } else msg(C_ERR, "Destination group must not be the same\n");
+                }
+                break;
+            case 5: /* Move */
+                if (menu_glist(&msn.lock, &msn.GL, &pg) >= 0) {
+                    if (pg.gid != p.gid) {
+                        msn_add(msn.nfd, nftid(), 'F', p.login, pg.gid);
                         msn_rem(msn.nfd, nftid(), 'F', p.login, p.gid);
-                        if (inAL && inFL == 1) msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
-                        break;
-                    case 'b':
-                        if (inBL)
-                            msg(C_ERR, "%s <%s> is already blocked\n", getnick(p.login, p.nick, Config.aliases), p.login);
-                        else {
-                            if (inAL) msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
-                            msn_add(msn.nfd, nftid(), 'B', p.login, -1);
-                        }
-                        break;
-                    case 'u':
-                        if (!inBL)
-                            msg(C_ERR, "%s <%s> is not blocked\n", getnick(p.login, p.nick, Config.aliases), p.login);
-                        else {
-                            msn_rem(msn.nfd, nftid(), 'B', p.login, -1);
-                            msn_add(msn.nfd, nftid(), 'A', p.login, -1);
-                        }
-                        break;
-                    case 'n':
-                        menu_change_name(p.login, p.nick);
-                        break;
-                    case 'c':
-                        if (menu_glist(&msn.lock, &msn.GL, &pg) >= 0) {
-                            if (pg.gid != p.gid) {
-                                msn_add(msn.nfd, nftid(), 'F', p.login, pg.gid);
-                            } else msg(C_ERR, "Destination group must not be the same\n");
-                        }
-                        break;
-                    case 'm':
-                        if (menu_glist(&msn.lock, &msn.GL, &pg) >= 0) {
-                            if (pg.gid != p.gid) {
-                                msn_add(msn.nfd, nftid(), 'F', p.login, pg.gid);
-                                msn_rem(msn.nfd, nftid(), 'F', p.login, p.gid);
-                            } else msg(C_ERR, "Destination group must not be the same\n");
-                        }
-                        break;
-                    case 'i':
-                        do_invite(&p);
-                        break;
+                    } else msg(C_ERR, "Destination group must not be the same\n");
                 }
-            }
-            break;
-        case 'r':
-            if (menu_clist(&msn.lock, &msn.RL, &p, 0, NULL) >= 0) {
+                break;
+            case 6: /* Invite */
+                do_invite(&p);
+                break;
+            case 7: /* Per-user settings */ {
+                msn_contact_t *q;
+                
                 LOCK(&msn.lock);
-                inBL = msn_clist_find(&msn.BL, p.login) != NULL;
-                inAL = msn_clist_find(&msn.AL, p.login) != NULL;
+                q = msn_clist_find(&msn.FL, p.login);
+                if (q == NULL) {
+                    UNLOCK(&msn.lock);
+                    msg(C_ERR, "Cannot find contact -- try again\n");
+                    break;
+                }
+                mn_setchecked(&menu_percontact.item[0], q->notify);
+                mn_setchecked(&menu_percontact.item[1], q->ignored);
                 UNLOCK(&msn.lock);
-                msg2(C_MNU, "(A)dd  (B)lock");
-                switch (tolower(getch())) {
-                    case KEY_RESIZE: redraw_screen(1); break;
-                    case 'a':
-                        if (p.gid > 0)
-                            msg(C_ERR, "<%s> is already in your Forward list\n", p.login);
-                        else if (menu_glist(&msn.lock, &msn.GL, &pg) >= 0) {
-                            msn_add(msn.nfd, nftid(), 'F', p.login, pg.gid);
-                            if (!inBL && !inAL) msn_add(msn.nfd, nftid(), 'A', p.login, -1);
+                
+                if (play_menu(&menu_percontact) == 2) {
+                    if (menu_percontact.cur == 2) { /* Accept */
+                        LOCK(&msn.lock);
+                        q = msn_clist_find(&msn.FL, p.login);
+                        if (q == NULL) {
+                            UNLOCK(&msn.lock);
+                            msg(C_ERR, "Cannot find contact -- try again\n");
+                            break;
                         }
-                        break;
-                    case 'b':
-                        if (inBL)
-                            msg(C_ERR, "<%s> is already blocked\n", p.login);
-                        else {
-                            if (inAL) msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
-                            msn_add(msn.nfd, nftid(), 'B', p.login, -1);
-                        }
-                        break;
-                }
+                        q->notify = mn_ischecked(&menu_percontact.item[0]);
+                        q->ignored = mn_ischecked(&menu_percontact.item[1]);
+                        draw_lst(1);
+                        UNLOCK(&msn.lock);
+                    }
+                    break;
+                } else return 1;
             }
-            break;
-        case 'a':
-            if (menu_clist(&msn.lock, &msn.AL, &p, 0, NULL) >= 0) {
-                msg2(C_MNU, "(R)emove  (B)lock");
-                switch (tolower(getch())) {
-                    case KEY_RESIZE: redraw_screen(1); break;
-                    case 'r':
-                        msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
-                        break;
-                    case 'b':
-                        msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
-                        msn_add(msn.nfd, nftid(), 'B', p.login, -1);
-                        break;
-                }
-            }
-            break;
-        case 'b':
-            if (menu_clist(&msn.lock, &msn.BL, &p, 0, NULL) >= 0) {
-                msg2(C_MNU, "(R)emove  (A)llow");
-                switch (tolower(getch())) {
-                    case KEY_RESIZE: redraw_screen(1); break;
-                    case 'r':
-                        msn_rem(msn.nfd, nftid(), 'B', p.login, -1);
-                        break;
-                    case 'a':
-                        msn_rem(msn.nfd, nftid(), 'B', p.login, -1);
-                        msn_add(msn.nfd, nftid(), 'A', p.login, -1);
-                        break;
-                }
-            }
-            break;
-        case 'g':
-            if (menu_glist(&msn.lock, &msn.GL, &pg) >= 0) {
-                msg2(C_MNU, "(R)emove  Re(n)ame");
-                switch (tolower(getch())) {
-                    case KEY_RESIZE: redraw_screen(1); break;
-                    case 'r':
-                        msn_rmg(msn.nfd, nftid(), pg.gid);
-                        break;
-                    case 'n':
-                        menu_change_gname(&pg);
-                        break;
-                }
-            }
-            break;
-        case 'x':
-            export_nicks();
-            break;
-        case 'c': {
-            int c;
-            c = msn_list_cleanup(&msn.FL, &msn.RL);
-            msg(C_MSG, "FL: %d obsolete entries\n", c);
-            c = msn_list_cleanup(&msn.AL, &msn.RL);
-            msg(C_MSG, "AL: %d possibly obsolete entries\n", c);
-            c = msn_list_cleanup(&msn.BL, &msn.RL);
-            msg(C_MSG, "BL: %d possibly obsolete entries\n", c);
-            break;
         }
     }
+    return 2;
 }
 
-void menu_msn_options()
+menu_t menu_RL;
+
+int menu_list_RL(void *arg)
 {
-    int c, key, i;
-    char optline[SML], tmp[SML];
-    FILE *cfg_fp;
-
-    msg2(C_MNU, "(R)L prompt  (A)ll others  (V)ar  (Q)uery  (W)rite  (1)-(6) Sound test");
-    switch (key = tolower(getch())) {
-        case KEY_RESIZE: redraw_screen(1); break;
-        case 'r':
-            if (msn.nfd == -1) {
-                msg(C_ERR, "You are not logged in\n");
-                break;
-            }
-            msg2(C_MNU, "(A)lways  (N)ever  (Q)uery");
-            c = toupper(getch());
-            if (c == KEY_RESIZE) redraw_screen(1);
-            if (c == 'A' || c == 'N') msn_gtc(msn.nfd, nftid(), (char) c);
-            if (c == 'Q')
-                msg(C_NORMAL, "Prompt when other users add you: %s\n", msn.GTC == 'N'? "NEVER": "ALWAYS");
-            break;
-        case 'a':
-            if (msn.nfd == -1) {
-                msg(C_ERR, "You are not logged in\n");
-                break;
-            }
-            msg2(C_MNU, "(A)llow  (B)lock  (Q)uery");
-            c = toupper(getch());
-            if (c == KEY_RESIZE) redraw_screen(1);
-            if (c == 'A' || c == 'B') msn_blp(msn.nfd, nftid(), (char) c);
-            if (c == 'Q')
-                msg(C_NORMAL, "All other users: %s\n", msn.BLP == 'B'? "BLOCKED": "ALLOWED");
-            break;
-        case 'v':
-            optline[0] = 0;
-            if (get_string(C_EBX, 0, "<var>=<value>:", optline)) {
-                parse_cfg_entry(optline);
-                config_init();
-                redraw_screen(0);
-            }
-            break;
-        case 'q':
-            msg(C_DBG, "-- begin cfg --\n");
-            for (i = 0; i < NumConfigVars; i++) {
-                if (strcmp(ConfigTbl[i].var, "password") == 0) continue; /* security */
-                if (ConfigTbl[i].type == 0) {/* string */
-                    msg(C_DBG, "%s=%s\n", ConfigTbl[i].var, ConfigTbl[i].sval);
-                    if (strcmp(ConfigTbl[i].var, "console_encoding") == 0 &&
-                        strcmp(ConfigTbl[i].sval, "*locale*") == 0)
-                            msg(C_DBG, "*locale*=%s\n", Config.console_encoding);
-                } else                     /* int */ 
-                    msg(C_DBG, "%s=%d\n", ConfigTbl[i].var, ConfigTbl[i].ival);
-            }
-            msg(C_DBG, "-- end cfg --\n");
-            break;
-        case 'w':
-            sprintf(tmp, "%s/config", Config.cfgdir);
-            cfg_fp = fopen(tmp, "w");
-            if (cfg_fp == NULL) msg(C_ERR, "Cannot open config file for writing\n");
-            else {
-                int i;
-                msg(C_DBG, "-- begin cfg (written) --\n");
-                for (i = 0; i < NumConfigVars; i++) {
-                    if (strcmp(ConfigTbl[i].var, "password") == 0) continue; /* security */
-                    if (ConfigTbl[i].type == 0) { /* string */
-                        if(strcmp(ConfigTbl[i].sval, OConfigTbl[i].sval) != 0) {
-                            fprintf(cfg_fp, "%s=%s\n", ConfigTbl[i].var, ConfigTbl[i].sval);
-                            msg(C_DBG, "%s=%s\n", ConfigTbl[i].var, ConfigTbl[i].sval);
-                        }
-                    } else {                     /* int */ 
-                        if (ConfigTbl[i].ival != OConfigTbl[i].ival) {
-                            fprintf(cfg_fp, "%s=%d\n", ConfigTbl[i].var, ConfigTbl[i].ival);
-                            msg(C_DBG, "%s=%d\n", ConfigTbl[i].var, ConfigTbl[i].ival);
-                        }
-                    }
+    msn_contact_t p;
+    msn_group_t pg;
+    int inBL, inAL;
+    if (menu_clist(&msn.lock, &msn.RL, &p, 0, NULL) >= 0) {
+        LOCK(&msn.lock);
+        inBL = msn_clist_find(&msn.BL, p.login) != NULL;
+        inAL = msn_clist_find(&msn.AL, p.login) != NULL;
+        UNLOCK(&msn.lock);
+        if (play_menu(&menu_RL) == 2) switch (menu_RL.cur) {
+            case 0: /* Add */
+                if (p.gid > 0)
+                    msg(C_ERR, "<%s> is already in your Forward list\n", p.login);
+                else if (menu_glist(&msn.lock, &msn.GL, &pg) >= 0) {
+                    msn_add(msn.nfd, nftid(), 'F', p.login, pg.gid);
+                    if (!inBL && !inAL) msn_add(msn.nfd, nftid(), 'A', p.login, -1);
                 }
-                fclose(cfg_fp);
-                msg(C_DBG, "-- end cfg (written) --\n");
-            }
-            break;
-        case '1':
-        case '2':
-        case '3':
-        case '4':
-        case '5':
-        case '6':
-            playsound(key-'1' + 2);
-            break;
+                break;
+            case 1: /* Block */
+                if (inBL)
+                    msg(C_ERR, "<%s> is already blocked\n", p.login);
+                else {
+                    if (inAL) msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
+                    msn_add(msn.nfd, nftid(), 'B', p.login, -1);
+                }
+                break;
+        }
     }
+    return 2;
 }
+
+menu_t menu_AL;
+
+int menu_list_AL(void *arg)
+{
+    msn_contact_t p;
+    if (menu_clist(&msn.lock, &msn.AL, &p, 0, NULL) >= 0) {
+        if (play_menu(&menu_AL) == 2) switch (menu_AL.cur) {
+            case 0: /* Remove */
+                msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
+                break;
+            case 1: /* Block */
+                msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
+                msn_add(msn.nfd, nftid(), 'B', p.login, -1);
+                break;
+        }
+    }
+    return 2;
+}
+
+menu_t menu_BL;
+
+int menu_list_BL(void *arg)
+{
+    msn_contact_t p;
+    if (menu_clist(&msn.lock, &msn.BL, &p, 0, NULL) >= 0) {
+        if (play_menu(&menu_BL) == 2) switch (menu_BL.cur) {
+            case 0: /* Remove */
+                msn_rem(msn.nfd, nftid(), 'B', p.login, -1);
+                break;
+            case 1: /* Allow */
+                msn_rem(msn.nfd, nftid(), 'B', p.login, -1);
+                msn_add(msn.nfd, nftid(), 'A', p.login, -1);
+                break;
+        }
+    }
+    return 2;
+}
+
+menu_t menu_GL;
+
+int menu_list_GL(void *arg)
+{
+    msn_group_t pg;
+    if (menu_glist(&msn.lock, &msn.GL, &pg) >= 0) {
+        if (play_menu(&menu_GL) == 2) switch (menu_GL.cur) {
+            case 0: /* Remove */
+                msn_rmg(msn.nfd, nftid(), pg.gid);
+                break;
+            case 1: /* Rename */
+                menu_change_gname(&pg);
+                break;
+        }
+    }
+    return 2;
+}
+
+int menu_list_CU(void *arg)
+{
+    int c;
+    c = msn_list_cleanup(&msn.FL, &msn.RL);
+    msg(C_MSG, "FL: %d obsolete entries\n", c);
+    c = msn_list_cleanup(&msn.AL, &msn.RL);
+    msg(C_MSG, "AL: %d possibly obsolete entries\n", c);
+    c = msn_list_cleanup(&msn.BL, &msn.RL);
+    msg(C_MSG, "BL: %d possibly obsolete entries\n", c);
+    return 2;
+}
+
+menu_t menu_AC;
 
 void menu_add_contact()
 {
@@ -1272,21 +1417,19 @@ void menu_add_contact()
     msn_group_t pg;
 
     con[0] = 0;
-    if (get_string(C_EBX, 0, "Account: ", con)) {
+    if (get_string(C_EBX, 0, "Account: ", con, SML)) {
         LOCK(&msn.lock);
         inBL = msn_clist_find(&msn.BL, con) != NULL;
         inAL = msn_clist_find(&msn.AL, con) != NULL;
         UNLOCK(&msn.lock);
-        msg2(C_MNU, "(F)orward  (B)lock");
-        switch (tolower(getch())) {
-            case KEY_RESIZE: redraw_screen(1); break;
-            case 'f':
+        if (play_menu(&menu_AC) == 2) switch (menu_AC.cur) {
+            case 0: /* Forward */
                 if (menu_glist(&msn.lock, &msn.GL, &pg) >= 0) {
                     msn_add(msn.nfd, nftid(), 'F', con, pg.gid);
                     if (!inBL && !inAL) msn_add(msn.nfd, nftid(), 'A', con, -1);
                 }
                 break;
-            case 'b':
+            case 1: /* Block */
                 if (inBL)
                     msg(C_ERR, "<%s> is already blocked\n", con);
                 else {
@@ -1303,22 +1446,158 @@ void menu_add_group()
     char grp[SML];
 
     grp[0] = 0;
-    if (get_string(C_EBX, 0, "Group name: ", grp)) msn_adg(msn.nfd, nftid(), grp);
+    if (get_string(C_EBX, 0, "Group name: ", grp, SML)) msn_adg(msn.nfd, nftid(), grp);
 }
 
-void menu_add()
+menu_t menu_Add;
+
+int menu_list_add(void *arg)
 {
-    msg2(C_MNU, "(C)ontact  (G)roup");
-    switch (tolower(getch())) {
-        case KEY_RESIZE: redraw_screen(1); break;
-        case 'c':
+    if (play_menu(&menu_Add) == 2) switch (menu_Add.cur) {
+        case 0: /* Contact */
             menu_add_contact();
-            break;
-        case 'g':
+            return 2;
+        case 1: /* Group */
             menu_add_group();
+            return 2;
     }
+    return 1;
 }
 
+int menu_srv_MAIL(void *arg)
+{
+    LOCK(&msn.lock);
+    msg(C_NORMAL, "MBOX STATUS: Inbox: %d, Folders: %d\n", msn.inbox, msn.folders);
+    UNLOCK(&msn.lock);
+    return 2;
+}
+
+void do_ping()
+{
+    gettimeofday(&tv_ping, NULL);
+    msn_png(msn.nfd);
+}
+
+int menu_srv_PNG(void *arg)
+{
+    show_ping_result++; 
+    do_ping(); 
+    return 2;
+}
+
+int menu_srv_RAW(void * arg)
+{
+    char s[SML] = {0};
+    int v = 0;
+
+    msg(C_DBG, "next tid: %u\n", _nftid);
+    if (get_string(C_EBX, 0, "COMMAND: ", s, SML)) {
+        strcat(s, "\r\n");
+        sendstr(s);
+        v = 2;
+    } else v = 1;
+    msg2(C_MNU, copyright_str);
+    return v;
+}
+
+int menu_srv_NICK(void *arg)
+{
+    if (menu_change_name(msn.login, msn.nick)) return 2;
+    else return 1;
+}
+        
+menu_t menu_options, menu_server, menu_status, menu_lists, menu_main;
+
+void menus_init()
+{
+    mn_init(&menu_options, 5, -1, 
+            "Variables", 'v', 0, menu_opt_VAR,
+            "Query", 'q', 0, menu_opt_QRY, 
+            "Write", 'w', 0, menu_opt_WR,
+            "Password", 'p', 0, menu_opt_PW,
+            "(1)-(6) Sound test", -1, -1, menu_opt_SND, 
+            menu_opt_XTRA);
+
+    mn_init(&menu_server, 6, -1, 
+            "Nickname", 'n', 0, menu_srv_NICK,
+            "RL prompt", 'r', 0, menu_srv_RL,
+            "All others", 'a', 0, menu_srv_AO,
+            "Mailbox", 'm', 0, menu_srv_MAIL,
+            "Ping", 'p', 0, menu_srv_PNG,
+            "Send command", 'c', 5, menu_srv_RAW,
+            NULL);
+    
+    mn_init(&menu_status, 9, -1, 
+            "On-line", 'n', 1, menu_status_CB,
+            "Idle", 'i', 0, menu_status_CB,
+            "Away", 'a', 0, menu_status_CB,
+            "Busy", 's', 2, menu_status_CB,
+            "BRB", 'b', 0, menu_status_CB,
+            "Phone", 'p', 0, menu_status_CB,
+            "Lunch", 'l', 0, menu_status_CB,
+            "Hidden", 'h', 0, menu_status_CB,
+            "Disconnect", 'd', 0, menu_status_CB,
+            NULL);
+    
+    mn_init(&menu_lists, 8, -1,
+            "Forward", 'f', 0, menu_list_FL,
+            "Reverse", 'r', 0, menu_list_RL,
+            "Allow", 'a', 0, menu_list_AL,
+            "Block", 'b', 0, menu_list_BL,
+            "Group", 'g', 0, menu_list_GL,
+            "Add", 'd', 1, menu_list_add,
+            "Export aliases", 'x', 1, export_nicks,
+            "Clean up", 'c', 0, menu_list_CU,
+            NULL);
+
+    mn_init(&menu_FL, 8, -1,
+            "Block", 'b', 0, NULL, "Remove", 'r', 0, NULL,
+            "Unblock", 'u', 0, NULL, "Rename", 'n', 2, NULL,
+            "Copy", 'c', 0, NULL, "Move", 'm', 0, NULL, 
+            "Invite", 'i', 0, NULL, "Per-contact settings", 'p', 0, NULL,
+            NULL);
+
+    mn_init(&menu_percontact, 4, -1,
+            "[ ] Notifications", 's', 4, NULL, "[ ] Ignored", 'i', 4, NULL, 
+            "Apply", 'a', 0, NULL, "Cancel", 'c', 0, NULL, NULL);
+    menu_percontact.item[0].checked = 1; /* checkable */
+    menu_percontact.item[1].checked = 1;
+
+    mn_init(&menu_RL, 2, -1, 
+            "Add", 'a', 0, NULL, "Block", 'b', 0, NULL, NULL);
+    mn_init(&menu_AL, 2, -1, 
+            "Remove", 'r', 0, NULL, "Block", 'b', 0, NULL, NULL);
+    mn_init(&menu_BL, 2, -1, 
+            "Remove", 'r', 0, NULL, "Allow", 'a', 0, NULL, NULL);
+    mn_init(&menu_GL, 2, -1, 
+            "Remove", 'r', 0, NULL, "Rename", 'n', 2, NULL, NULL);
+    
+    mn_init(&menu_RLp, 3, -1,
+            "Always", 'a', 0, NULL, "Never", 'n', 0, 
+            NULL, "Query", 'q', 0, NULL, NULL);
+    mn_init(&menu_AO, 3, -1,
+            "Allow", 'a', 0, NULL, "Block", 'b', 0, 
+            NULL, "Query", 'q', 0, NULL, NULL);
+
+    mn_init(&menu_AC, 2, -1,
+            "Forward", 'f', 0, NULL, "Block", 'b', 0, NULL, NULL);
+    mn_init(&menu_Add, 2, -1,
+            "Contact", 'c', 0, NULL, "Group", 'g', 0, NULL, NULL);
+
+    mn_init(&menu_YN, 2, -1, "Yes", 'y', 0, NULL, "No", 'n', 0, NULL, NULL);
+    menu_YN.attr = attrs[C_EBX];
+    
+    mn_init(&menu_main, 8, -1,
+            "Connect", 'c', 0, NULL,
+            "Status", 's', 0, NULL,
+            "Lists", 'l', 0, NULL,
+            "Server", 'v', 3, NULL,
+            "Options", 'o', 0, NULL,
+            "Invite", 'i', 0, NULL,
+            "Note", 't', 2, NULL,
+            "Quit", 'q', 0, NULL,
+            NULL);
+}
 
 int log_in(int startup)
 {
@@ -1330,17 +1609,17 @@ int log_in(int startup)
     if (startup) {
         if (!msn.login[0]) return 0;
     } else {
-        if (!(r = get_string(C_EBX, 0, "Login as: ", msn.login))) return 0;
+        if (!(r = get_string(C_EBX, 0, "Login as: ", msn.login, SML))) return 0;
         if (r == 1) {
             if (strchr(msn.login, '@') == NULL) strcat(msn.login, "@hotmail.com");
-            strcpy(msn.nick, msn.login);
+            Strcpy(msn.nick, msn.login, SML);
             msn.pass[0] = 0;
             draw_status(1);
         }
     }
     if (startup) {
         if (!msn.pass[0]) return 0;
-    } else if (!get_string(C_EBX, 1, "Password: ", msn.pass)) return 0;
+    } else if (!get_string(C_EBX, 1, "Password: ", msn.pass, SML)) return 0;
     msg2(C_MNU, "Logging in ...");
     
     while ((r = do_login()) == 1);
@@ -1357,14 +1636,36 @@ int do_update_nicks()
     if (Config.update_nicks) {
         msn_contact_t *p;
         for (p = msn.FL.head; p != NULL; p = p->next)
-        if (p->dirty && (Config.update_nicks == 2 || Config.update_nicks == 1 && 
-            strstr(p->nick, p->login) == NULL)) {
+        if ((p->dirty && (Config.update_nicks == 2)) || 
+            ((Config.update_nicks == 1) && (strstr(p->nick, p->login) == NULL))) {
                 msg(C_DBG, "Renaming <%s> to %s\n", p->login, p->nick);
                 msn_rea(msn.nfd, nftid(), p->login, p->nick);
                 c++;
         }
     }
     return c;
+}
+
+/* per-user settings */
+
+int skip_pcs = 0;
+
+void write_pcs() 
+{
+    msn_contact_t *p;
+    FILE *f;
+    char fn[SML];
+
+    if (skip_pcs) return;
+    sprintf(fn, "%s/%s/per_user", Config.cfgdir, msn.login);
+    f = fopen(fn, "w");
+    fprintf(f, "#GTMESS:%s:PCS\n", VERSION);
+    if (f != NULL) {
+        for (p = msn.FL.head; p != NULL; p = p->next )
+            if (p->notify != 1 || p->ignored == 1)
+                fprintf(f, "%s\t%d\t%d\n", p->login, p->notify, p->ignored);
+        fclose(f);
+    }
 }
 
 void log_out(int panic)
@@ -1376,6 +1677,7 @@ void log_out(int panic)
     sboard_leave_all(panic);
     if (msn.nfd == -1) return;
     if (panic == 0) {
+        write_pcs();
         retcode = do_update_nicks();
         timeout = nowplus(5+retcode/2);
         msg(C_NORMAL, "Logging out...\n");
@@ -1391,13 +1693,6 @@ void log_out(int panic)
         pthread_cancel(msn.thrid);
         pthread_join(msn.thrid, NULL);
     }
-}
-
-void show_mbstatus()
-{
-    LOCK(&msn.lock);
-    msg(C_NORMAL, "MBOX STATUS: Inbox: %d, Folders: %d\n", msn.inbox, msn.folders);
-    UNLOCK(&msn.lock);
 }
 
 void set_flskip(int delta)
@@ -1472,12 +1767,6 @@ void sboard_new()
     Write(msn.nfd, s, strlen(s));
 }
 
-void do_ping()
-{
-    gettimeofday(&tv_ping, NULL);
-    msn_png(msn.nfd);
-}
-
 void sb_keydown(int c)
 {
     switch (c) {
@@ -1517,7 +1806,7 @@ void load_aliases()
                 } /* 2 fields */
             } /* not comment */
         } /* not eof */
-        msg(C_DBG, "Loaded %d alias%s\n", c, (c>1)?"es": "");
+        msg(C_DBG, "Loaded %d alias%s\n", c, (c!=1)?"es": "");
         fclose(f);
     } /* file exists */
 }
@@ -1526,7 +1815,7 @@ void setup_cfg_dir()
 {
     char tmp[SML];
     
-    get_home_dir(Config.cfgdir);
+    get_home_dir(Config.cfgdir, SCL);
     strcat(Config.cfgdir, "/.gtmess");
     
     if (!file_exists(Config.cfgdir)) {
@@ -1540,11 +1829,12 @@ void setup_cfg_dir()
 
 int main(int argc, char **argv)
 {
-    int c, paste;
+    int c, paste, escape, mstatus;
     
-    sprintf(copyright_str, "gtmess, version %s (%s), (c) 2002-2006 by George M. Tzoumas", VERSION, VDATE);
+    sprintf(copyright_str, "gtmess, version %s (%s), (c) 2002-2007 by George M. Tzoumas", VERSION, VDATE);
     printf("%s\n", copyright_str);
     
+    queue_init(&msg_q);
     setup_cfg_dir();
     
     msn_ic[0] = msn_ic[1] = (iconv_t) -1;
@@ -1557,7 +1847,6 @@ int main(int argc, char **argv)
     msn.nfd = -1;
     config_init();
     
-    signal(SIGPIPE, SIG_IGN);
     signal(SIGINT, gtmess_exit_panic);
     signal(SIGQUIT, gtmess_exit_panic);
     signal(SIGTERM, gtmess_exit_panic);
@@ -1578,6 +1867,7 @@ int main(int argc, char **argv)
     hash_tbl_init(&Aliases);
 
     screen_init(Config.colors);
+    menus_init();
 
     pthread_key_create(&key_sboard, NULL);
     pthread_setspecific(key_sboard, NULL);
@@ -1608,93 +1898,124 @@ int main(int argc, char **argv)
 
     if (Config.auto_login) log_in(1);
     
-    msg2(C_MNU, "Welcome to gtmess");
+    msg2(C_MNU, "Welcome to gtmess. Press F9 for menu.");
     
     paste = 0;
+    escape = 0;
+    ui_active = 1;
+    
     while (1) {
-        if (paste == 0) c = getch();
-        else paste = 0;
+        if (paste == 0) c = getch(); else paste = 0;
         time(&keyb_time);
         if (!iamback && msn.status == MS_IDL) {
             if (msn.nfd != -1) msn_chg(msn.nfd, nftid(), MS_NLN);
             iamback = 1;
         }
-        if (c == KEY_F(10)) break;
+        if (c == KEY_F(10) && escape == 0) break;
         switch (c) {
-            case KEY_F(9): {
-                char s[SML] = {0};
-
-                msg(C_DBG, "next tid: %u\n", _nftid);
-                if (get_string(C_NORMAL, 0, "COMMAND: ", s)) {
-                    strcat(s, "\r\n");
-                    sendstr(s);
-                }
-                msg2(C_MNU, copyright_str);
-                break;
-            }
-            case KEY_F(4): { 
+            case KEY_F(4): 
                 wvis ^= 1; 
                 LOCK(&SX);
                 draw_sb(SL.head, 1);
                 UNLOCK(&SX);
                 break; 
-            } 
             case KEY_F(5): set_msgskip(-1); break;
             case KEY_F(6): set_msgskip(1); break;
             case KEY_F(7): set_flskip(-1); break;
             case KEY_F(8): set_flskip(1); break;
             case 7: beep(); break; /* ^G */
             case 12: redraw_screen(0); break; /* ^L */
-            case KEY_RESIZE: redraw_screen(1); break;
+            case 6: /* ^F */
+                    Config.online_only = ConfigTbl[13].ival = !Config.online_only;
+                    redraw_screen(0);
+                    break;
+            case KEY_RESIZE: 
+                redraw_screen(1); 
+                if (escape) {
+                    menu_main.cur = menu_main.left = 0;
+                    LOCK(&scr_lock);
+                    mn_draw(&menu_main, SLINES-1, 0, stdscr);
+                    UNLOCK(&scr_lock);
+                }
+                break;
+            case KEY_F(9):
             case 27: /* escape mode */
-                msg2(C_MNU, "ESC: (A)dd (C)onn/(D)isconn (S)tat (L)st (N)am (O)pt (M)ail (P)ng (I)nv No(t)e");
-                c = tolower(getch());
-/*                msg2(C_MNU, copyright_str);*/
-/*                usleep(1000);*/
-                if (c == KEY_RESIZE) redraw_screen(1);
-                else if (c == '0') {
-                    c = KEY_F(10);
-                    paste = 1;
-                } else if (c >= '1' && c <= '9') {
-                    int k = c - '0';
-                    c = KEY_F(k);
-                    paste = 1;
-                } else if (c == 'c') {
-                    log_in(0);
-                    LOCK(&SX);
-                    draw_sb(SL.head, 0);
-                    UNLOCK(&SX);
-                } else if (c == 't') {
-                    char note[SML] = {0};
-                    if (get_string(C_EBX, 0, "Note:", note) && note[0]) msg(C_NORMAL, "%s\n", note);
-                } else if (c == 'o') {
-                    menu_msn_options();
-                } else if (strchr("sladnmpi/", c) != NULL) {
-                    if (c == '/') {
+                escape ^= 1;
+                break;
+            default:
+                if (escape) {
+                    if (c == KEY_BACKSPACE || c == '-') {
+                        escape = 0;
+                        break;
+                    } else if (c == '0') {
+                        c = KEY_F(10);
+                        paste = 1;
+                        escape = 0;
+                        break;
+                    } else if (c >= '1' && c <= '9') {
+                        int k = c - '0';
+                        c = KEY_F(k);
+                        paste = 1;
+                        escape = 0;
+                        break;
+                    } else if (c == '/') {
                         char s[SML] = {0};
 
-                        if (get_string(C_EBX, 0, "/", s)) {
+                        if (get_string(C_EBX, 0, "/", s, SML)) {
                             msg(C_ERR, "Invalid command\n");;
                         }
-                        msg2(C_MNU, copyright_str);
+                        escape = 0;
                         break;
-                    } else if (msn.nfd == -1) msg(C_ERR, "You are not logged in\n");
-                    else switch (c) {
-                        case 's': menu_change_status(); break;
-                        case 'l': menu_lists(); break;
-                        case 'a': menu_add(); break;
-                        case 'd': log_out(0); break;
-                        case 'n': menu_change_name(msn.login, msn.nick); break;
-                        case 'm': show_mbstatus(); break;
-                        case 'p': show_ping_result++; do_ping(); break;
-                        case 'i': menu_invite(); break;
-                    }
-                } else if (wvis == 0) sb_keydown(-c); else xf_keydown(-c);
-                msg2(C_MNU, copyright_str);
-                break;
-            default: if (wvis == 0) sb_keydown(c); else xf_keydown(c);
-        }
-    }
+                    } else if ((mstatus = mn_keydown(&menu_main, c)) == 2) {
+                        char note[SML] = {0};
+
+                        switch (menu_main.cur) {
+                        case 0: /* Connect */
+                            log_in(0);
+                            LOCK(&SX);
+                            draw_sb(SL.head, 0);
+                            UNLOCK(&SX);
+                            escape = 0;
+                            break;
+                        case 7: /* Quit */
+                            c = KEY_F(10);
+                            paste = 1;
+                            escape = 0;
+                            break;
+                        case 6: /* Note */
+                            if (get_string(C_EBX, 0, "Note:", note, SML) && note[0]) 
+                                msg(C_NORMAL, "%s\n", note);
+                            escape = 0;
+                            break;
+                        case 4: /* Options */
+                            if (play_menu(&menu_options) == 2) escape = 0;
+                            break;
+                        case 1: /* Status */
+                        case 2: /* Lists */
+                        case 3: /* Server */
+                        case 5: /* Invite */
+                            if (msn.nfd == -1) {
+                                msg(C_ERR, "You must be logged in for this option to work\n");
+                            } else switch (menu_main.cur) {
+                   /* Status */ case 1: if (play_menu(&menu_status) == 2) escape = 0; break;
+                   /* Lists */  case 2: if (play_menu(&menu_lists) == 2) escape = 0; break;
+                   /* Server */ case 3: if (play_menu(&menu_server) == 2) escape = 0; break;
+                   /* Invite */ case 5: if (menu_invite()) escape = 0; break;
+                            }
+                            break;
+                        }
+                    } else if (wvis == 0) sb_keydown(-c); else xf_keydown(-c);
+                } else {
+                    if (wvis == 0) sb_keydown(c); else xf_keydown(c);
+                }
+        } /* switch */
+        if (escape == 0) msg2(C_MNU, copyright_str);
+        else {
+            LOCK(&scr_lock);
+            mn_draw(&menu_main, SLINES-1, 0, stdscr);
+            UNLOCK(&scr_lock);
+        }        
+    } /* while */
     _gtmess_exit(0);
     return 0;
 }

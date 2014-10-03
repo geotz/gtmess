@@ -2,7 +2,7 @@
  *    screen.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -30,9 +30,10 @@
 #include"unotif.h"
 #include"xfer.h"
 #include"utf8.h"
+#include"queue.h"
 #include"gtmess.h"
 
-int attrs[] = {A_NORMAL, A_UNDERLINE, A_BOLD, A_NORMAL, A_STANDOUT, A_REVERSE, A_NORMAL};
+int attrs[] = {A_NORMAL, A_UNDERLINE, A_BOLD, A_NORMAL, A_REVERSE, A_NORMAL, A_NORMAL};
 int statattrs[] = {A_REVERSE, A_REVERSE, A_STANDOUT, A_REVERSE,
         A_REVERSE, A_REVERSE, A_REVERSE, A_REVERSE, A_REVERSE, A_REVERSE};
 int lstatattrs[] = {A_NORMAL, A_NORMAL, A_REVERSE, A_BOLD, A_BOLD,
@@ -40,6 +41,7 @@ int lstatattrs[] = {A_NORMAL, A_NORMAL, A_REVERSE, A_BOLD, A_BOLD,
 
 TWindow w_msg, w_lst, w_back, w_xfer;
 pthread_mutex_t scr_lock;
+int scr_shutdown = 0;
 
 int wvis; /* 0 = sb window visible, 1 = transfers window visible */
 int w_msg_top = 0;
@@ -49,9 +51,20 @@ char msg2_str[SML] = {0};
 cattr_t msg2_attr = C_MNU;
 
 time_t msg_now = 0;
-extern pthread_mutex_t time_lock;
+
+extern struct tm now_tm;
+
+
+/* text message queue before screen init. */
+xqueue_t msg_q; 
 
 int fullscreen = 0;
+
+float scr_rx = 0.75;
+float scr_ry = 0.4;
+
+int SCOLS, SLINES;
+int utf8_mode;
 
 char *get_next_word(char **text, char **word, int *len, int *numlines)
 {
@@ -127,7 +140,7 @@ void gs_draw_ebox(ebox_t *e, cattr_t attr, int pl)
     attrset(attrs[C_NORMAL]);
 }
 
-int get_string(cattr_t attr, int mask, const char *prompt, char *dest)
+int get_string(cattr_t attr, int mask, const char *prompt, char *dest, size_t n)
 {
     int r;
     int c, pl;
@@ -156,8 +169,8 @@ int get_string(cattr_t attr, int mask, const char *prompt, char *dest)
     }
     r = (c == 13);
     if (r) {
-        if (strcmp(dest, E.text) == 0) r <<= 1;
-        else strcpy(dest, E.text);
+        if (strcmp(dest, (char *) E.text) == 0) r <<= 1;
+        else Strcpy(dest, (char *) E.text, n);
     }
     move(SLINES - 1, SCOLS - 1);
     eb_free(&E);
@@ -165,7 +178,8 @@ int get_string(cattr_t attr, int mask, const char *prompt, char *dest)
 }
 
 /* print a message */
-void vwmsg(TWindow *w, int size, time_t *sbtime, cattr_t attr, FILE *fp_log, const char *fmt, va_list ap)
+void vwmsg(TWindow *w, int size, time_t *sbtime, time_t *real_sbtime, cattr_t attr, 
+        FILE *fp_log, const char *fmt, va_list ap)
 {
     char tmpbuf[SXL], *tmp, *s;
     int alloc;
@@ -199,6 +213,8 @@ void vwmsg(TWindow *w, int size, time_t *sbtime, cattr_t attr, FILE *fp_log, con
     }
 /*    waddstr(w->wh, tmp);*/
     time(&now2);
+    /* BUG: ugly hack to ignore "disconnected..." msgs */
+    if (attr != C_ERR) *real_sbtime = now2;
     LOCK(&time_lock);
     if (difftime(now2, *sbtime) > 60) {
         *sbtime = now2;
@@ -241,6 +257,15 @@ void msgn(cattr_t attr, int size, const char *fmt, ...)
     va_end(ap);
 }
 
+int screen_shut()
+{
+    int v = 0;
+    LOCK(&scr_lock);
+    v = scr_shutdown;
+    UNLOCK(&scr_lock);
+    return v;
+}
+
 void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
 {
     char txtbuf[SML], *txt;
@@ -249,6 +274,8 @@ void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
     int y, x, newtop;
     time_t now2;
     int indent = 0;
+    
+    if (screen_shut()) return;
     
     if (size < SML) {
         txt = txtbuf;
@@ -261,6 +288,7 @@ void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
     for (s = txt; *s; s++) if (*s == '\r') *s = ' ';
     
     if (!fullscreen) {
+        queue_put(&msg_q, 0, strdup(txt), strlen(txt) + 1);
         fprintf(stderr, "%s\n", txt);
         if (alloc && txt != NULL) free(txt);
         return;
@@ -302,12 +330,14 @@ void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
     newtop = y - w_msg.h + 1;
     if (w_msg_top < newtop) w_msg_top = newtop;
     if (w_msg_top < 0) w_msg_top = 0;
+    LOCK(&scr_lock);
     getyx(stdscr, y, x);
     copywin(w_msg.wh, stdscr, w_msg_top, 0, w_msg.y, w_msg.x,
             w_msg.y + w_msg.h - 1, w_msg.x + w_msg.w - 1, FALSE);
     UNLOCK(&w_msg.lock);
     move(y, x);
     refresh();
+    UNLOCK(&scr_lock);
     if (alloc && txt != NULL) free(txt);
 }
 
@@ -317,13 +347,16 @@ void msg2(cattr_t attr, const char *fmt, ...)
     char txt[SML];
     int y, x;
 
+    if (screen_shut()) return;
+
     va_start(ap, fmt);
     vsprintf(txt, fmt, ap);
     va_end(ap);
-    strcpy(msg2_str, txt);
+    Strcpy(msg2_str, txt, SML);
     msg2_attr = attr;
     if (utf8_mode) txt[widthoffset(txt, SCOLS-2)] = 0;
     else txt[SCOLS-2] = 0;
+    LOCK(&scr_lock);
     getyx(stdscr, y, x);
     move(SLINES - 1, 0);
     bkgdset(' ' | attrs[attr]);
@@ -334,6 +367,7 @@ void msg2(cattr_t attr, const char *fmt, ...)
     attrset(attrs[C_NORMAL]);
     move(y, x);
     refresh();
+    UNLOCK(&scr_lock);
 }
 
 void draw_rest()
@@ -341,9 +375,9 @@ void draw_rest()
     int y, x;
 
     getyx(stdscr, y, x);
-    move(1, SCOLS * 3 / 4);
+    move(1, (int) (SCOLS * scr_rx + 0.5));
     vline(ACS_VLINE, SLINES - 2);
-    mvaddch(w_msg.y - 1, SCOLS * 3 / 4, ACS_RTEE);
+    mvaddch(w_msg.y - 1, (int) (SCOLS * scr_rx + 0.5), ACS_RTEE);
     move(y, x);
 }
 
@@ -423,6 +457,7 @@ void draw_lst(int r)
                     wattrset(w_lst.wh, lstatattrs[p->status]);
                     if (now - p->tm_last_char <= Config.time_user_types) ch = '!';
                     else if (p->blocked) ch = '+';
+                    else if (p->ignored) ch = ':';
                     else ch = ' ';
                     wprintw(w_lst.wh, "%c%c %s\n", ch, msn_stat_char[p->status], 
                             getnick(p->login,p->nick, Config.aliases));
@@ -481,7 +516,7 @@ void draw_dlg(msn_sboard_t *sb, int r)
 void draw_plst(msn_sboard_t *sb, int r)
 {
     msn_contact_t *p;
-    TWindow *w, data;
+    TWindow *w;
     int lines, total;
     int y, x;
 
@@ -548,7 +583,7 @@ void draw_sbbar(int r)
             else if (s->pending) strcat(txt, "}-");
             else strcat(txt, " -");
         }
-        if (strlen(txt) > w_msg.w) {
+        if (strwidth(txt) > w_msg.w) {
             for (i = 0; i < c; i++, s = s->next) {
                if (s == SL.head) *ch++ = 'O';
                else if (s->pending) *ch++ = '+';
@@ -601,7 +636,7 @@ void vdlg(cattr_t attr, int size, const char *fmt, va_list ap)
     int y, x, newtop;
 
     if (sb == NULL) return;
-    vwmsg(&sb->w_dlg, size, &sb->dlg_now, attr, sb->fp_log, fmt, ap);
+    vwmsg(&sb->w_dlg, size, &sb->dlg_now, &sb->real_dlg_now, attr, sb->fp_log, fmt, ap);
     
     getyx(sb->w_dlg.wh, y, x);
     newtop = y - sb->w_dlg.h + 1;
@@ -659,8 +694,8 @@ void screen_resize()
     if (SLINES < 9) SLINES = 9; else SLINES = LINES;
     
     LOCK(&w_msg.lock);
-    w_msg.w = SCOLS * 3 / 4;
-    w_msg.h = 2 * SLINES / 5 - 2;
+    w_msg.w = (int) (SCOLS * scr_rx + 0.5);
+    w_msg.h = (int) (SLINES * scr_ry + 0.5) - 2;
     wresize(w_msg.wh, W_MSG_LBUF, w_msg.w);
     w_msg.x = 0;
     w_msg.y = SLINES - 1 - w_msg.h;
@@ -714,6 +749,8 @@ void screen_resize()
 
 void screen_init(int colors)
 {
+    qelem_t *q;
+
     initscr();
     if (colors == 1 || (colors == 0 && has_colors())) {
         start_color();
@@ -780,8 +817,8 @@ void screen_init(int colors)
     move(SLINES - 1, SCOLS - 1);
     refresh();
 
-    w_msg.w = SCOLS * 3 / 4;
-    w_msg.h = 2 * SLINES / 5 - 2;
+    w_msg.w = (int) (SCOLS * scr_rx + 0.5);
+    w_msg.h = (int) (SLINES * scr_ry + 0.5) - 2;
     w_msg.wh = newpad(W_MSG_LBUF, w_msg.w);
 /*    w_msg.wh = newwin(w_msg.h, w_msg.w, 0, 0);*/
     scrollok(w_msg.wh, TRUE);
@@ -817,4 +854,8 @@ void screen_init(int colors)
     pthread_mutex_init(&scr_lock, NULL);
     
     fullscreen = 1;
+    while ((q = queue_get(&msg_q)) != NULL) {
+        msg(C_ERR, "%s", q->data);
+        free(q->data);
+    }
 }

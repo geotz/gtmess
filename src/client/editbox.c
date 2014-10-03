@@ -2,7 +2,7 @@
  *    editbox.c
  *
  *    editbox control for curses
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -19,14 +19,14 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include<stdlib.h>
-#include<string.h>
-#include<wchar.h>
-#include<curses.h>
-#include<assert.h>
+#include <wchar.h>
+#include <stdlib.h>
+#include <string.h>
+#include <curses.h>
+#include <assert.h>
 
-#include"editbox.h"
-#include"utf8.h"
+#include "editbox.h"
+#include "utf8.h"
 
 /* clipboard length */
 #define CBL 1024
@@ -44,7 +44,7 @@ void eb_mkwtext(ebox_t *e)
     
     if (e->utf8) {
         memset(&mbs, 0, sizeof(mbs));
-        s = e->text;
+        s = (char *) e->text;
         mbsrtowcs(e->wtext, &s, e->nc+1, &mbs);
     } else {
         i = 0;
@@ -62,7 +62,7 @@ void eb_flush(ebox_t *e)
     if (e->utf8) {
         memset(&mbs, 0, sizeof(mbs));
         s = e->wtext;
-        wcsrtombs(e->text, &s, e->nb, &mbs);
+        wcsrtombs((char *) e->text, &s, e->nb, &mbs);
         e->text[e->nb+1] = 0;
     } else {
         for (i = 0; i < e->sl; i++) e->text[i] = (unsigned char) e->wtext[i];
@@ -105,7 +105,7 @@ void eb_init(ebox_t *e, int nc, int width)
     hlist_init(&e->HL, EBHLEN);
     e->mline = 0;
     e->grow = 0;
-    e->text = (char *) malloc(e->nb+1);
+    e->text = (unsigned char *) malloc(e->nb+1);
     e->text[0] = 0;
     assert(e->text != NULL);
     e->wtext = (wchar_t *) malloc((e->nc+1)*sizeof(wchar_t));
@@ -117,7 +117,7 @@ void _eb_grow(ebox_t *e)
 {
     e->nc *= 2;
     e->nb = 6*e->nc;
-    e->text = (char *) realloc(e->text, e->nb+1);
+    e->text = (unsigned char *) realloc(e->text, e->nb+1);
     e->wtext = (wchar_t *) realloc(e->wtext, (e->nc+1)*sizeof(wchar_t));
 }
 
@@ -138,11 +138,11 @@ void eb_settext(ebox_t *e, char *s)
 {
     if (e->grow) eb_growfor(e,strlen(s));
     memset(e->text, 0, e->nb+1);
-    strncpy(e->text, s, e->nb);
+    strncpy((char *) e->text, s, e->nb);
     eb_mkwtext(e);
     e->sl = e->bl = 0;
     while (e->wtext[e->sl]) e->sl++;
-    e->bl = strlen(e->text);
+    e->bl = strlen((char *) e->text);
     e->ii = e->sl;
     if (e->sl > e->nc) e->ii = e->sl = e->nc;
     e->wtext[e->nc] = 0;
@@ -208,7 +208,7 @@ void eb_cut(ebox_t *e)
     wmemset(e->wtext, 0, e->nc);
     e->sl = e->ii = 0;
     eb_flush(e);
-    e->bl = strlen(e->text);
+    e->bl = strlen((char *) e->text);
 }
 
 int eb_keydown(ebox_t *e, int key)
@@ -216,7 +216,7 @@ int eb_keydown(ebox_t *e, int key)
     switch (key) {
         case KEY_UP: /* history previous */
             if (e->history && e->HL.head != NULL) {
-                if (strcmp(e->HL.head->text, e->text) == 0) e->HL.head = e->HL.head->prev;
+                if (strcmp((char *) e->HL.head->text, (char *) e->text) == 0) e->HL.head = e->HL.head->prev;
                 eb_settext(e, e->HL.head->text);
                 e->HL.head = e->HL.head->prev;
             }
@@ -224,7 +224,7 @@ int eb_keydown(ebox_t *e, int key)
         case KEY_DOWN: /* history next */
             if (e->history && e->HL.head != NULL) {
                 e->HL.head = e->HL.head->next;
-                if (strcmp(e->HL.head->text, e->text) == 0) e->HL.head = e->HL.head->next;
+                if (strcmp((char *) e->HL.head->text, (char *) e->text) == 0) e->HL.head = e->HL.head->next;
                 eb_settext(e, e->HL.head->text);
             }
             break;
@@ -381,7 +381,7 @@ int eb_keydown(ebox_t *e, int key)
                     }
                     if (e->multi == 0) { /* end of mb seq */
                         memset(&mbs, 0, sizeof(mbs));
-                        mbrtowc(&wc, e->mbseq, 7, &mbs);
+                        mbrtowc(&wc, (char *) e->mbseq, 7, &mbs);
                         eb_pastechar(e, wc);
                     }
                 }

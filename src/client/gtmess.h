@@ -2,7 +2,7 @@
  *    gtmess.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -30,11 +30,11 @@
 
 #define DBG() fprintf(stderr, "DEBUG: %s: %d\n", __FILE__, __LINE__)
 
-#define SCL 256
+#include "util.h"
 
 struct cfg_entry {
-    char var[256];  /* variable name */
-    char sval[256]; /* string value */
+    char var[SCL];  /* variable name */
+    char sval[SCL]; /* string value */
     int ival;       /* integer value */
     int type;       /* 0 = string; 1 = integer */
     int min, max;   /* bounds for integer value */
@@ -70,8 +70,11 @@ typedef struct {
     int update_nicks;
     char snd_dir[SCL];
     char snd_exec[SCL];
-    int snd_redirect;
+    char url_exec[SCL];
     int keep_alive;
+    int nonotif_status;
+    int skip_says;
+    int safe_msg;
     
     char cfgdir[SCL];
     char datadir[SCL];
@@ -83,12 +86,9 @@ extern config_t Config;
 extern struct cfg_entry ConfigTbl[];
 extern int SCOLS, SLINES;
 extern int utf8_mode;
-extern struct tm now_tm;
+extern pthread_mutex_t time_lock;
 
 extern char MyIP[];
-
-void *Malloc(size_t size);
-int Write(int fd, void *buf, size_t count);
 
 unsigned int nftid();
 char *getnick(char *login, char *nick, int flag);

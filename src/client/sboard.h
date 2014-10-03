@@ -2,7 +2,7 @@
  *    sboard.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -51,7 +51,12 @@ typedef struct msn_sboard_s {
     time_t tm_last_char; /* when last char was typed */
     ebox_t EB; /* editbox */
     int plskip; /* PL list line skip (for display) */
-    time_t dlg_now; /* time of last screen output */
+    time_t dlg_now; /* time of last screen output (snap to minutes) */
+    time_t real_dlg_now; /* real time of last screen output (no snap) */
+
+    char last_nick[SML]; /* who has spoken last */
+    time_t last_spoken;  /* ...and when */
+    
     FILE *fp_log; /* log file pointer */
     char fn_log[SML]; /* log file name */
     

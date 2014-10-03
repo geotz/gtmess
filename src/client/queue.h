@@ -37,7 +37,6 @@ typedef struct {
 } xqueue_t; /* those guys at SUN came up first with the name 'queue_t' :-( */
 
 void queue_init(xqueue_t *q);
-void queue_free(xqueue_t *q);
 void qelem_free(qelem_t *e);
 
 int queue_put(xqueue_t *q, int type, void *data, int size);

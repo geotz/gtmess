@@ -2,7 +2,7 @@
  *    xfer.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2007  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -25,12 +25,13 @@
 #include"msn.h"
 #include"sboard.h"
 
-typedef enum {XF_UNKNOWN, XF_FILE} xclass_t;
+typedef enum {XF_UNKNOWN, XF_FILE, XF_URL} xclass_t;
 typedef enum {XS_UNKNOWN, XS_INVITE, XS_ACCEPT, 
                XS_CANCEL, XS_REJECT, XS_TIMEOUT, XS_FAIL,
                XS_REJECT_NOT_INSTALLED, XS_FTTIMEOUT, XS_OUTBANDCANCEL,
                XS_CONNECT, XS_COMPLETE, XS_ABORT} xstat_t;
 
+/* file transfer (MSNFTP) */
 typedef struct {
     char fname[SML];        /* file name */
     unsigned int size;      /* file size */
@@ -39,6 +40,11 @@ typedef struct {
     unsigned int auth_cookie; /* authorization cookie */
     char ipaddr[SML];       /* ip address */
 } xfer_file_t;
+
+/* url string transfer (parsed) */
+typedef struct {
+    char name[SML];
+} xfer_url_t;
 
 typedef struct xfer_s {
     xclass_t xclass; /* class of data transfer (i.e. file)*/
@@ -57,6 +63,7 @@ typedef struct xfer_s {
     
     union {
         xfer_file_t file; /* for file transfers */
+        xfer_url_t url; /* for url transfers */
     } data;               /* invitation-specific data */
     struct xfer_s *prev, *next;
 } xfer_t;
@@ -69,11 +76,12 @@ typedef struct {
 extern pthread_mutex_t XX;
 extern xfer_l XL;
         
-xfer_t *xfl_add(xfer_l *l, xclass_t xclass, xstat_t status, char *local, char *remote, 
-                int incoming, unsigned int inv_cookie, msn_sboard_t *sb);
 xfer_t *xfl_add_file(xfer_l *l, xstat_t status, char *local, char *remote, int incoming,
                      unsigned int inv_cookie, msn_sboard_t *sb, 
                      char *fname, unsigned int fsize);
+xfer_t *xfl_add_url(xfer_l *l, char *local, char *remote,
+                    unsigned int inv_cookie, msn_sboard_t *sb, 
+                    char *url);
 xfer_t *xfl_find(xfer_l *l, unsigned int inv_cookie);
 void xfl_rem(xfer_l *l, xfer_t *x);
 void draw_xfer(int r);
