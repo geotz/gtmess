@@ -41,7 +41,8 @@ enum msn_listflags { msn_FL = 1, msn_AL = 2, msn_BL = 4, msn_RL = 8, msn_PL = 16
 typedef struct msn_contact_s {
     char login[SML];
     char nick[SML];
-    char uuid[SNL];		/* contact UUID (FL) */
+    char uuid[SNL];     /* contact UUID (FL) */
+    char psm[SML];      /* personal message */
     int dirty;          /* should update nickname on server */
     msn_stat_t status;
     char **gid;          /* group UUIDs (FL) */
@@ -84,13 +85,15 @@ int msn_clist_count(msn_clist_t *q, unsigned char lf);
 /*int msn_clist_gcount(msn_clist_t *q, char *login);*/
 int msn_clist_update(msn_clist_t *q, unsigned char lf, char *loginu,
                      char *nick, int status, int tm_last_char, int byuuid);
+int msn_clist_psm_update(msn_clist_t *q, char *login, char *psm);
 void msn_contact_free(msn_contact_t *q);
 void msn_clist_free(msn_clist_t *q);
 int  msn_clist_rem_grp(msn_clist_t *q, char *gid);
-void msn_clist_rem(msn_clist_t *q, unsigned char lf, char *login, char *gid);
+void msn_clist_rem(msn_clist_t *q, unsigned char lf, char *loginu, char *gid);
 int  msn_clist_load(msn_clist_t *q, FILE *f, int count);
 int  msn_clist_save(msn_clist_t *q, FILE *f);
 msn_contact_t *msn_clist_add(msn_clist_t *q, unsigned char lf, char *login, char *nick, char *gid, char *uuid);
+int msn_contact_belongs(const msn_contact_t *q, char *gid);
 void msn_contact_cpy(msn_contact_t *dest, msn_contact_t *src);
 void msn_clist_cpy(msn_clist_t *dest, msn_clist_t *src, unsigned char lf);
 
@@ -123,6 +126,7 @@ int msn_png(int fd);
 int msn_out(int fd);
 int msn_qry(int fd, unsigned int tid, const char *challenge);
 int msn_chg(int fd, unsigned int tid, msn_stat_t status);
+int msn_uux(int fd, unsigned int tid, const char *psm);
 int msn_syn(int fd, unsigned int tid, unsigned int ver);
 int msn_reg(int fd, unsigned int tid, char *gid, char *name);
 int msn_sbp(int fd, unsigned int tid, char *uuid, char *name);

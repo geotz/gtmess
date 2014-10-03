@@ -105,13 +105,33 @@ int msn_clist_update(msn_clist_t *q, unsigned char lf, char *loginu,
         if (byuuid) s = p->uuid; else s = p->login;
         if (((p->lflags & lf) == lf) && strcmp(s, loginu) == 0) {
             r = 0;
-            if (nick != NULL) {
-                if (strcmp(p->nick, nick) != 0) p->dirty = 1;
-                Strcpy(p->nick, nick, SML);
-                r = 1;
+            if (nick != NULL && strcmp(p->nick, nick) != 0) {
+                    p->dirty = 1;
+                    Strcpy(p->nick, nick, SML);
+                    r = 1;
             }
-            if (status >= 0) p->status = status, r = 1;
+            if (status >= 0 && p->status != status) p->status = status, r = 1;
             if (tm_last_char >= 0) p->tm_last_char = tm_last_char, r = 1;
+            break;
+        }
+    }
+    return r;
+}
+
+int msn_clist_psm_update(msn_clist_t *q, char *login, char *psm)
+{
+    msn_contact_t *p;
+    int r = -1;
+
+    for (p = q->head; p !=NULL; p = p->next) {
+        if (strcmp(p->login, login) == 0) {
+            r = 0;
+            if (psm != NULL) {
+                if (strcmp(p->psm, psm) != 0) {
+                    Strcpy(p->psm, psm, SML);
+                    r = 1;
+                }
+            }
             break;
         }
     }
@@ -120,6 +140,7 @@ int msn_clist_update(msn_clist_t *q, unsigned char lf, char *loginu,
 
 void msn_contact_free(msn_contact_t *q)
 {
+    if (q == NULL) return;
     if (q->next != NULL) msn_contact_free(q->next);
     if (q->gid != NULL) {
         int i;
@@ -152,11 +173,13 @@ int msn_clist_rem_zombies(msn_clist_t *q)
         }
         if (p != NULL) {
             next = p->next;
-            if (p->gid != NULL) {
+            assert(p->groups == 0);
+            /*if (p->gid != NULL) {
                 int i;
                 for (i = 0; i < p->groups; i++) free(p->gid[i]);
                 free(p->gid);
-            }
+            }*/
+            if (p->gidsize) free(p->gid);
             free(p); c++;
             if (last != NULL) last->next = next; else q->head = next;
             p = next;
@@ -175,39 +198,51 @@ int msn_clist_rem_grp(msn_clist_t *q, char *gid)
         /* linear search, no problem since #groups small */
         for (i = 0; i < p->groups; i++) if (strcmp(p->gid[i], gid) == 0) {
 			free(p->gid[i]);
-            if (i < p->groups-1) memmove(&p->gid[i], &p->gid[i+1], p->groups-i-1);
+            if (i < p->groups-1) memmove(&p->gid[i], &p->gid[i+1], (p->groups-i-1)*sizeof(char *));
             p->groups--;
             c++;
             break;
         }
-        if (p->groups == 0) p->lflags &= ~(msn_FL);
     }
-    msn_clist_rem_zombies(q);
     return c;
 }
 
-void msn_clist_rem(msn_clist_t *q, unsigned char lf, char *login, char *gid)
+void msn_clist_rem(msn_clist_t *q, unsigned char lf, char *loginu, char *gid)
 {
     msn_contact_t *p;
+    char *s;
     int i;
 
     for (p = q->head; p != NULL; p = p->next) {
-        if (strcmp(p->login, login) != 0) continue;
+        if (lf == msn_FL) s = p->uuid; else s = p->login;
+        if (strcmp(s, loginu) != 0) continue;
         if ((p->lflags & lf) != lf) continue;
         
         if (lf == msn_FL) {
             /* linear search, no problem since #groups small */
-            i = 0;
-            if (p->gid != NULL && gid[0]) {
-                while (i < p->groups)
-                if (strcmp(p->gid[i], gid) == 0) {
-                    free(p->gid[i]);
-                    if (i < p->groups-1) memmove(&p->gid[i], &p->gid[i+1], p->groups-i-1);
-                    p->groups--;
-                    break;
-                } else i++;
-                if (p->groups == 0) p->lflags &= ~msn_FL;
-            } else p->lflags &= ~msn_FL;
+            if (gid != NULL) {
+                /* remove contact from given group ONLY */
+                if (p->groups) {
+                    i = 0;
+                    while (i < p->groups)
+                    if (strcmp(p->gid[i], gid) == 0) {
+                        free(p->gid[i]);
+                        if (i < p->groups-1) memmove(&p->gid[i], &p->gid[i+1], (p->groups-i-1)*sizeof(char *));
+                        p->groups--;
+                        break;
+                    } else i++;
+                }
+            } else {
+                /* remove contact from ALL groups and list */
+                if (p->gid) {
+                    for (i = 0; i < p->groups; i++) free(p->gid[i]);
+                    free(p->gid);
+                    p->gid = NULL;
+                    p->groups = 0;
+                    p->gidsize = 0;
+                }
+                p->lflags &= ~lf;
+            }
         } else p->lflags &= ~lf;
         
         break; /* weird style, isn't it? :-) */
@@ -260,12 +295,14 @@ msn_contact_t *msn_clist_add(msn_clist_t *q, unsigned char lf, char *login, char
     msn_contact_t *p;
 
     if ((p = msn_clist_find(q, 0, login)) != NULL) {
-        if (gid != NULL && gid[0] && (lf & msn_FL) == msn_FL) {
-            if (p->groups >= p->gidsize) {
-                if (p->gidsize == 0) p->gidsize = 4; else p->gidsize *= 2;
-                p->gid = (char **) realloc(p->gid, p->gidsize * sizeof(char *));
+        if (gid != NULL && gid[0] && (lf & msn_FL)) {
+            if (!msn_contact_belongs(p, gid)) {
+                if (p->groups >= p->gidsize) {
+                    if (p->gidsize == 0) p->gidsize = 4; else p->gidsize *= 2;
+                    p->gid = (char **) realloc(p->gid, p->gidsize * sizeof(char *));
+                }
+                p->gid[p->groups++] = strdup(gid);
             }
-            p->gid[p->groups++] = strdup(gid);
         }
         p->lflags |= lf;
         return p;
@@ -274,26 +311,28 @@ msn_contact_t *msn_clist_add(msn_clist_t *q, unsigned char lf, char *login, char
     p = (msn_contact_t *) calloc(1, sizeof(msn_contact_t));
     if (p == NULL) return NULL;
     p->lflags = lf;
-    
-    if (gid != NULL) {
+    p->groups = 0;
+
+    if (gid != NULL && gid[0]) {
         p->gidsize = 4;
         p->gid = (char **) malloc(p->gidsize * sizeof(char *));
         if (p->gid == NULL) {
             free(p);
             return NULL;
         }
+        p->gid[p->groups++] = strdup(gid);
     } else {
         p->gid = NULL;
         p->gidsize = 0;
     }
 
-    p->groups = 0;
     p->tm_last_char = 0;
     Strcpy(p->login, login, SML);
     if (nick != NULL && nick[0]) Strcpy(p->nick, nick, SML);
     else Strcpy(p->nick, p->login, SML);
     if (uuid != NULL && uuid[0]) Strcpy(p->uuid, uuid, SNL);
     else p->uuid[0] = 0;
+    p->psm[0] = 0;
     p->dirty = 0;
     p->status = MS_FLN;
     p->notify = 1;
@@ -303,6 +342,16 @@ msn_contact_t *msn_clist_add(msn_clist_t *q, unsigned char lf, char *login, char
     q->head = p;
     q->count++;
     return p;
+}
+
+/* if gid == NULL, then returns 1 when contact is GROUPLESS! */
+int msn_contact_belongs(const msn_contact_t *q, char *gid)
+{
+    int i;
+    if (gid == NULL) return q->groups == 0;
+    for (i = 0; i < q->groups; i++)
+        if (strcmp(q->gid[i], gid) == 0) return 1;
+    return 0;
 }
 
 void msn_contact_cpy(msn_contact_t *dest, msn_contact_t *src)
@@ -680,6 +729,10 @@ char *msn_error_str(int err)
         case 301: return "too many hits to FND";
         case 302: return "not logged in";
 
+        case 402:
+        case 403: return "error accessing contact list";
+        case 420: return "invalid account permissions";
+
         case 500: return "internal server error";
         case 501: return "database server error";
         case 502: return "command disabled";
@@ -721,6 +774,8 @@ char *msn_error_str(int err)
         case 922: return "server too busy";
         case 923: return "kids passport without parental consent";
         case 924: return "passport account not yet verified";
+        case 928: return "bad ticket";
+        case 931: return "account not on this server";
 
         default: return "<unknown server error>";
     }
@@ -897,6 +952,16 @@ int msn_chg(int fd, unsigned int tid, msn_stat_t status)
     return writestr(fd, s);
 }
 
+/* set personal message */
+int msn_uux(int fd, unsigned int tid, const char *psm)
+{
+    char reply[SML*3], s[SML*2], psmu[SML];
+    str2url(psm, psmu);
+    sprintf(s, " <Data><PSM>%s</PSM><CurrentMedia></CurrentMedia></Data>", psmu);
+    sprintf(reply, "UUX %u %d\r\n%s", tid, strlen(s), s);
+    return writestr(fd, reply);
+}
+
 /* sync contact lists */
 int msn_syn(int fd, unsigned int tid, unsigned int ver)
 {
@@ -954,7 +1019,7 @@ int msn_adc(int fd, unsigned int tid, char list, char *loginu, char *gid)
     char s[SML];
     
     if (list == 'F') {
-        if (gid != NULL && gid[0]) sprintf(s, "ADC %u FL N=%s F=%s\r\n", tid, loginu, loginu);
+        if (gid == NULL || !gid[0]) sprintf(s, "ADC %u FL N=%s F=%s\r\n", tid, loginu, loginu);
         else sprintf(s, "ADC %u FL C=%s %s\r\n", tid, loginu, gid);
     } else sprintf(s, "ADC %u %cL N=%s\r\n", tid, list, loginu);
     return writestr(fd, s);

@@ -2150,7 +2150,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 PACKAGE="gtmess"
-VERSION="0.96beta"
+VERSION="0.96beta2"
 VDATE="Dec 2009"
 am__api_version="1.9"
 ac_aux_dir=

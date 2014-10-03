@@ -33,6 +33,7 @@ typedef struct {
 
     /* personal state */
     char nick[SML];
+    char psm[SML];
     msn_stat_t status;
     int inbox, folders;
     /* privacy mode */
@@ -72,7 +73,6 @@ typedef struct {
 
 void *msn_ndaemon(void *dummy);
 void msn_init(msn_t *msn);
-int  msn_list_cleanup(msn_clist_t *q, unsigned char lf);
 
 extern msn_t msn;
 #endif

@@ -29,18 +29,9 @@ DELETE EVERYTHING AND WRITE THE CLIENT FROM SCRATCH IN C++ :-)
 
 NEXT version
 -------------
-handle PL separately
-fix clist cleanup
-fix auto-add to RL when in PL after SYN
-handle UUX (set personal message)
-check ourself rename in FL!!
-add contact to group
-
-check remove contact from FL while in Groups, and then add again
-keep old groups in Mem?
-
-remove comments msn.IL
-
+fix clist scrolling...?
+possible bug upon initial Connect...() ?
+fix challenge on big-endian
 
 
 MAYBE in SOME future version
@@ -95,7 +86,7 @@ add option to display all contacts of a group at group list browsing
 type notif on sb, too
 auto filename complete or file selector
 show ETA on transfers!
-cache notif/passport server 
+permanent cache of notif server
 MSNFTP: show both IPs or always remote !
 support for unavailable connectivity (act as server for receiving a file)
 use iconv() at invitation messages, too!
@@ -109,6 +100,7 @@ group block/unblock
 if I ever have TOO MUCH FREE TIME 
 and there are no other features to add :-)
 --------------------------------------------------
+verify that no problems are caused when we add ourselves to FL!
 fix issue with multiple file accepts (after cancel!)
 fix issue with number of threads spawned, at msnftpd!
 filesize limit is 2GB!!!
@@ -200,13 +192,15 @@ struct cfg_entry ConfigTbl[] =
     {"snd_dir", "*data*", 0, 0, 0, 0},
     {"snd_exec", "/usr/bin/aplay -Nq %s > /dev/null 2>&1 &", 0, 0, 0, 0},
     {"url_exec", "opera --remote 'openURL(%s,new-page)' >/dev/null 2>&1 &", 0, 0, 0, 0},
-    {"keep_alive", "", 0, 1, 0, 7200},
+    {"keep_alive", "", 60, 1, 0, 7200},
     {"nonotif_mystatus", "", 368, 1, 0, 511},
     {"skip_says", "", 20, 1, 0, 7200},
     {"safe_msg", "", 0, 1, -1, 30},
     {"err_connreset", "", 1, 1, 0, 1},
     {"auto_cl", "", 1, 1, 0, 1},
-    {"force_nick", "", 0, 0, 0, 0}
+    {"force_nick", "", 0, 0, 0, 0},
+    {"passp_server", "login.live.com/login2.srf", 0, 0, 0, 0},
+    {"psm", "", 0, 0, 0, 0}
   };
 
 struct cfg_entry *OConfigTbl;
@@ -273,6 +267,7 @@ char *help_str[] = {
 "^N: new chat, ^W: leave chat & close window\n"
 "`i': invite contact to current chat, q: info\n"
 "`I': invite to current chat & leave menu\n"
+"`m': context menu (forward list menu)\n"
 "ENTER or SPACE: new chat & invite & leave menu\n"
 "`+' or `b': block/unblock, `:': toggle ignore\n"
 "TAB: leave this menu, PgUp/PgDn: scroll contact list\n"
@@ -565,7 +560,11 @@ int do_login()
     msg(C_NORMAL, "Connecting to server %s ...\n", msn.notaddr);
     msn.nfd = do_connect(msn.notaddr);
     if (msn.nfd < 0) return -1;
-    GetMyIP(msn.nfd, MyIP);
+    /* quick'n'dirty -- should have a flag instead */
+    if (strcmp(msn.notaddr, "messenger.hotmail.com") != 0) {
+        GetMyIP(msn.nfd, MyIP);
+        msg(C_MSG, "Local IP: %s\n", MyIP);
+    }
 
     if ((r = msn_login_init(msn.nfd, nftidn(3), msn.login, Config.cvr, hash)) == 1) {
         Strcpy(msn.notaddr, hash, SML);
@@ -578,7 +577,10 @@ int do_login()
         return -3;
     }
 
-    if (get_login_server(dalogin) != NULL) {
+    dalogin[0] = 0;
+    if (Config.passp_server[0]) strcpy(dalogin, Config.passp_server);
+    else get_login_server(dalogin);
+    if (dalogin[0]) {
         if ((r = get_ticket(dalogin, msn.login, msn.pass, hash, ticket, SXL)) == 0) {
             if ((r = msn_login_twn(msn.nfd, nftid(), ticket)) != 0) {
                 msg(C_ERR, "%s\n", msn_ios_str(r));
@@ -656,7 +658,7 @@ void print_usage(char *argv0)
                     "console_encoding=<s>\tconsole encoding (iconv -l) [*locale*]\n"
                     "cvr=<s>\t\t\tconsumer versioning (CVR) string\n"
                     "err_connreset=<b>\tignore `Connection reset by peer' error messages on SB [1]\n"
-					"force_nick=<s>\tsetup this nickname upon login (empty=do not set)\n"
+                    "force_nick=<s>\tsetup nickname upon login (empty = do not set) []\n"
                     "gtmesscontrol_ignore=<s>ignore gtmess-specific messages, <s>=*all* or\n"
                     "\t\t\tignore only messages that are substrings of <s>\n"
                     "idle_sec=<n>\t\tseconds before auto-idle status [180], 0=never, <= 7200\n"
@@ -664,7 +666,7 @@ void print_usage(char *argv0)
                     "\t\t\tOffline, Appear_Offline, Online, Idle, Away,\n"
                     "\t\t\tBusy, Be_Right_Back, On_the_Phone, Out_to_Lunch\n"
                     "invitable=<b>\t\tallow others to invite you to conversations [1]\n"
-                    "keep_alive=<n>\t\tkeep connection alive by regular PNG every <n> sec [0]\n"
+                    "keep_alive=<n>\t\tkeep connection alive by regular PNG every <n> sec [60]\n"
                     "\t\t\t(0=disable)\n"
                     "login=<s>\t\tdefault login account\n"
                     "log_traffic=<b>\t\tlog network traffic [0]\n"
@@ -680,7 +682,10 @@ void print_usage(char *argv0)
                     "notif_aliases=<n>\taliases in notif win [0], 0=never, 1=smart, 2=always\n"
                     "online_only=<b>\t\tshow only online contacts [0]\n"
                     "password=<s>\t\tdefault password\n"
+                    "passp_server=<s>\tdefault passport login server [login.live.com/login2.srf]\n"
+                    "\t\t\tif empty, then a server will be requested from nexus.passport.com\n"
                     "popup=<b>\t\tenable/disable popup notification window [1]\n"
+                    "psm=<s>\t\tset personal message upon login (empty = do not set) []\n"
                     "safe_msg=<n>\t\tprevents inadvertently closing chat window with\n"
                     "\t\t\ttoo recent messages (just before <n> seconds,\n"
                     "\t\t\t-1=disable) [0]\n"
@@ -949,7 +954,9 @@ void config_init()
     Config.safe_msg = ConfigTbl[c++].ival;
     Config.err_connreset = ConfigTbl[c++].ival;
     Config.auto_cl = ConfigTbl[c++].ival;
-	Strcpy(Config.force_nick, ConfigTbl[c++].sval, SCL);
+    Strcpy(Config.force_nick, ConfigTbl[c++].sval, SCL);
+    Strcpy(Config.passp_server, ConfigTbl[c++].sval, SCL);
+    Strcpy(Config.psm, ConfigTbl[c++].sval, SML);
     NumConfigVars = c;
     
     sprintf(Config.datadir, "%s", DATADIR);
@@ -966,9 +973,10 @@ void config_init()
 
     if (msn.nfd == -1) {
         if (Config.login[0] && strchr(Config.login, '@') == NULL) strcat(Config.login, "@hotmail.com");
-        Strcpy(msn.notaddr, Config.server, SML);
-        Strcpy(msn.login, Config.login, SML);
-        Strcpy(msn.pass, Config.password, SML);
+        Strcpy(msn.notaddr, Config.server, SCL);
+        Strcpy(msn.login, Config.login, SCL);
+        Strcpy(msn.pass, Config.password, SCL);
+        Strcpy(msn.psm, Config.psm, SML);
     }
     
     if (msn_ic[0] != (iconv_t) -1) iconv_close(msn_ic[0]);
@@ -1033,6 +1041,7 @@ void show_contact_info(msn_contact_t *p)
             (p->lflags & msn_BL) ? 'B': ' ',
             (p->lflags & msn_RL) ? 'R': ' ',
             (p->lflags & msn_PL) ? 'P': ' ');
+    msg(C_NORMAL, "PERSONAL MESSAGE: %s\n", p->psm);
     msg(C_NORMAL, "GROUPS: %d\n", p->groups);
     for (j = 0; j < p->groups; j++)
         msg(C_NORMAL, "GROUP : [%s] - %s\n", p->gid[j], msn_glist_findn(&msn.GL, p->gid[j]));
@@ -1046,6 +1055,22 @@ int menu_clist(pthread_mutex_t *lock, msn_clist_t *q, unsigned char lf, msn_cont
     msn_contact_t **a, *r;
 
     *con = NULL;
+
+    if (lf == msn_FL && clmenu) {
+        if (lock != NULL) LOCK(lock);
+        r = msn_clist_find(&msn.CL, msn_FL, msn.hlogin);
+        if (r != NULL) {
+            *con = (msn_contact_t *) malloc(sizeof(msn_contact_t));
+            if (*con != NULL) {
+                msn_contact_cpy(*con, r);
+                if (lock != NULL) UNLOCK(lock);
+                return 0;
+            }
+        }
+        if (lock != NULL) UNLOCK(lock);
+        return -1;
+    }
+
     if (lock != NULL) LOCK(lock);
     if (q->count == 0) {
         msg(C_ERR, "List is empty\n");
@@ -1061,7 +1086,7 @@ int menu_clist(pthread_mutex_t *lock, msn_clist_t *q, unsigned char lf, msn_cont
     if (count == 0) {
         msn_clist_free(&p);
         free(a);
-        msg(C_ERR, "No online contacts\n");
+        msg(C_ERR, "No contacts\n");
         return -1;
     }
     i = c = 0;
@@ -1109,12 +1134,24 @@ int menu_clist(pthread_mutex_t *lock, msn_clist_t *q, unsigned char lf, msn_cont
     return i;
 }
 
-int menu_glist(pthread_mutex_t *lock, msn_glist_t *q, msn_group_t *grp, msn_contact_t *ref, char *prompt)
+int menu_glist(pthread_mutex_t *lock, msn_glist_t *q, msn_group_t *grp, msn_contact_t *ref, char *prompt, int use_clist)
 {
     int c, i, j, gc;
     msn_glist_t p;
     msn_group_t **a, *r;
     msn_contact_t *con;
+
+    if (use_clist && clmenu) {
+        if (lock != NULL) LOCK(lock);
+        r = msn_glist_find(&msn.GL, msn.hgid);
+        if (r != NULL) {
+            memcpy(grp, r, sizeof(msn_group_t));
+            if (lock != NULL) UNLOCK(lock);
+            return 0;
+        } else msg(C_ERR, "Contact does not belong to any group\n");
+        if (lock != NULL) UNLOCK(lock);
+        return -1;
+    }
 
     if (lock != NULL) LOCK(lock);
     if (q->count == 0) {
@@ -1123,6 +1160,11 @@ int menu_glist(pthread_mutex_t *lock, msn_glist_t *q, msn_group_t *grp, msn_cont
         return -1;
     }
     msn_glist_cpy(&p, q, ref);
+    if (p.count == 0) {
+        msg(C_ERR, "Contact does not belong to any group\n");
+        if (lock != NULL) UNLOCK(lock);
+        return -1;
+    }
     if (lock != NULL) UNLOCK(lock);
     a = (msn_group_t **) Malloc(p.count * sizeof(msn_group_t *));
     for (r = p.head, i = 0; r != NULL; r = r->next, i++) a[i] = r;
@@ -1188,6 +1230,20 @@ int menu_change_name(char *uuid, char *old)
         if (uuid == NULL) msn_prp(msn.nfd, nftid(), newn);
         else msn_sbp(msn.nfd, nftid(), uuid, newn);
         /* BUG: what happens if we have added OURSELVES in FL? */
+        return 1;
+    } else return 0;
+}
+
+int menu_change_psm(char *old)
+{
+    char newpsm[SML];
+
+    Strcpy(newpsm, old, SML);
+    if (get_string(C_EBX, 0, "Personal msg: ", newpsm, SML)) {
+        LOCK(&msn.lock);
+        strcpy(msn.psm, newpsm);
+        UNLOCK(&msn.lock);
+        msn_uux(msn.nfd, nftid(), newpsm);
         return 1;
     } else return 0;
 }
@@ -1354,7 +1410,7 @@ int menu_opt_XTRA(void *arg)
     } return 0;
 }
 
-menu_t menu_FL, menu_percontact;
+menu_t menu_FL, menu_percontact, menu_AG;
 
 int menu_list_FL(void *arg)
 {
@@ -1364,6 +1420,7 @@ int menu_list_FL(void *arg)
     int m;
 
     m = menu_clist(&msn.lock, &msn.CL, msn_FL, &p, NULL);
+
     if (m >= 0) {
         m = play_menu(&menu_FL);
         if (m == 2) {
@@ -1372,16 +1429,6 @@ int menu_list_FL(void *arg)
             inAL = (p->lflags & msn_AL) == msn_AL;
             
             switch (menu_FL.cur) {
-            case 1: /* Remove */
-                m = menu_glist(&msn.lock, &msn.GL, &pg, p, "FROM");
-                if (m >= 0) {
-                    msn_rem(msn.nfd, nftid(), 'F', p->uuid, pg.gid);
-                    if (inAL && p->groups == 1) msn_rem(msn.nfd, nftid(), 'A', p->login, NULL);
-                } else {
-                    msn_contact_free(p);
-                    return m;
-                }
-                break;
             case 0: /* Block */
                 if (inBL)
                     msg(C_ERR, "%s <%s> is already blocked\n", getnick1c(p), p->login);
@@ -1390,7 +1437,7 @@ int menu_list_FL(void *arg)
                     msn_adc(msn.nfd, nftid(), 'B', p->login, NULL);
                 }
                 break;
-            case 2: /* Unblock */
+            case 1: /* Unblock */
                 if (!inBL)
                     msg(C_ERR, "%s <%s> is not blocked\n", getnick1c(p), p->login);
                 else {
@@ -1398,11 +1445,36 @@ int menu_list_FL(void *arg)
                     msn_adc(msn.nfd, nftid(), 'A', p->login, NULL);
                 }
                 break;
-            case 3: /* Rename */
+            case 2: /* Rename */
                 menu_change_name(p->uuid, p->nick);
                 break;
+            case 3: /* Ungroup */
+                menu_AG.cur = 0;
+                m = play_menu(&menu_AG);
+                if (m == 2) {
+                    if (menu_AG.cur == 0) {
+                        if (p->groups) {
+                            m = menu_glist(&msn.lock, &msn.GL, &pg, p, "FROM", 1);
+                            if (m >= 0)
+                                msn_rem(msn.nfd, nftid(), 'F', p->uuid, pg.gid);
+                            else {
+                                msn_contact_free(p);
+                                return m;
+                            }
+                        } else
+                            msg(C_ERR, "Contact does not belong to any group\n");
+                    } else if (menu_AG.cur == 1) {
+                        int i;
+                        for (i = 0; i < p->groups; i++)
+                            msn_rem(msn.nfd, nftid(), 'F', p->uuid, p->gid[i]);
+                    }
+                    break;
+                } else {
+                    msn_contact_free(p);
+                    return m;
+                }
             case 4: /* Copy */
-                m = menu_glist(&msn.lock, &msn.GL, &pg, NULL, "TO");
+                m = menu_glist(&msn.lock, &msn.GL, &pg, NULL, "TO", 0);
                 if (m >= 0)
                     msn_adc(msn.nfd, nftid(), 'F', p->uuid, pg.gid);
                 else {
@@ -1410,19 +1482,25 @@ int menu_list_FL(void *arg)
                 }
                 break;
             case 5: /* Move */
-                m = menu_glist(&msn.lock, &msn.GL, &pg, p, "FROM");
+                m = menu_glist(&msn.lock, &msn.GL, &pg, p, "FROM", 1);
                 if (m >= 0) {
-                    m = menu_glist(&msn.lock, &msn.GL, &pg2, NULL, "TO");
+                    m = menu_glist(&msn.lock, &msn.GL, &pg2, NULL, "TO", 0);
                     if (m >= 0) {
-                        msn_adc(msn.nfd, nftid(), 'F', p->uuid, pg2.gid);
-                        msn_rem(msn.nfd, nftid(), 'F', p->uuid, pg.gid);
+                        if (strcmp(pg.gid, pg2.gid) != 0) {
+                            msn_adc(msn.nfd, nftid(), 'F', p->uuid, pg2.gid);
+                            msn_rem(msn.nfd, nftid(), 'F', p->uuid, pg.gid);
+                        } else msg(C_ERR, "Source and destination groups cannot be the same\n");
                     } else { msn_contact_free(p); return m; }
                 } else { msn_contact_free(p); return m; }
                 break;
-            case 6: /* Invite */
+            case 6: /* Delete */
+                msn_rem(msn.nfd, nftid(), 'F', p->uuid, NULL);
+                if (inAL) msn_rem(msn.nfd, nftid(), 'A', p->login, NULL);
+                break;
+            case 7: /* Invite */
                 do_invite(p->login);
                 break;
-            case 7: /* Per-user settings */ {
+            case 8: /* Per-user settings */ {
                 msn_contact_t *q;
 
                 LOCK(&msn.lock);
@@ -1502,6 +1580,49 @@ int menu_list_RL(void *arg)
     return 2;
 }
 
+menu_t menu_PL;
+
+int menu_list_PL(void *arg)
+{
+    msn_contact_t *p;
+    /* msn_group_t pg; */
+    int inBL, inAL, inRL;
+    int m;
+
+    m = menu_clist(&msn.lock, &msn.CL, msn_PL, &p, NULL);
+    if (m >= 0) {
+        LOCK(&msn.lock);
+        inBL = msn_clist_find(&msn.CL, msn_BL, p->login) != NULL;
+        inAL = msn_clist_find(&msn.CL, msn_AL, p->login) != NULL;
+        inRL = msn_clist_find(&msn.CL, msn_RL, p->login) != NULL;
+        UNLOCK(&msn.lock);
+        m = play_menu(&menu_PL);
+        if (m == 2) switch (menu_RL.cur) {
+            case 0: /* Add */
+                /* m = menu_glist(&msn.lock, &msn.GL, &pg, NULL, "TO");
+                if (m >= 0) {*/
+                    msn_adc(msn.nfd, nftid(), 'F', p->login, NULL);
+                    if (!inRL) msn_adc(msn.nfd, nftid(), 'R', p->login, NULL);
+                    if (!inBL && !inAL) msn_adc(msn.nfd, nftid(), 'A', p->login, NULL);
+                    msn_rem(msn.nfd, nftid(), 'P', p->login, NULL);
+                /*} else return m;*/
+                break;
+            case 1: /* Block */
+                if (!inRL) msn_adc(msn.nfd, nftid(), 'R', p->login, NULL);
+                if (inBL)
+                    msg(C_ERR, "<%s> is already blocked\n", p->login);
+                else {
+                    if (inAL) msn_rem(msn.nfd, nftid(), 'A', p->login, NULL);
+                    msn_adc(msn.nfd, nftid(), 'B', p->login, NULL);
+                }
+                msn_rem(msn.nfd, nftid(), 'P', p->login, NULL);
+                break;
+        } else { msn_contact_free(p); return m; }
+    } else { msn_contact_free(p); return m; }
+    msn_contact_free(p);
+    return 2;
+}
+
 menu_t menu_AL;
 
 int menu_list_AL(void *arg)
@@ -1569,8 +1690,8 @@ void menu_empty_group(char *gid)
         for (j = 0; j < p->groups; j++) if (strcmp(p->gid[j], gid) == 0) {
 /*            msg(C_DBG, "%s would be removed from FL group %d\n", p->login, gid);*/
             msn_rem(msn.nfd, nftid(), 'F', p->uuid, gid);
-            if (((p->lflags & msn_AL) == msn_AL) && p->groups == 1) 
-                msn_rem(msn.nfd, nftid(), 'A', p->login, NULL);
+            /* if (((p->lflags & msn_AL) == msn_AL) && p->groups == 1)
+                msn_rem(msn.nfd, nftid(), 'A', p->login, NULL); */
 /*                msg(C_DBG, "%s would be removed from AL\n", p->login);*/
         }
     }
@@ -1582,7 +1703,7 @@ int menu_list_GL(void *arg)
     msn_group_t pg;
     int m;
     
-    m = menu_glist(&msn.lock, &msn.GL, &pg, NULL, NULL);
+    m = menu_glist(&msn.lock, &msn.GL, &pg, NULL, NULL, 0);
     if (m >= 0) {
         m = play_menu(&menu_GL);
         if (m == 2) switch (menu_GL.cur) {
@@ -1610,15 +1731,100 @@ int menu_list_GL(void *arg)
     return 2;
 }
 
-int menu_list_CU(void *arg)
+/* What we check:
+   1) contacts in PL, but not in RL
+   2) contacts in RL:
+         if FL, then should be in AL^BL
+     [?]    if !FL, then need not be in BL if BLP = 'B'
+     [?]    if !FL, then need not be in AL if BLP = 'A'
+   3) contacts in BL, but not in (FL|RL), when BLP = 'B'
+   4) contacts in AL, but not in (FL|RL), when BLP = 'A'
+
+  it is not clear whether contacts in RL SHOULD BE in FL|AL|BL, but it is assumed so
+*/
+int menu_list_CleanUp(void *arg)
 {
-    int c;
-    c = msn_list_cleanup(&msn.CL, msn_FL);
-    msg(C_MSG, "FL: %d obsolete entries\n", c);
-    c = msn_list_cleanup(&msn.CL, msn_AL);
-    msg(C_MSG, "AL: %d possibly obsolete entries\n", c);
-    c = msn_list_cleanup(&msn.CL, msn_BL);
-    msg(C_MSG, "BL: %d possibly obsolete entries\n", c);
+    msn_contact_t *p;
+    int count;
+
+    LOCK(&msn.lock);
+
+    msg(C_MSG, "Contact list cleanup (Pending, Reverse, Block, Allow and Forward List)\n");
+
+    count = 0;
+    msg(C_MSG, "Examining Pending List...\n");
+    for (p = msn.CL.head; p != NULL; p = p->next)
+        if ((p->lflags & msn_PL) && !(p->lflags & msn_RL)) {
+            msg(C_DBG, "%s <%s> has added you to his/her contact list\n",
+                getnick1c(p), p->login);
+            count++;
+        }
+    msg(C_MSG, "Cases found: %d\n", count);
+
+    count = 0;
+    msg(C_MSG, "Examining Reverse List...\n");
+    for (p = msn.CL.head; p != NULL; p = p->next) {
+        if (!(p->lflags & msn_RL)) continue;
+        if (p->lflags & msn_FL) {
+            if (!(p->lflags & (msn_AL|msn_BL))) {
+                msg(C_DBG, "%s <%s> is in RL and FL, but neither in AL not in BL\n",
+                    getnick1c(p), p->login);
+                count++;
+            }
+        } /* else {
+            if (msn.BLP == 'B') {
+                if (p->lflags & msn_BL) {
+                    msg(C_DBG, "%s <%s> on your RL and not in FL is already blocked, despite being in BL\n",
+                        getnick1c(p), p->login);
+                    count++;
+                }
+            } else if (p->lflags & msn_AL) {
+                msg(C_DBG, "%s <%s> on your RL and not in FL is already allowed, despite being in AL\n",
+                    getnick1c(p), p->login);
+                count++;
+            }
+        } */
+    }
+    msg(C_MSG, "Cases found: %d\n", count);
+
+    count = 0;
+    msg(C_MSG, "Examining Block List...\n");
+    for (p = msn.CL.head; p != NULL; p = p->next) {
+        if (!(p->lflags & msn_BL)) continue;
+        if (!p->lflags & (msn_FL|msn_RL) && msn.BLP == 'B') {
+            msg(C_DBG, "%s <%s> is already blocked, since not in your FL/RL\n", getnick1c(p), p->login);
+            count++;
+        }
+    }
+    msg(C_MSG, "Cases found: %d\n", count);
+
+    count = 0;
+    msg(C_MSG, "Examining Allow List...\n");
+    for (p = msn.CL.head; p != NULL; p = p->next) {
+        if (!(p->lflags & msn_AL)) continue;
+        if (!p->lflags & (msn_FL|msn_RL) && msn.BLP == 'A') {
+            msg(C_DBG, "%s <%s> is already allowed, even if not in your FL/RL\n", getnick1c(p), p->login);
+            count++;
+        }
+    }
+    msg(C_MSG, "Cases found: %d\n", count);
+
+    count = 0;
+    msg(C_MSG, "Examining Forward List...\n");
+    for (p = msn.CL.head; p != NULL; p = p->next) {
+        if ((p->lflags & msn_FL) && !(p->lflags & msn_RL)) {
+            msg(C_DBG, "%s <%s> may have removed you from his/her contact list\n",
+                getnick1c(p), p->login);
+            count++;
+        }
+        if ((p->lflags & msn_FL) && !(p->lflags & (msn_AL|msn_BL))) {
+            msg(C_DBG, "%s <%s> is in your FL, but not in AL neither in BL\n",
+                getnick1c(p), p->login);
+            count++;
+        }
+    }
+    msg(C_MSG, "Cases found: %d\n", count);
+    UNLOCK(&msn.lock);
     return 2;
 }
 
@@ -1722,6 +1928,15 @@ int menu_srv_NICK(void *arg)
     if (menu_change_name(NULL, msn.nick)) return 2;
     else return 1;
 }
+
+int menu_srv_PSM(void *arg)
+{
+    if (menu_change_psm(msn.psm)) {
+        draw_status(1);
+        return 2;
+    }
+    else return 1;
+}
         
 menu_t menu_options, menu_server, menu_status, menu_lists, menu_main;
 
@@ -1735,8 +1950,9 @@ void menus_init()
             "(1)-(6) Sound test", -1, -1, menu_opt_SND, 
             menu_opt_XTRA);
 
-    mn_init(&menu_server, 6, -1, 
+    mn_init(&menu_server, 7, -1,
             "Nickname", 'n', 0, menu_srv_NICK,
+            "Personal msg", 's', 3, menu_srv_PSM,
             "RL prompt", 'r', 0, menu_srv_RL,
             "All others", 'a', 0, menu_srv_AO,
             "Mailbox", 'm', 0, menu_srv_MAIL,
@@ -1757,22 +1973,28 @@ void menus_init()
             "Soft-out", 'f', 2, menu_status_CB,
             NULL);
     
-    mn_init(&menu_lists, 8, -1,
+    mn_init(&menu_lists, 9, -1,
             "Forward", 'f', 0, menu_list_FL,
             "Reverse", 'r', 0, menu_list_RL,
             "Allow", 'a', 0, menu_list_AL,
             "Block", 'b', 0, menu_list_BL,
+            "Pending", 'p', 0, menu_list_PL,
             "Group", 'g', 0, menu_list_GL,
             "Add", 'd', 1, menu_list_add,
             "Export aliases", 'x', 1, export_nicks,
-            "Clean up", 'c', 0, menu_list_CU,
+            "Clean up", 'c', 0, menu_list_CleanUp,
             NULL);
 
-    mn_init(&menu_FL, 8, -1,
-            "Block", 'b', 0, NULL, "Remove", 'r', 0, NULL,
-            "Unblock", 'u', 0, NULL, "Rename", 'n', 2, NULL,
-            "Copy", 'c', 0, NULL, "Move", 'm', 0, NULL, 
-            "Invite", 'i', 0, NULL, "Per-contact settings", 'p', 0, NULL,
+    mn_init(&menu_FL, 9, -1,
+            "Block", 'b', 0, NULL,
+            "Unblock", 'u', 0, NULL,
+            "Rename", 'n', 2, NULL,
+            "Ungroup", 'g', 2, NULL,
+            "Copy", 'c', 0, NULL,
+            "Move", 'm', 0, NULL,
+            "Delete", 'd', 0, NULL,
+            "Invite", 'i', 0, NULL,
+            "Per-contact settings", 'p', 0, NULL,
             NULL);
 
     mn_init(&menu_percontact, 4, -1,
@@ -1781,7 +2003,9 @@ void menus_init()
     menu_percontact.item[0].checked = 1; /* checkable */
     menu_percontact.item[1].checked = 1;
 
-    mn_init(&menu_RL, 2, -1, 
+    mn_init(&menu_PL, 2, -1,
+            "Add", 'a', 0, NULL, "Block", 'b', 0, NULL, NULL);
+    mn_init(&menu_RL, 2, -1,
             "Add", 'a', 0, NULL, "Block", 'b', 0, NULL, NULL);
     mn_init(&menu_AL, 2, -1, 
             "Remove", 'r', 0, NULL, "Block", 'b', 0, NULL, NULL);
@@ -1790,6 +2014,8 @@ void menus_init()
     mn_init(&menu_GL, 3, -1, 
             "Remove", 'r', 0, NULL, "Rename", 'n', 2, NULL, 
             "Empty", 'e', 0, NULL, NULL);
+
+
     
     mn_init(&menu_RLp, 3, -1,
             "Always", 'a', 0, NULL, "Never", 'n', 0, NULL,
@@ -1805,7 +2031,9 @@ void menus_init()
 
     mn_init(&menu_YN, 2, -1, "Yes", 'y', 0, NULL, "No", 'n', 0, NULL, NULL);
     menu_YN.attr = C_EBX;
-    
+
+    mn_init(&menu_AG, 2, -1, "This group", 't', 0, NULL, "All groups", 'a', 0, NULL, NULL);
+
     mn_init(&menu_main, 8, -1,
             "Connect", 'c', 0, NULL,
             "Status", 's', 0, NULL,
@@ -2132,6 +2360,10 @@ int cl_keydown(c)
         UNLOCK(&msn.lock);
         break;
     }
+
+    case 'm': /* context menu */
+        menu_list_FL(NULL);
+        break;
     
     case ':': { /* toggle ignore contact */
         msn_contact_t *p;
@@ -2181,7 +2413,7 @@ int main(int argc, char **argv)
 {
     int c, paste, escape, mstatus;
     
-    sprintf(copyright_str, "F9.Menu TAB.Contacts ?.Help | gtmess %s (%s), (c) 2002-2007 by GeoTz", VERSION, VDATE);
+    sprintf(copyright_str, "F9.Menu TAB.Contacts ?.Help | gtmess %s (%s), (c) 2002-2009 by GeoTz", VERSION, VDATE);
     printf("%s\n", &copyright_str[30]);
     
     queue_init(&msg_q);

@@ -1,12 +1,17 @@
 *******************************
-* Version 0.96beta            *
+* Version 0.96beta2           *
 *******************************
-~ buggy contact list add/remove (to be fixed in final)
-+ personal message support (set/display)
+~ challenge fails on bigendian systems
++ remove contact from all groups
+* skip redundant status changes
++ context menu with `m' when Contact List selected
+* faster login (cached passport server) [passp_server]
+* auto-ping every 60 sec [keep_alive]
++ personal message support (set/display) [psm]
 + MSNP12 support
 + new challenge/response implementation {Tibor}
 ! fixed a memory leak in clist group realloc
-* contact list cleanup, corrected warnings
+* list cleanup (better semantics)
 + set nickname upon login [force_nick]
 
 

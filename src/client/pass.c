@@ -2,7 +2,7 @@
  *    pass.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2009  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -273,12 +273,9 @@ char *get_login_server(char *dest)
     int i, r;
     
     memset(buf, 0, sizeof(buf));
-    if ((r = http_get("https://nexus.passport.com/rdr/pprdr.asp", 
+    if ((r = http_get("http://nexus.passport.com/rdr/pprdr.asp",
                       0, NULL, buf, sizeof(buf), NULL)) != 0) {
-        if (r == -10) msg(C_ERR, "SSL: connect error\n");
-        else if (r == -11) msg(C_ERR, "SSL: write error\n");
-        else if (r == -12) msg(C_ERR, "SSL: read error\n");
-        else if (r != -13) msg(C_ERR, "ConnectToServer(): socket error\n");
+        msg(C_ERR, "ConnectToServer(): socket error\n");
         return NULL;
     }
     if ((s = strafter(buf, "\nPassportURLs:")) != NULL

@@ -78,7 +78,9 @@ typedef struct {
     int safe_msg;
     int err_connreset;
     int auto_cl;
-	char force_nick[SCL];
+    char force_nick[SCL];
+    char passp_server[SCL];
+    char psm[SML];
     
     char cfgdir[SCL];
     char datadir[SCL];

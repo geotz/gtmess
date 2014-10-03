@@ -399,7 +399,10 @@ void draw_status(int r)
     int y, x;
     char txt[SML];
     
-    sprintf(txt, "%s (%s)", msn.nick, msn_stat_name[msn.status]);
+    if (msn.psm[0])
+        sprintf(txt, "%s (%s) - %s", msn.nick, msn_stat_name[msn.status], msn.psm);
+    else
+        sprintf(txt, "%s (%s)", msn.nick, msn_stat_name[msn.status]);
     if (utf8_mode) txt[widthoffset(txt, SCOLS-6)] = 0;
     else txt[SCOLS-6] = 0;
     getyx(stdscr, y, x);
@@ -574,7 +577,7 @@ void draw_lst(int r)
                     wattrset(w_lst.wh, statattrs[p->status]);
                 else wattrset(w_lst.wh, lstatattrs[p->status]);
                 if (now - p->tm_last_char <= Config.time_user_types) ch = '!';
-                else if ((p->lflags & msn_BL) == msn_BL) ch = '+'; /* blocked */
+                else if ((p->lflags & msn_BL)) ch = '+'; /* blocked */
                 else if (p->ignored) ch = ':';
                 else ch = ' ';
                 wprintw(w_lst.wh, "%c%c %s\n", ch, msn_stat_char[p->status], getnick1c(p));
