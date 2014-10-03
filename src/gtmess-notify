@@ -1,0 +1,83 @@
+#!/usr/bin/wish
+
+# gtmess - MSN Messenger client
+# (c) 2002-2003 by George M. Tzoumas
+#
+# This script pops up a notification window with
+# the contents of the named pipe ~/.gtmess/notify.pip.
+# Each line goes in a separate window.
+#
+# This script is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# The source code of this script is ABSOLUTELY FREE.
+# You can do whatever you want with it ;-)
+
+set f [open $env(HOME)/.gtmess/notify.pip]
+
+set nh 0
+set nw 0
+set k 0
+set wid 0
+set bye 0
+
+set txt ""
+
+proc unnotif { id } {
+    global k nh nw bye
+    destroy .w$id
+    set k [expr $k - 1]
+    if {$k == 0} then {
+        set nh 0
+        set nw 0
+        if {$bye == 1} then exit
+    }
+}
+
+proc notif { } {
+    global f txt k nw nh wid bye
+    
+    if {[eof $f] == 1} then {
+        fileevent $f readable ""
+        close $f
+        set bye 1
+        if {$k == 0} then exit
+        return
+    }
+    gets $f txt
+    if {$txt == ""} then return
+
+    toplevel .w$wid
+    wm state .w$wid withdrawn
+
+    wm geometry .w$wid -$nw-$nh
+
+    canvas .w$wid.c -bg SteelBlue -width 120 -height 90 \
+       -relief ridge -borderwidth 2
+    pack .w$wid.c
+
+    .w$wid.c create text 60 45 -justify center -width 110 -text "$txt"
+
+    after 7000 "unnotif $wid"
+
+#    bind .w$wid <Button-1> "unnotif $wid"
+
+    wm title .w$wid "gtmess-notify"
+    wm overrideredirect .w$wid 1
+    wm transient .w$wid
+    wm state .w$wid normal
+
+    set k [expr $k + 1]
+    set nh [expr $nh + 94]
+    if {$nh >= 450} then {
+        set nh 0
+        set nw [expr $nw + 124]
+    }
+    raise .w$wid
+    set wid [expr $wid + 1]
+}
+
+fileevent $f readable "notif"
+
+wm state . withdrawn

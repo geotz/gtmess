@@ -1,0 +1,868 @@
+.TH gtmess 1 "November 7, 2003" "" "gtmess messenger"
+
+.SH NAME
+gtmess - MSN messenger client
+
+.SH SYNOPSIS
+gtmess [options]
+
+.SH DESCRIPTION
+.PP
+gtmess is an MSN messenger client, which allows you to use
+the MSN messenger service. It is a console application that
+uses the curses library to present a friendly user interface.
+This manpage corresponds to version 0.8.1.
+
+.SH OPTIONS
+.TP
+.B -h
+Short list of options.
+
+.TP
+.B -w
+Create the default configuration directory ~/.gtmess and
+write the configuration file. The contents of the file derive from the command
+line
+.B -O 
+flags that follow.
+The configuration file name is
+.BR ~/.gtmess/config .
+The incoming files directory ~/.gtmess/incoming and the named pipe
+~/.gtmess/notify.pip are also created.
+
+.TP
+.BI -O var = value
+Assigns the value
+.I value
+to the configuration variable
+.IR var .
+
+.SH CONFIGURATION VARIABLES
+The following list shows all configuration variables in alphabetical order.
+The value of a variable is either an integer or a (line-terminated) 
+string of characters.
+In the following descriptions,
+.I N
+represents an integer value,
+.I S
+represents a character string value and
+.I B
+represents a boolean value, a special case of an integer value 
+with only two possible values, 0 and 1. 0 is for True and 1 is for False.
+
+.TP
+.BI cert_prompt "" = B
+If
+.I B
+is 1 and a certificate cannot be verified against
+.BR ca_list ,
+the user is asked if the login process should continue. 
+Three options are given,
+.IR Yes ,
+.I No 
+and
+.IR Always .
+The meaning of each option is obvious.
+The login procedure requires more than one SSL connection, so option
+.I Always
+means that successive SSL connections will also continue upon unverified certificates.
+If
+.I B
+is 0, then the procedure always continues without asking the user, 
+even if certificates cannot be verified.
+.br
+The default value is
+.BR 1 .
+
+.TP
+.BI colors "" = N
+Sets initial color mode.
+Possible values are 0, 1 or 2. With 0, color is selected automatically
+(according to curses). 1 forces color mode, while 2 forces black and white.
+.br 
+The default value is
+.B 0
+(automatic).
+
+.TP
+.BI common_name_prompt "" = B
+Like
+.BR cert_prompt ,
+the user is asked if the login process should continue,
+when the common name does not match the host name upon
+the initialization of an SSL connection.
+.br
+The default value is
+.BR 1.
+
+.TP
+.BI console_encoding "" = S
+Sets the character encoding to be used for displaying the text on the console.
+.I S
+is the name of the encoding. To see all valid encoding names, look at
+the output of the
+.BR "iconv -l" " command."
+.br
+The default value is
+.BR ISO_8859-7 .
+
+.TP
+.BI cvr "" = S
+Sets the consumer versioning (CVR) string that is sent to the server during
+the login process. This string provides information about the client. For more
+information you should look at the protocol specification.
+.br
+The default value is
+.BR "0x0409 linux 2.2.4 i386 GTMESS 0.8.1 MSMSGS null" .
+
+.TP 
+.BI initial_status "" = N
+Sets the initial status after login. For the MSN Messenger protocol
+.I N
+can be a number from 0 to 8 representing the following statuses:
+0 = 
+.BR Offline , 
+1 = 
+.BR "Appear Offline" , 
+2 = 
+.BR Online ,
+3 =
+.BR Idle ,
+4 =
+.BR Away ,
+5 =
+.BR Busy ,
+6 =
+.BR "Be Right Back" ,
+7 =
+.BR "On the Phone" ,
+8 = 
+.BR "Out to Lunch" .
+.br
+The default value is
+.B 1
+(Appear Offline).
+.br
+.B NOTE:
+This does not guarantee that you have logged in unnoticed! For more information see the
+.B ADVANCED FEATURES
+section.
+
+.TP
+.BI login "" = S
+Sets the default login account. If
+.I S
+does not contain a `@' character, then the string `@hotmail.com' is
+automatically appended.
+
+.TP
+.BI log_traffic "" = B
+If 
+.I B
+is 1, network traffic between the client and the server is logged into 
+file ~/.gtmess/msn.log.
+.br 
+The default value is
+.BR 0 .
+
+.TP
+.BI msnftpd "" = B
+If 
+.I B
+is 1, then a server thread runs in the background listening on port 6891. This enables
+outgoing file transfers by allowing others to connect on this port.
+.br 
+The default value is
+.BR 1 .
+
+
+.TP
+.BI online_only "" = B
+If enabled, only contacts with online status are shown on the screen.
+.br
+The default value is
+.BR 0.
+
+.TP 
+.BI password "" = S
+Sets the default password.
+
+.TP
+.BI popup "" = B
+Enables/disables the popup notification window at the lower right corner of
+the screen. This is an external Tcl/Tk script.
+.br
+The default value is
+.BR 1.
+
+.TP
+.BI server "" = S
+Sets the initial server to connect to. For the MSN Messenger protocol,
+this can be a dispatch or a notification server.
+.I S
+is of the form
+.IR hostname [ :port ].
+If port is not specified, 1863 is assumed.
+.br
+The default value is 
+.BR messenger.hotmail.com .
+
+.TP
+.BI sound "" = N
+Sets sound mode.
+.I N
+can be 0, 1 or 2. 0 disables all sound, 1 produces always a (console) beep,
+while 2 plays sound effects (through a sound device).
+.br
+The default value is
+.B 1
+(beep).
+
+.TP
+.BI syn_cache "" = B
+If enabled, the contact/group lists are cached for future use.
+.br
+The default value is
+.BR 1.
+
+.TP
+.BI time_user_types "" = N
+Sets how often typing notifications are sent. It is the time interval in seconds.
+.br
+The default value is
+.BR 4.
+
+.SH USER INTERFACE
+.PP
+The screen is divided in 7 parts. Four status lines and three windows.
+The first line of the screen displays your nickname, your account and
+your status. The bottom line displays the copyright string and the menus 
+or the edit boxes.
+On the right is the contact list window. On the left of the contact list
+window is the switchboard (chat) window. Right below the switchboard window
+is the messages window. This window displays various messages and errors
+from the operating system, as well as the notification server. The switchboard
+window is separated from the messages window by two lines. The first line
+is the edibox where you type your text when you talk. The second line
+is a kind of window-bar that displays a character for each open switchboard
+window. The selected switchboard window (which is displayed) is represented
+with an `O'. A `-' represents a switchboard window that is open but not
+on the foreground, while a `+' means additionally that the designated
+window has unread messages (something got typed in the window while
+it was in the background and the user has not seen it yet).
+
+.PP
+The following keys are available. Symbol `^' denotes holding CTRL, while
+`$' denotes holding SHIFT. `@' denotes holding ALT (or mod1 or pressing ESC
+first).
+
+.SS MENUS
+
+.PP
+The functions of the main menu can be accesed by pressing ESC first, 
+or by holding down the default modifier key (ALT) and then pressing one
+of the following keys (case insensitive):
+
+.TP
+.B C
+Connect to server
+
+.TP
+.B S
+Change status
+
+.TP
+.B L
+Manage contact/group lists
+
+.TP
+.B O
+Options
+
+.TP
+.B D
+Logout from notification server
+
+.TP
+.B N
+Change nickname
+
+.TP
+.B M
+Display mailbox status
+
+.TP
+.B P
+Ping the server and calculate RTT
+
+.TP
+.B I
+Invite a contact from your Forward List to the active switchboard window. This
+is actually a shortcut for 
+.IR "" Alt-L-F- contact -I,
+although only online contacts are shown.
+
+.TP
+.B /
+Enter special client command (none available yet)
+
+.PP
+The shortcut key for the menu is shown in parentheses. Some menu
+entries may display a nested menu. The menu tree of the application is
+the following (for readability purposes the parentheses have been omitted
+and the shortcut key is shown alone on the left; also full names have
+been used instead of abbreviations):
+
+.IP A 4
+.B Add
+
+.IP C 8
+.B Contact
+
+.IP F 12
+.B Forward
+- add a contact in your forward list
+
+.IP B 12
+.B Block
+- add a contact in your block list
+
+.IP G 8
+.B Group
+- add a new group
+
+.IP C 4
+.B Connect
+
+.IP D 4
+.B Disconnect
+
+.IP S 4
+.B Status
+.IP N 8
+.B On-line
+.IP I 8
+.B Idle 
+.IP A 8
+.B Away
+.IP S 8
+.B Busy 
+.IP B 8
+.B "Be Right Back"
+.IP P 8
+.B "On the Phone"
+.IP L 8
+.B "Out to Lunch"
+.IP H 8
+.B "Appear Offline (Hidden)"
+
+.IP L 4
+.B List
+.IP F 8
+.B Forward 
+- you are presented with a contact selection menu where you can pick up
+up a contact from your list and do the following
+.IP B 16
+.B Block
+the selected contact (by adding him/her to the block list)
+.IP R 16
+.B Remove
+the contact from the list
+.IP U 16
+.B Unblock
+the selected contact (by adding him/her to the allow list)
+.IP N 16
+.B Rename
+- change the name of the contact
+.IP C 16
+.B Copy
+the contact to another group
+.IP M 16
+.B Move
+the contact to a different group
+.IP I 16
+.B Invite
+the contact to the active switchboard window
+
+.IP R 8
+.B Reverse
+.IP A 16
+.B Add
+the contact to your forward list, too
+(usually you 'll do this just after somebody has added you 
+to his/her forward list)
+.IP B 16
+.B Block
+the contact
+(you don't have to add the contact to your forward list if you don't want to,
+you can block him/her instead)
+
+.IP A 8
+.B Allow
+.IP R 16
+.B Remove
+the contact from your allow list
+.IP B 16
+.B Block
+- remove the contact from your allow list and add to your block list
+
+.IP B 8
+.B Block
+.IP R 16
+.B Remove
+the contact from your block list
+.IP A 16
+.B Allow
+- remove the contact from your block list and add to your allow list
+
+.IP G 8
+.B Group
+.IP R 16
+.B Remove
+the selected group
+.IP N 16
+.B Rename
+the selected group
+
+.IP N 4
+.B Name
+
+.IP O 4
+.B Options
+
+.IP M 4
+.B Mail
+
+.IP P 4
+.B Ping
+
+.SS SWITCHBOARD (chat window) CONTROLS
+
+.TP
+.B ^N
+new switchboard session
+
+.TP
+.B ^W
+leave current switchboard session and close the window
+
+.TP
+.B ^X
+leave current swithboard session, but leave the window open
+
+
+.TP
+.B F1
+previous switchboard session
+
+.TP
+.B F2
+next switchboard session
+
+.TP
+.B F3
+next switchboard session that has unread messages
+
+.TP
+.B PgUp
+scroll down switchboard window
+
+.TP
+.B PgDn
+scroll up switchboard window
+
+.TP
+.B @F7
+participant list scroll down
+
+.TP
+.B @F8
+participant list scroll up
+
+.SS SWITCHBOARD TEXT INPUT
+
+.PP
+Type any string and press enter to send it to server (talk).
+While you are typing, typing notifications are being sent in 
+.B time_user_types
+sec intervals.
+If the string you type begins with `/', then it forms a special command 
+(and typing notifications are not being sent while you are typing it).
+.br
+Type `//' if you want to send a message with one `/' in the beginning.
+
+.SS SWITCHBOARD COMMANDS
+
+.TP
+.BI "/ " string
+This command sends
+.I string
+to the server without a typing notification. This actually happens
+because the string gets typed in command-entry mode (`/'). Note that there is
+a space after the first slash.
+
+.TP
+.BI "/send " string
+Send a raw command string to server.
+
+.TP
+.BI "/invite " useraccount
+Invite the user with account
+.I useraccount
+to join the switchboard session. You can also use the shorcut
+.B /i
+for this command. Example:
+.br
+.B /i myfriend@hotmail.com
+
+.TP
+.BI "/spoof " fake
+Send a fake typing notification from user
+.IR fake .
+
+.TP
+.BI "/file " filename
+Send a request to send the file
+.IR filename .
+
+
+.SS MISCELLANEOUS CONTROLS
+
+.TP
+.B ^L
+redraw screen from scratch
+
+.TP
+.B F4
+display / hide the transfers window
+
+.TP
+.B F5
+messages window scroll down
+
+.TP
+.B F6
+messages window scroll up
+
+.TP
+.B F7
+contact list scroll down
+
+.TP
+.B F8
+contact list scroll up
+
+.TP
+.B F10
+exit the client
+
+.SS EDITBOX CONTROLS
+.PP
+When you are presented with an edit box to type a string, you can use
+the following keys:
+
+.TP
+.B "arrow LEFT/RIGHT"
+move cursor left/right
+
+.TP
+.B HOME/END
+move cursor to home/end
+
+.TP
+.B INSERT
+toggle insert mode
+
+.TP
+.B DELETE
+delete character at cursor and move the rest to the left
+
+.TP
+.B ^T
+delete word
+
+.TP
+.B ^A
+move one word left
+
+.TP
+.B ^D 
+move one word right
+
+.TP
+.BR BACKSPACE " or " ^H
+delete character on the left
+
+.TP
+.B ESC
+cancel editing (leaves string unmodified)
+
+.TP
+.B ENTER
+exit edit mode and save string
+
+.TP
+.B "arrow UP/DOWN"
+recall previous/next line from history
+
+.TP
+.B ^K
+enter clipboard mode
+
+.SS EDITBOX CLIPBOARD MODE CONTROLS
+.PP
+Clipboard mode is valid for exactly one keystroke and is automatically exited
+after it. Invalid keystrokes exit the mode. You cannot cut or copy a masked field 
+(i.e. password), though you can paste on it. The following are valid keystrokes
+in clipboard mode:
+
+.TP
+.B C
+copy whole line to clipboard buffer
+
+.TP
+.B B
+set block begin
+
+.TP
+.B K
+copy from block begin to current position
+
+.TP
+.B V
+paste buffer contents
+
+.TP
+.B X
+cut line to buffer
+
+.TP
+.B Z
+clear line (without affecting the buffer)
+
+.SS CONTACT/GROUP SELECTION MODE
+.PP
+When you are presented with a list of contacts or groups, you can use
+the following keys:
+
+.TP
+.BR ] " or " "arrow RIGHT/DOWN"
+next entry
+
+.TP
+.B [ " or " "arrow LEFT/UP"
+previous entry
+
+.TP
+.BR { " or " HOME
+first entry
+
+.TP
+.BR } " or " END
+last entry
+
+.TP
+.B q
+show contact/group information
+
+.TP
+.BR SPACE " or " ENTER"
+select
+
+.TP
+.BR ESC " or " BACKSPACE " or " ^H
+cancel selection
+
+
+.SS TRANSFERS WINDOW CONTROLS
+.PP
+When the transfers window is visible, you can use the following keys:
+
+.TP
+.BR ] " or " "arrow DOWN"
+next entry
+
+.TP
+.BR [ " or " "arrow UP"
+previous entry
+
+.TP
+.BR } " or " "arrow RIGHT"
+scroll left
+
+.TP
+.BR { " or " "arrow LEFT"
+scroll right
+
+.TP
+.B a
+accept incoming invitation
+
+.TP
+.B r
+reject incoming invitation
+
+.TP
+.B c
+cancel (abort) incoming/outgoing transfer or outgoing invitation
+
+.TP
+.B q
+quick printout
+
+.TP
+.B DELETE
+delete entry
+
+.TP
+.B ?
+mini help
+
+.SH ADVANCED FEATURES
+.PP
+There are some features of the protocol that gtmess takes advantage of, while
+the original client for windows does not use them. These features are:
+
+.TP
+.B *
+Get notified when somebody has opened a chat window to you
+(but has not sent a message yet).
+
+.TP
+.B *
+Allow you to login with a different initial status. 
+However, if you login as 
+.B "Appear Offline"
+other users will still receive some offline events and if you originally were offline,
+they will suspect that you logged in in this mode.
+
+.TP
+.B *
+Allow you to send a fake typing notification. This does not affect all clients.
+However, the original client gets affected!
+
+.TP
+.B *
+Allow you to know if somebody is online, but has blocked you.
+To find out if a user is blocking you do the following: Open a switchboard window and
+invite the user you think has blocked you (whom you see offline) to the session. 
+If you receive an error 216, then the user has blocked you. 
+Otherwise, if you receive an error 217 then we cannot tell.
+When you receive error 217 there are two cases:
+1) The user is really offline and you can't find out if he or she has blocked you. 
+2) The user appears offline and hasn't blocked you. 
+.br
+To sum up, if a user is logged in
+and has blocked you, you will receive error 216.
+
+
+.SH FILES
+.TP
+.B ~/.gtmess/
+Main configuration directory. This directory relies in the user's home directory
+and stores the following gtmess-specific files:
+
+.TP
+.B ~/.gtmess/config
+The configuration file. It contains lines of the form
+.IR variable = value .
+Lines beginning  with `#' are considered to be comments, and therefore ignored.
+
+.TP
+.B ~/.gtmess/received/
+Received files from other users are stored
+in this directory.
+
+.TP
+.B ~/.gtmess/msn.log
+The traffic log (see the
+.I log_traffic 
+variable).
+
+.TP
+.B ~/.gtmess/notify.pip
+This file is a named pipe that is used by the gtmess-notify script to pop up notification
+windows. The client writes data in this file.
+
+.TP
+.BI ~/.gtmess/ account /syn
+The cached version of the contact/group lists for a user's account.
+
+.TP
+.B /usr/local/share/gtmess/root.pem
+Trusted root certificates, verified upon the initialization 
+of an SSL connection. 
+
+.SS NOTE
+The prefix 
+.B /usr/local/share/gtmess
+might be different on your system. You need not have any files in this directory,
+if gtmess has been compiled with `--enable-home' option. In this case,
+.B ~/.gtmess
+is used instead.
+
+.SH BUGS
+
+This is a list of known bugs and limitations. 
+They will be removed as soon as possible.
+
+Supported protocol versions are MSNP7 and MSNP8.
+
+Notification or Passport login servers are not cached.
+
+If you send a file, you cannot see the IP of the receiver. 
+When you receive a file, you cannot be server. 
+When you send a file, you cannot be client.
+
+There is no option to keep an idle connection alive.
+
+There is no limit on the number of threads created by the msnftp server.
+
+Filesize limit is 2GB.
+
+There may occur conflicts in the authorization cookies of file transfers (though rare).
+
+Messages are always assumed to be UTF-8 encoded.
+
+No automatic offline user rename.
+
+
+.SH SEE ALSO
+.BR gtmess-gw "(1), "
+.BR gtmess-notify "(1)"
+
+
+.SH ACKNOWLEDGEMENTS
+I would like to thank the following people:
+
+.I "Mike Mintz"
+for his excellent site on the MSN Messenger Protocol.
+.br
+.B http://www.hypothetic.org/docs/msn/index.php
+
+.I "L. Peter Deutsch"
+for his MD5 module.
+
+
+.SH AUTHORS
+
+gtmess - MSN Messenger client
+.br
+Copyright (C) 2002-2003  George M. Tzoumas
+
+.PP
+This program is free software; you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation; either version 2 of the License, or
+(at your option) any later version.
+
+.PP
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+.PP
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA

@@ -1,0 +1,46 @@
+*******************************
+* Version 0.8.1 (7 Nov 2003)  * 
+*******************************
++ autoconf/automake configure script for compilation
+! when adding a group, the group name now gets url-encoded correctly
++ certificates are now verified against a known list
+* you can abort the login process when certificates
+  do not verify or when the hostname does not match
++ configuration file support
+* improved word wrapping
+! iconv, iconv_close are not called when iconv_open fails
++ added option to display online contacts only
+! fixed bug that caused a contact to be removed from AL 
+  if it was removed from FL and still existed in some other group;
+  now the contact is automatically removed from AL only if it is
+  removed from FL and no other group contains it
++ BLP (block/allow all other users) and 
+  GTC (prompt when others add you)
+  settings that are stored in the server are now taken into consideration
+  (formerly you could change them but they had no actual effect)
++ contact/group list cache
++ transfers window shows total number of entries
++ keyboard shortcuts: 
+  * F5/F6 replaced by PgUp/PgDn
+  * $F5/$F6 replaced by F5/F6
+  * $F7/$F8 replaced by @F7/@F8
+  + ESC-1..0 generates F1..F10
+  + Alt-I shortcut for Alt-L-F-<sel>-I  (invite)
+! send CCL when local error occurs during file download
+* replaced A_NORMAL with C_NORMAL, because on some terminals A_NORMAL
+  was not white on black
+- removed aggressive beeping! :-)
++ added option to enable/disable msnftp daemon
+
+*******************************
+* Version 0.8.0 (16 Oct 2003) * 
+*******************************
+
++ first public release
+
+
+Legend:
+! bugfix
+* change/update
++ add
+- remove

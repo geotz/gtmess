@@ -1,0 +1,153 @@
+*****************************
+gtmess - MSN Messenger Client
+*****************************
+
+To see command line options:
+    gtmess -h
+
+Keys:
+^ = CTRL, @ = ALT (or ESC first), $ = SHIFT
+===========================================
+^N	new switchboard session
+^W	leave sb (chat) session and close window
+^X	leave sb session, but leave window open
+^L	redraw screen (in case it gets garbled)
+
+F1	previous sb session
+F2	next sb session
+F3	next sb session that has unread messages
+F4	transfers window (show/hide)
+F5	message window scroll down
+F6	message window scroll up
+F7	contact list scroll down
+F8	contact list scroll up
+F9	send RAW data to server
+F10	exit
+
+PgUp	switchboard (chat) window scroll down
+PgDn	switchboard window scroll up
+@F7	participant list scroll down (chat session)
+@F8	participant list scroll up
+
+ESC first, or ALT down :
+------------------------
+C	connect
+S	change status
+L	contact lists
+O	options
+A	add
+D	logout
+N	change name
+M	mailbox status
+P	ping
+I	invite
+/	enter special client command (none for now)
+
+Switchboard (chat) text input:
+------------------------------
+* to talk, just type any text and press enter to send it to the switchboard server
+* while you are typing, typing notifications are being sent in 4sec intervals.
+* if the string begins with "/", then it forms a special command 
+  (and typing notifications are not being sent while you are typing it).
+* use // if you want to send one "/" in the beginning
+
+switchboard commands:
+---------------------
+/ <text>
+	(there is space after slash!)  
+	This command sends <text> to the chat session without typing notification!
+        (this happens because the text gets typed while in command-entry mode ("/"))
+                
+/send <string>
+	send RAW command string to SB server
+        
+/invite <user>
+/i <user>
+	invite the user with account <user> to join session
+        
+/spoof <fake>
+	send a fake typing notification from user <fake>
+	(to have fun with the original client ;-)
+
+/file <filename>
+	send a request to send file <filename>
+       
+
+EDITBOX Controls (everywhere):
+------------------------------
+arrow left/right	navigation left/right
+home/end		navigation home/end
+insert			toggle insert mode
+delete			delete character at cursor (and move rest to the left)
+^T			delete word
+^A			word left
+^D			word right
+backspace/^H		delete character at the left
+ESC			cancel
+ENTER			exit edit mode and save string
+arrow up/down           recall previous/next line from history
+^K			enter clipboard mode (escape mode)
+* clipboard mode
+	C		copy whole line to clipboard
+	B		set block begin
+	K		copy from block begin to current pos
+	V		paste clipboard contents
+	X		cut line to clipboard
+	Z		clear line (without affecting clipboard)
+        
+* clipboard mode is valid only for one keystroke (CBKVXZ), 
+  and is automatically exited after it
+* invalid keystokes exit the mode
+* you cannot cut & copy a masked field (i.e. password), though you can paste on it
+
+Contact/Group Selection Mode:
+(when you are presented with a list of contacts or groups)
+----------------------------------------------------------
+]/arrow right/down	next entry
+[/arrow left/up		previous entry
+{/home			first entry
+}/end			last entry
+q			information
+space/enter		select
+ESC			cancel selection
+
+Transfers Window
+----------------
+]/arrow down		next entry
+[/arrow up		previous entry
+}/arrow right		scroll left
+{/arrow left		scroll right
+a			accept incoming invitation
+r			reject incoming invitation
+c			cancel (abort) incoming/outgoing transfer
+			or outgoing invitation
+q			information
+delete			delete entry
+?			mini help
+
+
+**************************************************
+gtmess-gw - HTTP gateway for MSN Messenger Clients
+**************************************************
+
+* installs a notification server at port 1863 and 
+  a switchboard server at port 1864
+* both servers forward the packets through the http gateway
+* useful if you are behind a firewall
+* you can use it with gtmess as follows:
+    1) start the gateway
+	gtmess-gw (better in another terminal)
+    2) start gtmess
+	gtmess -Oserver=127.0.0.1
+
+******************************************
+gtmess-notify - popup notification windows
+******************************************
+
+* pops up a notification window starting from lower right of the screen
+* watches the named pipe '~/.gtmess/notify.pip' for new lines and displays
+  the line text
+
+******************************************
+gtmess_w - sample desktop shortcut script
+******************************************

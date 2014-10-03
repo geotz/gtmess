@@ -1,0 +1,24 @@
+#!/bin/sh
+
+# gtmess - MSN Messenger client
+# (c) 2002-2003 by George M. Tzoumas
+#
+# This script opens a terminal window and runs gtmess in it.
+# It can be used as a desktop shortcut.
+#
+# This script is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# The source code of this script is ABSOLUTELY FREE
+# You can do whatever you want with it ;-)
+
+# Make sure the programs are in your PATH!
+
+# iso8859-7 font
+GTMESS_FONT='-*-*-medium-r-*-*-15-*-*-*-*-*-*-7'
+
+ps -e | grep "gtmess-notify" || gtmess-notify &
+sleep 1
+wterm -geometry 94x34 -fg white -bg black -fn $GTMESS_FONT \
+    -title gtmess -e gtmess
