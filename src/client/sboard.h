@@ -2,7 +2,7 @@
  *    sboard.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -79,8 +79,8 @@ extern xqueue_t q_sb_req;
 
 void *msn_sbdaemon(void *arg);
 void sboard_openlog(msn_sboard_t *p);
-msn_sboard_t *msn_sblist_add(msn_sblist_t *q, char *sbaddr, char *hash,
-                             char *master, char *mnick, int called, char *sessid);
+msn_sboard_t *msn_sblist_add(msn_sblist_t *q, const char *sbaddr, const char *hash,
+                             const char *master, const char *mnick, int called, const char *sessid);
 int msn_sblist_rem(msn_sblist_t *q);
 
 void sb_blah();

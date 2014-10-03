@@ -2,7 +2,7 @@
  *    msn.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2010  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -24,6 +24,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <iconv.h>
+
+#include <sys/errno.h>
 
 #include "../config.h"
 
@@ -527,7 +529,7 @@ void msn_glist_cpy(msn_glist_t *dest, msn_glist_t *src, msn_contact_t *ref)
 
 /******* string utility routines *******/
 
-void md5hex(char *src, char *hex_output)
+void md5hex(const char *src, char *hex_output)
 {
     md5_state_t state;
     md5_byte_t digest[16];
@@ -540,7 +542,7 @@ void md5hex(char *src, char *hex_output)
         sprintf(hex_output + di * 2, "%02x", digest[di]);
 }
 
-void utf8decode(iconv_t ic, char *src, char *dest)
+void utf8decode(iconv_t ic, const char *src, char *dest)
 {
     size_t ibl, obl;
     
@@ -565,7 +567,7 @@ void utf8decode(iconv_t ic, char *src, char *dest)
     }
 }
 
-void utf8encode(iconv_t ic, char *src, char *dest, size_t obl)
+void utf8encode(iconv_t ic, const char *src, char *dest, size_t obl)
 {
     size_t ibl;
     
@@ -590,7 +592,7 @@ void utf8encode(iconv_t ic, char *src, char *dest, size_t obl)
     }
 }
 
-void str2url(char *src, char *dest)
+void str2url(const char *src, char *dest)
 {
     static char unreserved[256] = {
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -611,6 +613,7 @@ void str2url(char *src, char *dest)
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     char textubuf[2*SXL], *textu;
+    const char *s;
     int alloc = 0;
     size_t size, len;
 
@@ -626,18 +629,19 @@ void str2url(char *src, char *dest)
             alloc = 1;
         }
         utf8encode(msn_ic[1], src, textu, size);
+        s = textu;
     } else {
-        textu = src;
+        s = src;
     }
     
-    for (; *textu; textu++)
-        if (unreserved[(unsigned char) *textu]) *dest++ = *textu;
-        else sprintf(dest, "%%%02X", (unsigned char) *textu), dest += 3;
+    for (; *s; s++)
+        if (unreserved[(unsigned char) *s]) *dest++ = *s;
+        else sprintf(dest, "%%%02X", (unsigned char) *s), dest += 3;
     *dest = 0;
     if (alloc && textu != NULL) free(textu);
 }
 
-void url2str(char *src, char *dest)
+void url2str(const char *src, char *dest)
 {
     unsigned int c;
     char *tmp, *t;
@@ -656,7 +660,7 @@ void url2str(char *src, char *dest)
     free(tmp);
 }
 
-int is3(char *a, char *b)
+int is3(const char *a, const char *b)
 {
     return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
 }
@@ -943,7 +947,7 @@ int msn_uux(int fd, unsigned int tid, const char *psm)
     char reply[SML*3], s[SML*2], psmu[SML];
     str2url(psm, psmu);
     sprintf(s, " <Data><PSM>%s</PSM><CurrentMedia></CurrentMedia></Data>", psmu);
-    sprintf(reply, "UUX %u %d\r\n%s", tid, strlen(s), s);
+    sprintf(reply, "UUX %u %zu\r\n%s", tid, strlen(s), s);
     return writestr(fd, reply);
 }
 
@@ -1074,9 +1078,18 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
     
 /*    sprintf(s, "VER %u MSNP12 CVR0\r\n", tid++);*/
     sprintf(s, "VER %u MSNP12\r\n", tid++);
-    if (writestr(fd, s) < 0) return -1;
-
-    if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
+    if (writestr(fd, s) < 0) {
+        err = errno;
+        close(fd);
+        errno = err;
+        return -1;
+    }
+    if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) {
+        err = errno;
+        close(fd);
+        errno = err;
+        return -2;
+    }
     if (sscanf(rep, "VER %*u %s", tmp) != 1 || 
         strcmp(tmp, "MSNP12") != 0) {
             close(fd);
@@ -1084,9 +1097,19 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
             return -3;
     }
 
-    if (msn_cvr(fd, tid++, cvr, login) < 0) return -1;
+    if (msn_cvr(fd, tid++, cvr, login) < 0) {
+        err = errno;
+        close(fd);
+        errno = err;
+        return -1;
+    }
     
-    if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
+    if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) {
+        err = errno;
+        close(fd);
+        errno = err;
+        return -2;
+    }
     if (sscanf(rep, "%s", tmp) != 1 || strcmp(tmp, "CVR") != 0) {
         close(fd);
         if (sscanf(rep, "%d", &err) == 1) return err;
@@ -1094,9 +1117,19 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
     }
 
     sprintf(s, "USR %u TWN I %s\r\n", tid++, login);
-    if (writestr(fd, s) < 0) return -1;
+    if (writestr(fd, s) < 0) {
+        err = errno;
+        close(fd);
+        errno = err;
+        return -1;
+    }
 
-    if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
+    if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) {
+        err = errno;
+        close(fd);
+        errno = err;
+        return -2;
+    }
     if (sscanf(rep, "XFR %*u %*s %s", tmp) == 1) {
         if (dest != NULL) Strcpy(dest, tmp, SML);
         close(fd);
@@ -1121,9 +1154,19 @@ int msn_login_twn(int fd, unsigned int tid, char *ticket)
     int foo;
     
     sprintf(s, "USR %u TWN S %s\r\n", tid, ticket);
-    if (writestr(fd, s) < 0) return -1;
+    if (writestr(fd, s) < 0) {
+        err = errno;
+        close(fd);
+        errno = err;
+        return -1;
+    }
     
-    if (readlnt(fd, s, SXL, SOCKET_TIMEOUT) == NULL) return -2;
+    if (readlnt(fd, s, SXL, SOCKET_TIMEOUT) == NULL) {
+        err = errno;
+        close(fd);
+        errno = err;
+        return -2;
+    }
     if (sscanf(s, "USR %*u OK %*s %d", &foo) != 1) {
         if (sscanf(s, "%d", &err) == 1) return err;
         return -3;
@@ -1140,7 +1183,7 @@ int msn_msg_typenotif(int fd, unsigned int tid, char *user)
     sprintf(msg, "MIME-Version: 1.0\r\n"
                  "Content-Type: text/x-msmsgscontrol\r\n"
                  "TypingUser: %s\r\n\r\n\r\n", user);
-    sprintf(s, "MSG %u U %d\r\n%s", tid, strlen(msg), msg);
+    sprintf(s, "MSG %u U %zu\r\n%s", tid, strlen(msg), msg);
     return writestr(fd, s);
 }
 
@@ -1151,7 +1194,7 @@ commands(args):
     GTMESS = tell everybody you are using gtmess, too
     SAY(text) = send <text> in a way that only gtmess users can see
 */
-int msn_msg_gtmess(int fd, unsigned int tid, char *cmd, char *args)
+int msn_msg_gtmess(int fd, unsigned int tid, const char *cmd, const char *args)
 {
     char s[2*SXL+6*48], msg[2*SXL+5*48], argsu[2*SXL];
 
@@ -1160,7 +1203,7 @@ int msn_msg_gtmess(int fd, unsigned int tid, char *cmd, char *args)
                  "Content-Type: text/x-gtmesscontrol\r\n"
                  "Command: %s\r\n"
                  "Args: %s\r\n\r\n", cmd, argsu);
-    sprintf(s, "MSG %u U %d\r\n%s", tid, strlen(msg), msg);
+    sprintf(s, "MSG %u U %zu\r\n%s", tid, strlen(msg), msg);
     return writestr(fd, s);
 }
 
@@ -1182,7 +1225,7 @@ int msn_msg_text(int fd, unsigned int tid, char *text)
         alloc = 1;
     }
     utf8encode(msn_ic[1], text, textu, size);
-    sprintf(s, "MSG %u N %d\r\n", tid, strlen(textu)+62);
+    sprintf(s, "MSG %u N %zu\r\n", tid, strlen(textu)+62);
     writestr(fd, s);
     writestr(fd, "MIME-Version: 1.0\r\n"
                  "Content-Type: text/plain; charset=UTF-8\r\n\r\n");    /* len = 62 */
@@ -1207,7 +1250,7 @@ int msn_msg_finvite(int fd, unsigned int tid, unsigned int cookie,
                  "Invitation-Cookie: %d\r\n"
                  "Application-File: %s\r\n"
                  "Application-FileSize: %u\r\n\r\n", cookie, fnameu, size);
-    sprintf(s, "MSG %u N %d\r\n%s", tid, strlen(msg), msg);
+    sprintf(s, "MSG %u N %zu\r\n%s", tid, strlen(msg), msg);
     return writestr(fd, s);
 }
 
@@ -1226,7 +1269,7 @@ int msn_msg_accept2(int fd, unsigned int tid, unsigned int cookie,
                  "AuthCookie: %u\r\n"
                  "Launch-Application: FALSE\r\n"
                  "Request-Data: IP-Address:\r\n\r\n", cookie, ip, port, auth_cookie);
-    sprintf(s, "MSG %u N %d\r\n%s", tid, strlen(msg), msg);
+    sprintf(s, "MSG %u N %zu\r\n%s", tid, strlen(msg), msg);
     return writestr(fd, s);
 }
 
@@ -1241,7 +1284,7 @@ int msn_msg_accept(int fd, unsigned int tid, unsigned int cookie)
                  "Invitation-Cookie: %u\r\n"
                  "Launch-Application: FALSE\r\n"
                  "Request-Data: IP-Address:\r\n\r\n", cookie);
-    sprintf(s, "MSG %u N %d\r\n%s", tid, strlen(msg), msg);
+    sprintf(s, "MSG %u N %zu\r\n%s", tid, strlen(msg), msg);
     return writestr(fd, s);
 }
 
@@ -1255,7 +1298,7 @@ int msn_msg_cancel(int fd, unsigned int tid, unsigned int cookie, char *code)
                  "Invitation-Command: CANCEL\r\n"
                  "Invitation-Cookie: %u\r\n"
                  "Cancel-Code: %s\r\n\r\n", cookie, code);
-    sprintf(s, "MSG %u N %d\r\n%s", tid, strlen(msg), msg);
+    sprintf(s, "MSG %u N %zu\r\n%s", tid, strlen(msg), msg);
     return writestr(fd, s);
 }
 

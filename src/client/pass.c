@@ -2,7 +2,7 @@
  *    pass.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2009  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by

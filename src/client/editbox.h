@@ -2,7 +2,7 @@
  *    editbox.h
  *
  *    editbox control for curses
- *    Copyright (C) 2002-2006  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -55,8 +55,8 @@ typedef struct {
 
 void eb_init(ebox_t *e, int nc, int width);
 void eb_free(ebox_t *e);
-void eb_settext(ebox_t *e, char *s);
-void eb_history_add(ebox_t *e, char *s, int len);
+void eb_settext(ebox_t *e, const char *s);
+void eb_history_add(ebox_t *e, const char *s, int len);
 int eb_keydown(ebox_t *e, int key);
 void eb_draw(ebox_t *e, WINDOW *w);
 void eb_resize(ebox_t *e, int nw);

@@ -2,7 +2,7 @@
  *    screen.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2009  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -255,7 +255,9 @@ void msg(int attr, const char *fmt, ...)
     va_start(ap, fmt);
     r = vmsg(attr, SML, fmt, ap);
     va_end(ap);
-    if (r) vmsg(C_ERR, SML, "msg(): output truncated\n", NULL);
+    /* workaround for empty va_list for ARM --
+         infinite recursion should not happen anyway :) */
+    if (r) msg(C_ERR, "msg(): output truncated\n");
 }
 
 void msgn(int attr, int size, const char *fmt, ...)
@@ -266,7 +268,7 @@ void msgn(int attr, int size, const char *fmt, ...)
     va_start(ap, fmt);
     r = vmsg(attr, size, fmt, ap);
     va_end(ap);
-    if (r) vmsg(C_ERR, SML, "msgn(): output truncated\n", NULL);
+    if (r) msg(C_ERR, "msgn(): output truncated\n");
 }
 
 int screen_shut()

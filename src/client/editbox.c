@@ -2,7 +2,7 @@
  *    editbox.c
  *
  *    editbox control for curses
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -27,6 +27,8 @@
 
 #include "editbox.h"
 #include "utf8.h"
+
+#include "gtmess.h"
 
 /* clipboard length */
 #define CBL 1024
@@ -134,7 +136,7 @@ void eb_free(ebox_t *e)
     if (e->wtext != NULL) free(e->wtext);
 }
 
-void eb_settext(ebox_t *e, char *s)
+void eb_settext(ebox_t *e, const char *s)
 {
     if (e->grow) eb_growfor(e,strlen(s));
     memset(e->text, 0, e->nb+1);
@@ -185,7 +187,7 @@ int eb_pastechar(ebox_t *e, wchar_t c)
     return res;
 }
 
-void eb_history_add(ebox_t *e, char *s, int len)
+void eb_history_add(ebox_t *e, const char *s, int len)
 {
     if (!e->history) return;
     hlist_add(&e->HL, s, len, -1);
@@ -215,6 +217,9 @@ int eb_keydown(ebox_t *e, int key)
 {
     switch (key) {
         case KEY_UP: /* history previous */
+            if (Config.safe_histroy) {
+                if (e->sl && hlist_find(&e->HL, e->text) == NULL) break;
+            }
             if (e->history && e->HL.head != NULL) {
                 if (strcmp((char *) e->HL.head->text, (char *) e->text) == 0) e->HL.head = e->HL.head->prev;
                 eb_settext(e, e->HL.head->text);
@@ -222,6 +227,9 @@ int eb_keydown(ebox_t *e, int key)
             }
             break;
         case KEY_DOWN: /* history next */
+            if (Config.safe_histroy) {
+                if (e->sl && hlist_find(&e->HL, e->text) == NULL) break;
+            }
             if (e->history && e->HL.head != NULL) {
                 e->HL.head = e->HL.head->next;
                 if (strcmp((char *) e->HL.head->text, (char *) e->text) == 0) e->HL.head = e->HL.head->next;
@@ -332,6 +340,11 @@ int eb_keydown(ebox_t *e, int key)
                     break;
                 case 'z':
                 case 'Z': /* zap */
+                    eb_zap(e);
+                    break;
+                case 'p':
+                case 'P': /* push */
+                    eb_history_add(e, e->text, e->sl);
                     eb_zap(e);
                     break;
                 case 'c':

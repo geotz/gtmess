@@ -2,7 +2,7 @@
  *    gtmess.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2010  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -29,20 +29,20 @@ DELETE EVERYTHING AND WRITE THE CLIENT FROM SCRATCH IN C++ :-)
 
 NEXT version
 -------------
-fix clist scrolling...?
-possible bug upon initial Connect...() ? why all those socket read errors?
-(currently dirty fix by max_retries)
-
+resize sub-windows!
+auto Be-Right-Back ---> Away
+auto Idle ---> Away
+scripting / remote-control
 
 MAYBE in SOME future version
 -----------------------------
+fix clist scrolling...?
+
 fix issue with terminal resize and interrupted system call during login
 
 test SB pending flag
 
 gtmess_w pass args
-
-fix history list (bash-like/readline)
 
 F9 also exits from EBoxes
 
@@ -51,14 +51,11 @@ more colors in sb win <Tibor>
 sprintf --> Sprintf (safe!)
 add URL... (xfers / strNcpy!!! -- play HOSTILE to others! :->)
 
-resize sub-windows!
 restore check for online mode (msn.fd == -1)
 avatars!
 vertical menu?
 
-auto Be-Right-Back ---> Away
 uninvitable when busy
-^K-P = push immediately into history buffer and clear line
 
 Invite option on Reverse/Allow list
 
@@ -160,7 +157,7 @@ histlen
 #if defined (__APPLE__)
 #define SNDEXEC "/usr/bin/afplay %s > /dev/null 2>&1 &"
 #define URLEXEC "/usr/bin/open '%s' > /dev/null 2>&1"
-#define POPEXEC "which -s growlnotify && growlnotify -a gtmess -m '%s' -t gtmess"
+#define POPEXEC "which -s growlnotify && growlnotify -a gtmess -t '%s' -m gtmess"
 #elif defined (__linux__)
 #define SNDEXEC "/usr/bin/aplay -Nq %s > /dev/null 2>&1 &"
 #define URLEXEC "opera --remote 'openURL(%s,new-page)' >/dev/null 2>&1 &"
@@ -216,7 +213,8 @@ struct cfg_entry ConfigTbl[] =
     {"passp_server", "login.live.com/login2.srf", 0, 0, 0, 0},
     {"psm", "", 0, 0, 0, 0},
     {"max_retries", "", 4, 1, 0, 31},
-    {"pop_exec", POPEXEC, 0, 0, 0, 0}
+    {"pop_exec", POPEXEC, 0, 0, 0, 0},
+    {"safe_histroy", "", 1, 1, 0, 1}
   };
 
 struct cfg_entry *OConfigTbl;
@@ -226,7 +224,7 @@ int NumConfigVars = 0;
 
 /*extern syn_hdr_t syn_cache;
 extern FILE *syn_cache_fp;*/
-char *ZS = "";
+const char *ZS = "";
 char MyIP[SML];
 char copyright_str[SML];
 
@@ -456,7 +454,7 @@ char *getalias2(char *login, char *nick)
 }
 
 /* 2-arg version */
-char *getnick2(char *login, char *nick)
+const char *getnick2(char *login, char *nick)
 {
     char *alias = NULL;
 
@@ -467,7 +465,7 @@ char *getnick2(char *login, char *nick)
     return (alias != NULL)? alias: login;
 }
 
-char *getnick1(char *login)
+const char *getnick1(char *login)
 {
     char *alias = NULL;
     char *nick = NULL;
@@ -481,7 +479,7 @@ char *getnick1(char *login)
     return getnick2(login, nick);
 }
 
-char *getnick1c(msn_contact_t *p)
+const char *getnick1c(msn_contact_t *p)
 {
     return getnick2(p->login, p->nick);
 }
@@ -626,7 +624,7 @@ int do_login()
     /* sync lists */
 /*    read_syn_cache_hdr();
     msn_syn(msn.nfd, nftid(), syn_cache.ver);*/
-	
+
     msn_syn(msn.nfd, nftid(), 0);
 
     return 0;
@@ -705,6 +703,7 @@ void print_usage(char *argv0)
                     "pop_exec=<s>\t\tcommand line for popup notification message\n"
                     "\t\t\t[%s]\n"
                     "psm=<s>\t\t\tset personal message upon login (empty = do not set) []\n"
+                    "safe_history=<b>\tdisable editbox history browsing for unsaved lines [1]\n"
                     "safe_msg=<n>\t\tprevents inadvertently closing chat window with\n"
                     "\t\t\ttoo recent messages (just before <n> seconds,\n"
                     "\t\t\t-1=disable) [0]\n"
@@ -724,7 +723,8 @@ void print_usage(char *argv0)
                     "url_exec=<s>\t\tcommand line for url browser\n"
                     "\t\t\t[%s]\n"
                     "EXAMPLE:\n"
-                    "\t%s -Ologin=george -Opassword=secret123 -Oinitial_status=1\n",
+                    "\t%s -Ologin=george '-Opassword=[:QXixxf!' -Oinitial_status=1\n"
+                    "\t  (obfuscated password corresponding to 'secret123')\n",
              argv0, ConfigTbl[40].sval, ConfigTbl[28].sval, ConfigTbl[4].ival, ConfigTbl[29].sval, argv0);
 }
 
@@ -979,6 +979,7 @@ void config_init()
     Strcpy(Config.psm, ConfigTbl[c++].sval, SML);
     Config.max_retries = ConfigTbl[c++].ival;
     Strcpy(Config.pop_exec, ConfigTbl[c++].sval, SCL);
+    Config.safe_histroy = ConfigTbl[c++].ival;
     NumConfigVars = c;
     
     sprintf(Config.datadir, "%s", DATADIR);
@@ -1256,16 +1257,22 @@ int menu_change_name(char *uuid, char *old)
     } else return 0;
 }
 
+void set_psm(const char *s)
+{
+    LOCK(&msn.lock);
+    strcpy(msn.psm, s);
+    draw_status(1);
+    UNLOCK(&msn.lock);
+    msn_uux(msn.nfd, nftid(), s);
+}
+
 int menu_change_psm(char *old)
 {
     char newpsm[SML];
 
     Strcpy(newpsm, old, SML);
     if (get_string(C_EBX, 0, "Personal msg: ", newpsm, SML)) {
-        LOCK(&msn.lock);
-        strcpy(msn.psm, newpsm);
-        UNLOCK(&msn.lock);
-        msn_uux(msn.nfd, nftid(), newpsm);
+        set_psm(newpsm);
         return 1;
     } else return 0;
 }
@@ -2435,11 +2442,58 @@ int dispatch_key(int c, int escape)
     }
 }
 
+int process_command(const char *s)
+{
+    char cmd[SXL];
+    const char *q, *arg;
+
+    for (q = s; *q == ' '; q++); /* skip initial spaces */
+    if (*q == 0) return 0;
+    arg = strchr(q, ' ');
+    if (arg == NULL) arg = strchr(q, 0);
+    strncpy(cmd, q, arg-q);
+    cmd[arg-q] = 0;
+    if (*arg == ' ') arg++;
+
+    if (strcmp(cmd, "help") == 0) {
+        msg(C_NORMAL, "Available commands:\n");
+        msg(C_DBG, "logout - sign out from msn server\n"
+                   "psm [message] - set personal message\n"
+                   "quit - program exit\n"
+                   "status [HDN|NLN|IDL|AWY|BSY|BRB|PHN|LUN] - set personal status\n");
+        return 1;
+    }
+    if (strcmp(cmd, "logout") == 0) {
+        log_out(0, 0);
+        return 1;
+    }
+    if (strcmp(cmd, "psm") == 0) {
+        set_psm(arg);
+        return 1;
+    }
+    if (strcmp(cmd, "quit") == 0) {
+        _gtmess_exit(0);
+        _exit(0);
+    }
+    if (strcmp(cmd, "status") == 0) {
+        int i;
+        for (i = 1; i < 9; i++) if (strcmp(msn_stat_com[i], arg) == 0) break;
+        if (i < 9) msn_chg(msn.nfd, nftid(), i); else msg(C_ERR, "Invalid status - %s\n", arg);
+        return 1;
+    }
+    if (strcmp(s, "test colors") == 0) { /* undocumented */
+        color_test();
+        return 1;
+    }
+    msg(C_ERR, "Invalid command -- try 'help'\n");
+    return 0;
+}
+
 int main(int argc, char **argv)
 {
     int c, paste, escape, mstatus;
     
-    sprintf(copyright_str, "F9.Menu TAB.Contacts ?.Help | gtmess %s (%s), (c) 2002-2010 by GeoTz", VERSION, VDATE);
+    sprintf(copyright_str, "F9.Menu TAB.Contacts ?.Help | gtmess %s (%s), (c) 2002-2011 by GeoTz", VERSION, VDATE);
     printf("%s\n", &copyright_str[30]);
     
     queue_init(&msg_q);
@@ -2498,12 +2552,13 @@ int main(int argc, char **argv)
     msg(C_DBG, 
         "gtmess version %s (%s)\n"
         "MSN Messenger Client for UNIX Console\n"
-        "(c) 2002-2010 by George M. Tzoumas\n"
+        "(c) 2002-2011 by George M. Tzoumas\n"
         "gtmess is free software, covered by the\nGNU General Public License.\n"
         "There is absolutely no warranty for gtmess.\n\n", VERSION, VDATE);
 
     load_aliases();
 
+    time(&keyb_time); /* to properly update timer */
     if (Config.auto_login) log_in(1);
     
     msg2(C_MNU, "Welcome to gtmess. Press F9 for menu, `?' for help, F5/F6 to scroll messages.");
@@ -2568,13 +2623,10 @@ int main(int argc, char **argv)
                         escape = 0;
                         break;
                     } else if (c == '/') {
-                        char s[SML] = {0};
+                        char s[SXL] = {0};
 
-                        if (get_string(C_EBX, 0, "/", s, SML)) {
-                            /* undocumented */
-                            if (strcmp(s, "test colors") == 0) {
-                                color_test();
-                            } else msg(C_ERR, "Invalid command\n");
+                        if (get_string(C_EBX, 0, "/", s, SXL)) {
+                            process_command(s);
                         }
                         escape = 0;
                         break;

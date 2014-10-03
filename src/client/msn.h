@@ -2,7 +2,7 @@
  *    msn.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2009  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -109,11 +109,12 @@ int  msn_glist_save(msn_glist_t *q, FILE *f);
 msn_group_t *msn_glist_add(msn_glist_t *q, char *gid, char *name);
 void msn_glist_cpy(msn_glist_t *dest, msn_glist_t *src, msn_contact_t *ref);
 
-int is3(char *a, char *b);
-void md5hex(char *src, char *hex_output);
-void str2url(char *src, char *dest);
-void utf8decode(iconv_t ic, char *src, char *dest);
-void url2str(char *src, char *dest);
+int is3(const char *a, const char *b);
+void md5hex(const char *src, char *hex_output);
+void str2url(const char *src, char *dest);
+void utf8decode(iconv_t ic, const char *src, char *dest);
+void utf8encode(iconv_t ic, const char *src, char *dest, size_t obl);
+void url2str(const char *src, char *dest);
 
 char *msn_parse_contact_data(char *buf, char *login, char *nick, char *uuid);
 char *msn_error_str(int err);
@@ -141,7 +142,7 @@ int msn_cvr(int fd, unsigned int tid, char *cvr, char *login);
 int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest);
 int msn_login_twn(int fd, unsigned int tid, char *ticket);
 int msn_msg_typenotif(int fd, unsigned int tid, char *user);
-int msn_msg_gtmess(int fd, unsigned int tid, char *cmd, char *args);
+int msn_msg_gtmess(int fd, unsigned int tid, const char *cmd, const char *args);
 int msn_msg_text(int fd, unsigned int tid, char *text);
 int msn_msg_finvite(int fd, unsigned int tid, unsigned int cookie, 
                     char *fname, unsigned int size);

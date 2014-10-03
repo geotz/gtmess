@@ -1,5 +1,18 @@
 *******************************
-* Version 0.96 (Aug 2009)     *
+* Version 0.97 (Dec 2011)     *
+*******************************
+! proper size_t printing -> fixed infamous "socket read error" bug!
+! fixed ARM compilation issues / empty va_list handling {Lluis}
+! fixed empty contact list syncing upon login
+! fixed an issue with auto-login and auto-idle
++ better editbox history handling (with empty sentinel)
++ push current line into history buffer (^K-P)
++ safe history browsing [safe_history]
++ global commands (Alt-/): help, psm, status, etc.
+* modified growlnotify cmdline (swapped title and message)
+
+*******************************
+* Version 0.96 (Aug 2010)     *
 *******************************
 ! fixed a memleak regarding PSM parsing
 * better macos/darwin integration (snd/url_exec)
@@ -10,7 +23,7 @@
 + popup script defaults to notify-send under Linux
 
 *******************************
-* Version 0.96beta3 (Feb 2009)*
+* Version 0.96beta3 (Jan 2010)*
 *******************************
 + auto-retry initial connection [max_retries]
 + remove contact from all groups

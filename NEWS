@@ -7,11 +7,11 @@ You can contact the developer at
     geotz@hotmail.com
 
 
-*** gtmess version 0.96 ***
+*** gtmess version 0.97 ***
 
-After several months of betatesting, the new protocol
-seems to be stable. You'll also enjoy the new notification
-scheme (supports native notifications for KDE, MacOS etc.)
+Maintenance release. Take it as a Christmas gift! :) The infamous
+"socket read error" bug has been fixed!  There are also some
+improvements regarding the editbox history browsing.
 
 Have fun...
     	    	    	    	    	    	---- George

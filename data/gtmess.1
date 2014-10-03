@@ -1,5 +1,5 @@
 .\" 
-.TH "gtmess" "1" "August 23, 2010" "" "gtmess messenger"
+.TH "gtmess" "1" "December 16, 2011" "" "gtmess messenger"
 .SH "NAME"
 gtmess \- MSN messenger client
 
@@ -11,7 +11,7 @@ gtmess [options]
 gtmess is an MSN messenger client, which allows you to use
 the MSN messenger service. It is a console application that
 uses the curses library to present a friendly user interface.
-This manpage corresponds to version 0.96.
+This manpage corresponds to version 0.97.
 
 .SH "OPTIONS"
 .TP 
@@ -396,7 +396,9 @@ The default value is
 
 .TP 
 .BI password "" = S
-Sets the default password.
+Sets the default password. The password should be given in obfuscated form. See
+.B Options/Password
+for more information.
 
 .TP 
 .BI passp_server "" = S
@@ -422,7 +424,7 @@ value is
 .B which notify-send >/dev/null 2>&1 && notify-send gtmess '%s' > /dev/null 2>&1
 which corresponds to the freedesktop.org notification scheme. For Darwin/MacOS
 the default value is
-.B which -s growlnotify && growlnotify -a gtmess -m '%s' -t gtmess
+.B which -s growlnotify && growlnotify -a gtmess -t '%s' -m gtmess
 which makes use of the Growl notification system.
 The provided  
 .I gtmess\-notify 
@@ -443,6 +445,14 @@ only a single `%s' is allowed which will be substituted
 with the message string. Single quotes in the message string will be replaced by spaces.
 Leaving this variable empty is another way to disable popups.
 
+.TP 
+.BI safe_history "" = B
+Enables/disables safe history browsing for the editboxes. When enabled and
+the editbox contains text that does not exist in the history buffer, the
+history browsing (up/down arrows) is disabled. This is to prevent the user from
+inadvertently pressing the arrow keys and losing some recently typed text.
+The default value is
+.BR 1 .
 
 .TP 
 .BI safe_msg "" = N
@@ -686,7 +696,10 @@ Quit the program
 
 .TP 
 .B /
-Enter special client command (try "test colors")
+Enter special client command (try "help" to see a list). This function
+presents a simple command-line interface to gtmess. This feature, although
+now in preliminary form, is intended to provide scripting capabilities in future
+versions.
 
 .PP 
 The shortcut key for the menu is shown underlined. Some menu
@@ -1150,7 +1163,11 @@ cut line to buffer
 
 .TP 
 .B Z
-clear line (without affecting the buffer)
+clear (zap) line (without affecting the buffer)
+
+.TP 
+.B P
+push line into history and zap
 
 .TP 
 .B N
@@ -1408,13 +1425,13 @@ information, especially on the keyboard shortcuts
 .SH "MAKING OF"
 .TP 
 .B Operating System
-Debian Linux
+Debian Linux, Mac OS X
 .TP 
 .B Desktop Environment
-WindowMaker
+WindowMaker, KDE 4, Quartz
 .TP 
 .B Code Editor
-NEdit
+NEdit, Qt Creator
 .TP 
 .B Sound Effects
 ZynAddSubFX

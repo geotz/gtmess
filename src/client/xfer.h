@@ -2,7 +2,7 @@
  *    xfer.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -76,12 +76,12 @@ typedef struct {
 extern pthread_mutex_t XX;
 extern xfer_l XL;
         
-xfer_t *xfl_add_file(xfer_l *l, xstat_t status, char *local, char *remote, int incoming,
+xfer_t *xfl_add_file(xfer_l *l, xstat_t status, const char *local, const char *remote, int incoming,
                      unsigned int inv_cookie, msn_sboard_t *sb, 
-                     char *fname, unsigned int fsize);
-xfer_t *xfl_add_url(xfer_l *l, char *local, char *remote,
+                     const char *fname, unsigned int fsize);
+xfer_t *xfl_add_url(xfer_l *l, const char *local, const char *remote,
                     unsigned int inv_cookie, msn_sboard_t *sb, 
-                    char *url);
+                    const char *url);
 xfer_t *xfl_find(xfer_l *l, unsigned int inv_cookie);
 void xfl_rem(xfer_l *l, xfer_t *x);
 void draw_xfer(int r);

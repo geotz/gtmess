@@ -2,7 +2,7 @@
  *    xfer.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -65,7 +65,7 @@ void xf_focus(int i)
         }
 }
 
-xfer_t *xfl_add(xfer_l *l, xclass_t xclass, xstat_t status, char *local, char *remote, 
+xfer_t *xfl_add(xfer_l *l, xclass_t xclass, xstat_t status, const char *local, const char *remote,
                 int incoming, unsigned int inv_cookie, msn_sboard_t *sb)
 {
     xfer_t *x = malloc(sizeof(xfer_t));
@@ -98,9 +98,9 @@ xfer_t *xfl_add(xfer_l *l, xclass_t xclass, xstat_t status, char *local, char *r
     return x;
 }
 
-xfer_t *xfl_add_file(xfer_l *l, xstat_t status, char *local, char *remote, int incoming, 
+xfer_t *xfl_add_file(xfer_l *l, xstat_t status, const char *local, const char *remote, int incoming,
                     unsigned int inv_cookie, msn_sboard_t *sb, 
-                    char *fname, unsigned int fsize)
+                    const char *fname, unsigned int fsize)
 {
     xfer_t *x = xfl_add(l, XF_FILE, status, local, remote, incoming, inv_cookie, sb);
     if (x == NULL) return NULL;
@@ -115,9 +115,9 @@ xfer_t *xfl_add_file(xfer_l *l, xstat_t status, char *local, char *remote, int i
     return x;
 }
 
-xfer_t *xfl_add_url(xfer_l *l, char *local, char *remote,
+xfer_t *xfl_add_url(xfer_l *l, const char *local, const char *remote,
                     unsigned int inv_cookie, msn_sboard_t *sb, 
-                    char *url)
+                    const char *url)
 {
     xfer_t *x = xfl_add(l, XF_URL, XS_INVITE, local, remote, 1, inv_cookie, sb);
     if (x == NULL) return NULL;

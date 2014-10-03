@@ -5,6 +5,13 @@ gtmess - MSN Messenger Client
 To see command line options:
     gtmess -h
 
+Quickstart:
+    Run gtmess, press F9, select "Connect", enter login/pass.
+    Use arrow keys to select a contact and press enter to open a chat window.
+    Press Tab to switch between chat window and contact list.
+    Read on for more keyboard shortcuts, to navigate between
+    chat windows, etc.
+
 Keys:
 ^ = CTRL, @ = ALT (or ESC first), $ = SHIFT
 ===========================================
@@ -76,7 +83,7 @@ O	options
 I	invite
 T	enter note
 Q	quit
-/	enter special client command (none for now, try "test colors" for fun)
+/	enter special client command (try "help" to get a list, "test colors" for fun)
 
 Menu navigation (F9)
 --------------------
@@ -154,9 +161,10 @@ arrow up/down           recall previous/next line from history
 	K		copy from block begin to current pos
 	V		paste clipboard contents
 	X		cut line to clipboard
-	Z		clear line (without affecting clipboard)
+	Z		clear (zap) line (without affecting clipboard)
+	P		push line into history and zap
 	N		insert newline (shown as "|")
-	ENTER	toggle multi-line mode; in multi-line mode ENTER adds
+	ENTER		toggle multi-line mode; in multi-line mode ENTER adds
 			a newline character; string will be accepted when you
 			turn off the mode  (^K-ENTER again)
 	A		word left
@@ -173,11 +181,11 @@ Contact/Group Selection Mode:
 -------------------------------------------------------------------------
 ]/arrow right/down	next entry
 [/arrow left/up		previous entry
-{/home		first entry
-}/end		last entry
+{/home			first entry
+}/end			last entry
 q			information
 m			invoke contact context menu
-space/enter	select
+space/enter		select
 ESC			cancel selection
 
 Transfers Window
@@ -191,7 +199,7 @@ r			reject incoming invitation
 c			cancel (abort) incoming/outgoing transfer
 			or outgoing invitation
 q			information
-delete		kill entry (and cancel of course)
+delete			kill entry (and cancel of course)
 
 
 ******************************************

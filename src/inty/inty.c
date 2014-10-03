@@ -2,7 +2,7 @@
  *    inty.c
  *
  *    Inty Library - Simple library for network applications
- *    Copyright (C) 2002-2003,2007  George M. Tzoumas
+ *    Copyright (C) 2002-2003,2007,2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include<string.h>
 
 #include<sys/select.h>
+#include<sys/errno.h>
 #include<sys/time.h>
 #include<sys/types.h>
 #include<netdb.h>
@@ -142,6 +143,7 @@ int ConnectToServer(char *addr, int defport)
     struct hostent *host;
     char hostname[256];
     int port;
+    int err;
     
     ParseAddr(hostname, &port, defport, addr);
     
@@ -152,13 +154,21 @@ int ConnectToServer(char *addr, int defport)
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(port);
     host = gethostbyname(hostname);
-    if (host == NULL)
+    if (host == NULL) {
+        err = errno;
+        close(sfd);
+        errno = err;
         return -2;
+    }
     
     servaddr.sin_addr.s_addr =  *((int *) host->h_addr_list[0]);
     
-    if (connect(sfd, (struct sockaddr *) &servaddr, sizeof(servaddr)))
+    if (connect(sfd, (struct sockaddr *) &servaddr, sizeof(servaddr))) {
+        err = errno;
+        close(sfd);
+        errno =err;
         return -3;
+    }
     
     return sfd;
 }

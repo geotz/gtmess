@@ -157,10 +157,12 @@ void end_of_sync()
     UNLOCK(&SX);*/
     draw_lst(1);
 /*    write_syn_cache();*/
+
     /* initial status to log in */
+    if (Config.initial_status) msn_chg(msn.nfd, nftid(), Config.initial_status);
     if (Config.force_nick[0]) msn_prp(msn.nfd, nftid(), Config.force_nick);
     if (msn.psm[0]) msn_uux(msn.nfd, nftid(), msn.psm);
-    if (Config.initial_status) msn_chg(msn.nfd, nftid(), Config.initial_status);
+
 }
 
 void msn_handle_msgbody(char *msgdata, int len)
@@ -659,6 +661,9 @@ void *msn_ndaemon(void *dummy)
                 LOCK(&msn.lock);
                 Strcpy(msn.nick, nick, SML);
                 draw_status(1);
+
+                if (msn.in_syn && msn.list_count == 0) end_of_sync(); /* trick to handle empty contact list */
+
                 UNLOCK(&msn.lock);
             }
 

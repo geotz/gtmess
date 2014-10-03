@@ -2,7 +2,7 @@
  *    hlist.c
  *
  *    history list
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2007,2011  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -49,7 +49,7 @@ void hlist_free(hlist_t *h)
     h->count = 0;
 }
 
-hline_t *hlist_find(hlist_t *h, char *s)
+hline_t *hlist_find(hlist_t *h, const char *s)
 {
     hline_t *l;
     
@@ -60,7 +60,7 @@ hline_t *hlist_find(hlist_t *h, char *s)
     return NULL;
 }
 
-hline_t *hlist_add(hlist_t *h, char *s, int len, int attr)
+hline_t *hlist_add(hlist_t *h, const char *s, int len, int attr)
 {
     hline_t *l, *o;
     
