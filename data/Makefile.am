@@ -1,5 +1,5 @@
 #    gtmess - MSN Messenger client
-#    Copyright (C) 2002-2003  George M. Tzoumas
+#    Copyright (C) 2002-2006  George M. Tzoumas
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -17,7 +17,10 @@
 
 #    This file must be processed by automake
 
-dist_man1_MANS = gtmess.1 gtmess-gw.1 gtmess-notify.1
-nobase_dist_pkgdata_DATA = root.pem snd/meout.wav snd/newemail.wav snd/offline.wav snd/online.wav snd/ring.wav snd/type.wav
+dist_man1_MANS = gtmess.1 gtmess-notify.1 gtmess_w.1
+nobase_dist_pkgdata_DATA = root.pem
 pixmapdir = $(datadir)/pixmaps
 dist_pixmap_DATA = gtmess_icon-64.png gtmess_icon-48.png gtmess_icon2-64.png gtmess_icon2-48.png gtmess_icon2-32.png gtmess_icon2-16.png
+
+dist-hook:
+	rm -rf $(distdir)/Makefile

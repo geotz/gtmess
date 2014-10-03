@@ -1,5 +1,5 @@
 dnl    gtmess - MSN Messenger client
-dnl    Copyright (C) 2002-2005  George M. Tzoumas
+dnl    Copyright (C) 2002-2006  George M. Tzoumas
 dnl
 dnl    This program is free software; you can redistribute it and/or modify
 dnl    it under the terms of the GNU General Public License as published by
@@ -24,8 +24,8 @@ dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT
 PACKAGE="gtmess"
-VERSION="0.91"
-VDATE="18 Mar 2005"
+VERSION="0.92"
+VDATE="7 Nov 2006"
 AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
 AM_CONFIG_HEADER(src/config.h)
 AC_CONFIG_SRCDIR(src/client/gtmess.c)
@@ -73,7 +73,7 @@ AC_CHECK_FUNCS([gettimeofday localtime_r memmove memset mkdir mkfifo select strc
 AC_SEARCH_LIBS([iconv], [iconv], ,
                [AC_MSG_ERROR([cannot find iconv() function])])
 
-AC_CHECK_FUNCS([wcswidth mbsrtowcs])
+AC_CHECK_FUNCS([wcwidth mbsrtowcs])
 
 AC_SEARCH_LIBS([socket], [socket], ,
                [AC_MSG_ERROR([cannot find socket() function])])
@@ -90,7 +90,11 @@ AC_CHECK_LIB(pthread, pthread_create, ,
 AC_SEARCH_LIBS([initscr], [ncursesw ncurses curses], ,
                [AC_MSG_ERROR([cannot find curses library])])
 
-AC_CHECK_FUNCS([wresize])
+AC_CHECK_FUNCS([wresize], ,
+               [AC_MSG_WARN([curses does not support window resizing])])
+
+AC_CHECK_FUNCS([use_default_colors], ,
+               [AC_MSG_WARN([curses does not support transparency])])
 
 AC_CHECK_FUNCS([addwstr], ,
                [AC_MSG_WARN([wchar_t unsupported by curses, UTF-8 might not display correctly])])

@@ -1,7 +1,7 @@
 #! /bin/sh
 
 # gtmess - MSN Messenger client
-# (c) 2002-2004 by George M. Tzoumas
+# (c) 2002-2006 by George M. Tzoumas
 #
 # This script opens a terminal window and runs gtmess in it.
 # It can be used as a desktop shortcut.
@@ -15,10 +15,67 @@
 
 # Make sure the programs are in your PATH!
 
-# iso8859-7 font
-GTMESS_FONT='-*-*-medium-r-*-*-15-*-*-*-*-*-*-7'
+APP="gtmess"
 
-ps -e | grep "gtmess-notify" || gtmess-notify &
-sleep 1
-wterm -geometry 94x34 -fg white -bg black -fn $GTMESS_FONT \
-    -title gtmess -e gtmess
+which $APP 2>/dev/null || exit 1
+
+NAMETITLE="-name $APP -title $APP"
+URXVT_FLAGS="-tn rxvt -fg gray -bg black -geometry 112x40 \
+-fn xft:monospace:pixelsize=13 -ip -sh 30 -tint white $NAMETITLE"
+XTERM_FLAGS="-fg gray -bg black -geometry 112x40 $NAMETITLE"
+RXVT_FLAGS="-fg gray -bg black -geometry 112x40 $NAMETITLE"
+WTERM_FLAGS="-tr $RXVT_FLAGS"
+KONSOLE_FLAGS="--vt_sz 94x34 --name $APP"
+GTERM_FLAGS="--geometry 94x34 -t $APP"
+
+PREFPROG="$1"
+
+if test -z "$PREFPROG"; then
+    if test "$KDE_FULL_SESSION" == "true"; then
+        PREFPROG="konsole"
+    elif test -n "$GNOME_DESKTOP_SESSION_ID"; then
+        PREFPROG="gnome-terminal"
+    fi
+fi
+
+for f in $PREFPROG urxvt wterm rxvt konsole gnome-terminal xterm; do
+    if which $f >/dev/null; then
+      TERMPROG="$f"
+      break
+    fi
+done
+
+test -z "$TERMPROG" && exit 2
+
+ps -U $UID | grep -q "gtmess-notify" || gtmess-notify &
+sleep 0.5
+
+case "$TERMPROG" in
+
+    urxvt)
+        # try to use the daemon first
+        urxvtc $URXVT_FLAGS -e $APP
+        test $? -eq 2 && urxvt $URXVT_FLAGS -e $APP
+        ;;
+        
+
+    rxvt)
+        rxvt $RXVT_FLAGS -e $APP
+        ;;
+
+    wterm)
+        wterm $WTERM_FLAGS -e $APP
+        ;;
+        
+    konsole)
+        konsole $KONSOLE_FLAGS -e $APP
+        ;;
+    
+    gnome-terminal)
+        gnome-terminal $GTERM_FLAGS -e $APP
+        ;;
+
+    *)
+        xterm $XTERM_FLAGS -e $APP
+        ;;
+esac

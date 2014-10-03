@@ -21,6 +21,7 @@
 
 #include<stdlib.h>
 #include<stdio.h>
+#include<string.h>
 #include<unistd.h>
 #include<sys/types.h>
 #include<sys/stat.h>
@@ -31,19 +32,16 @@
 #include"sound.h"
 #include"gtmess.h"
 
-int sound;  /* 0 = silence, 1 = beep, 2 = sound effects */
-int popup;  /* popup window enabled/disabled */
 int pfd;    /* pipe file descriptor */
 
 void unotif_init(int asound, int apopup)
 {
     char tmp[256];
     
-    sound = asound;
-    popup = apopup;
-    if (sound == 2) sound_init();
+    if (asound == 2) sound_init();
     sprintf(tmp, "%s/notify.pip", Config.cfgdir);
-    pfd = open(tmp, O_WRONLY | O_NONBLOCK);
+    if (apopup) pfd = open(tmp, O_WRONLY | O_NONBLOCK);
+    else pfd = -1;
 }
 
 void unotif_done()
@@ -54,9 +52,9 @@ void unotif_done()
 
 void playsound(snd_t snd)
 {
-    if (sound == 0) return;
+    if (Config.sound == 0) return;
     if (snd < SND_BEEP || snd > SND_LOGOUT) return;
-    if (sound == 1 || snd == SND_BEEP) {
+    if (Config.sound == 1 || snd == SND_BEEP) {
         beep();
         return;
     }

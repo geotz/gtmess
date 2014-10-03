@@ -2,7 +2,7 @@
  *    sboard.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2006  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -152,10 +152,9 @@ void sb_blah()
     LOCK(&msn.lock);
     LOCK(&SX);
     sb = SL.head;
-    if (sb != NULL && strlen(sb->input) > 0) {
+    if (sb != NULL && strlen(sb->EB.text) > 0) {
         if (sb->sfd > -1) {
-            strcpy(s, sb->input);
-            sp = s;
+            sp = sb->EB.text;
             pthread_setspecific(key_sboard, (void *) sb);
             if (sp[0] == '/') {
                 if (sp[1] == '/') sp++;
@@ -165,11 +164,13 @@ void sb_blah()
                     char cmd[SXL], args[SXL];
 
                     eb_history_add(&SL.head->EB, SL.head->EB.text, strlen(SL.head->EB.text));
-                    eb_settext(&SL.head->EB, ZS);
-                    draw_sbebox(SL.head, 1);
 
                     cmd[0] = args[0] = 0;
                     sscanf(sp, "%s %[^\n]", cmd, args);
+                    
+                    eb_settext(&SL.head->EB, ZS);
+                    draw_sbebox(SL.head, 1);
+                    
                     if (strcmp(cmd, "/flash") == 0)
                     /* easter egg! */
                         flash();
@@ -189,11 +190,11 @@ void sb_blah()
                     } else if (strcmp(cmd, "/msg") == 0) {
                         msn_msg_gtmess(sb->sfd, sb->tid++, "MSG", args);
                         msg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick, Config.aliases));
-                        msg(C_MSG, "%s\n", args);
+                        msgn(C_MSG, strlen(args)+2, "%s\n", args);
                     } else if (strcmp(cmd, "/dlg") == 0) {
                         msn_msg_gtmess(sb->sfd, sb->tid++, "DLG", args);
                         dlg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick, Config.aliases));
-                        dlg(C_MSG, "%s\n", args);
+                        dlgn(C_MSG, strlen(args)+2, "%s\n", args);
                     } else if (strcmp(cmd, "/file") == 0) {
                         struct stat st;
                         unsigned int cookie;
@@ -227,7 +228,7 @@ void sb_blah()
             }
             msn_msg_text(sb->sfd, sb->tid++, sp);
             dlg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick, Config.aliases));
-            dlg(C_MSG, "%s\n", sp);
+            dlgn(C_MSG, strlen(sp)+2, "%s\n", sp);
             eb_history_add(&SL.head->EB, SL.head->EB.text, strlen(SL.head->EB.text));
             eb_settext(&SL.head->EB, ZS);
             draw_sbebox(SL.head, 1);
@@ -245,20 +246,21 @@ void sb_blah()
     UNLOCK(&msn.lock);
 }
 
-void sb_type(int c)
+int sb_type(int c)
 {
     msn_sboard_t *sb;
     int command;
     time_t now;
+    int res;
 
     LOCK(&msn.lock);
     LOCK(&SX);
     sb = SL.head;
     if (sb != NULL) {
             time(&now);
-            command = (sb->input[0] == '/' &&
-                        ((sb->input[1] && sb->input[1] != '/') || (!sb->input[1] && c != '/'))) ||
-                      (!sb->input[0] && c == '/');
+            command = (sb->EB.text[0] == '/' &&
+                        ((sb->EB.text[1] && sb->EB.text[1] != '/') || (!sb->EB.text[1] && c != '/'))) ||
+                      (!sb->EB.text[0] && c == '/');
             if (!command && now - sb->tm_last_char > Config.time_user_types) {
                 sb->tm_last_char = now;
                 if (sb->thrid != -1 && sb->PL.count > 0)
@@ -278,11 +280,12 @@ void sb_type(int c)
                     Write(msn.nfd, s, strlen(s));
                 }
             }
-            eb_keydown(&sb->EB, c);
+            res = eb_keydown(&sb->EB, c);
             draw_sbebox(sb, 1);
     }
     UNLOCK(&SX);
     UNLOCK(&msn.lock);
+    return res;
 }
 
 void fcopy(FILE *s, FILE *d)
@@ -353,7 +356,7 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
     contype[0] = 0;
     s = strafter(msgdata, "Content-Type: ");
     if (s == NULL) {
-        dlg(C_DBG, msgdata);
+        dlgn(C_DBG, len+2, "%s\n", msgdata);
         return;
     }
     sscanf(s, "%s", contype);
@@ -369,7 +372,8 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
         
         utf8decode(sb->ic, s, text);
         dlg(C_DBG, "%s says:\n", getnick(arg1, nick, Config.aliases));
-        dlg(C_MSG, "%s\n", text);
+        dlgn(C_MSG, len+2, "%s\n", text);
+/*        playsound(SND_MSG); */
         free(text);
         
         return;
@@ -411,14 +415,15 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
                 char *text = strdup(args);
                 utf8decode(msn_ic[0], args, text);
                 msg(C_DBG, "%s says:\n", getnick(arg1, nick, Config.aliases));
-                msg(C_MSG, "%s\n", text);
+                msgn(C_MSG, len+2, "%s\n", text);
                 free(text);
             } else if (strcmp(cmd, "DLG") == 0) {
                 char *text = strdup(args);
                 utf8decode(sb->ic, args, text);
                 sb->pending = 1;
                 dlg(C_DBG, "%s says:\n", getnick(arg1, nick, Config.aliases));
-                dlg(C_MSG, "%s\n", text);
+                dlgn(C_MSG, len+2, "%s\n", text);
+/*                playsound(SND_MSG);   */
                 free(text);
             }
         }
@@ -464,7 +469,7 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
                     dlg(C_DBG, "%s wants to send you the file '%s', %u bytes long\n", getnick(arg1, nick, Config.aliases), fname, size);
                 } else {
                 /* reject all other types of invitations */
-                    dlg(C_DBG, msgdata);
+                    dlgn(C_DBG, len+2, "%s\n", msgdata);
                     msn_msg_cancel(sb->sfd, sb->tid++, cookie, "REJECT_NOT_INSTALLED");
                 }
                 draw_sb(sb, 1);
@@ -533,13 +538,13 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
             }
             UNLOCK(&XX);
         } else {
-            dlg(C_DBG, msgdata);
+            dlgn(C_DBG, len+2, "%s\n", msgdata);
         }
         draw_sb(sb, 1);
         return;
     }
     
-    if (Config.msg_debug == 2) dlg(C_DBG, msgdata);
+    if (Config.msg_debug == 2) dlgn(C_DBG, len+2, "%s\n", msgdata);
     else if (Config.msg_debug == 1) dlg(C_DBG, "MSG: %s\n", contype);
     
     if (Config.msg_debug > 0) sb->pending = 1;
@@ -560,6 +565,7 @@ void *msn_sbdaemon(void *arg)
     pthread_setspecific(key_sboard, arg);
     LOCK(&SX);
     tm = time(NULL);
+    s[0] = 0;
     ctime_r(&tm, s);
     dlg(C_NORMAL, "Switchboard session begin on %s", s);
     if (sb->called) dlg(C_DBG, "Invitation from <%s>\n", sb->master);
@@ -586,6 +592,7 @@ void *msn_sbdaemon(void *arg)
     pthread_cleanup_push(sb_cleanup, arg);
     while (1) {
         r = bfParseLine(&buf, s, SXL);
+        pthread_testcancel();
         LOCK(&SX);
         if (r == -2) dlg(C_ERR, "bfParseLine(): buffer overrun\n");
         else if (r < 0) dlg(C_ERR, "bfParseLine(): %s\n", strerror(errno));
@@ -716,11 +723,12 @@ void *msn_sbdaemon(void *arg)
             LOCK(&SX);
             sb->pending = 1;
             if (!scan_error_sb(com))
-                dlg(C_DBG, "<<< %s", s);
+                dlgn(C_DBG, strlen(s)+6, "<<< %s\n", s);
             UNLOCK(&SX);
         }
     }
     tm = time(NULL);
+    s[0] = 0;
     ctime_r(&tm, s);
     dlg(C_ERR, "Disconnected from switchboard on %s", s);
 /*    sb->pending = 1;*/
@@ -784,8 +792,8 @@ msn_sboard_t *msn_sblist_add(msn_sblist_t *q, char *sbaddr, char *hash,
     p->tid = 0;
     p->sfd = -1;
     p->thrid = -1;
-    p->input[0] = 0;
-    eb_init(&p->EB, SXL - 1, SXL - 1, w_msg.w, p->input, p->winput);
+    eb_init(&p->EB, SXL-1, w_msg.w);
+    p->EB.grow = 1;
     p->EB.utf8 = utf8_mode;
     p->EB.history = 1;
 /*    eb_settext(&p->EB, ZS);*/
@@ -819,8 +827,9 @@ int msn_sblist_rem(msn_sblist_t *q)
     if (p == NULL) return 0;
     if (p->thrid != -1) {
 /*        close(p->sfd);*/
-        pthread_cancel(p->thrid);
-        pthread_join(p->thrid, NULL);
+        pthread_t tmp = p->thrid;
+        pthread_cancel(tmp);
+        pthread_join(tmp, NULL);
     }
     msn_clist_free(&p->PL);
     delwin(p->w_dlg.wh);
@@ -835,7 +844,7 @@ int msn_sblist_rem(msn_sblist_t *q)
     if (q->start == p) q->start = NULL;
     q->head = p->next;
     if (q->head == p) q->head = NULL; /* only one element */
-    hlist_free(&p->EB.HL);
+    eb_free(&p->EB);
     LOCK(&XX);
        for (x = XL.head; x != NULL; x = x->next) if (x->sb == p) {
            x->sb = NULL;

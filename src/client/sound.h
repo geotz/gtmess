@@ -25,7 +25,7 @@
 #include<pthread.h>
 
 typedef enum {SND_NONE, SND_BEEP, SND_ONLINE, SND_OFFLINE, SND_NEWMAIL,
-        SND_PENDING, SND_RING, SND_LOGOUT } snd_t;
+        SND_PENDING, SND_RING, SND_LOGOUT, SND_MSG } snd_t;
 
 extern pthread_cond_t cond_snd;
 extern pthread_mutex_t lock_snd;

@@ -2,7 +2,7 @@
  *    nserver.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2006  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -42,6 +42,7 @@ FILE *flog;
 
 extern pthread_cond_t cond_out;
 extern struct timeval tv_ping;
+extern show_ping_result;
 
 void notif_openlog()
 {
@@ -52,6 +53,7 @@ void notif_openlog()
         
         msn.fp_log = fopen(msn.fn_log, "a");
         
+        s[0] = 0;
         ctime_r(&tm, s);
         fprintf(msn.fp_log, "Server log for user <%s> on %s", msn.login, s);
     }  else msn.fp_log = NULL;
@@ -72,6 +74,7 @@ void logout_cleanup(void *r)
     if (msn.fp_log != NULL) {
         time_t tm = time(NULL);
         char s[SNL];
+        s[0] = 0;
         ctime_r(&tm, s);
         fprintf(msn.fp_log, "Server log stopped on %s", s);
         fprintf(msn.fp_log, "\n----------------------------------------\n\n");
@@ -103,6 +106,22 @@ int scan_error(char *s)
     }
     return 0;
 }
+
+int msn_list_cleanup(msn_clist_t *LL, msn_clist_t *RL)
+{
+    msn_contact_t *p;
+    int count = 0;
+
+    for (p = LL->head; p != NULL; p = p->next)
+        if (msn_clist_find(RL, p->login) == NULL) {
+            /* bug: multiple same warnings, when user on multiple groups! */
+            msg(C_MSG, "%s <%s> has removed you from his/her contact list\n",
+                getnick(p->login, p->nick, Config.notif_aliases), p->login);
+            count++;
+        }
+
+    return count;
+}                    
 
 void msn_handle_msgbody(char *msgdata, int len)
 {
@@ -139,6 +158,15 @@ void msn_handle_msgbody(char *msgdata, int len)
         msg(C_MSG, "MBOX STATUS: Inbox: %d, Folders: %d\n", msn.inbox, msn.folders);
         unotify("New mail\n", SND_NEWMAIL);
     } else if (strstr(contype, "text/x-msmsgsprofile") != NULL) {
+        char tmp[SML];
+        tmp[0] = 0;
+        s = strafter(msgdata, "\nClientIP: ");
+        sscanf(s, "%[^\r]", tmp);
+        if (strlen(tmp) > 7 && strcmp(MyIP, tmp) != 0) {
+            strcpy(MyIP, tmp);
+            msg(C_MSG, "Client IP: %s\n", MyIP);
+        }
+        
     /* user profile */
     } else if (strstr(contype, "text/x-msmsgsactivemailnotification") != NULL) {
     /* mailbox traffic */
@@ -174,9 +202,9 @@ void msn_handle_msgbody(char *msgdata, int len)
         s = strafter(msgdata, "\nType: "); sscanf(s, "%d", &type);
         s = strafter(msgdata, "\nArg1: "); sscanf(s, "%d", &arg1);
         if (type == 1) msg(C_MSG, "The server is going down for maintenance in %d minutes", arg1);
-        else msg(C_DBG, msgdata);
+        else msg(C_DBG, "%s\n", msgdata);
     } else {
-        if (Config.msg_debug == 2) msg(C_DBG, msgdata);
+        if (Config.msg_debug == 2) msgn(C_DBG, strlen(msgdata)+2, "%s\n", msgdata);
         else if (Config.msg_debug == 1) msg(C_DBG, "MSG: %s\n", contype);
     }
 }
@@ -215,7 +243,7 @@ void *msn_ndaemon(void *dummy)
         com[0] = 0; arg1[0] = 0; arg2[0] = 0;
         msglen = 0; msgdata = NULL;
 
-/*        msg(C_DBG, "<<< %s", s);*/
+/*        msgn(C_DBG, strlen(s)+6, "<<< %s\n", s);*/
 
         sscanf(s, "%s", com);
         if (is3(com, "MSG")) {
@@ -517,13 +545,16 @@ void *msn_ndaemon(void *dummy)
             }
             if (--msn.list_count == 0) {
             /* end of sync -- last LST rmember */
+                int match_color = C_MSG;
+                
                 msn.in_syn = 0;
-                msg(C_MSG, "FL/AL/BL/RL contacts: %d/%d/%d/%d\n", msn.FL.count, msn.AL.count, msn.BL.count, msn.RL.count);
-                for (p = msn.FL.head; p != NULL; p = p->next)
-                    if (msn_clist_find(&msn.RL, p->login) == NULL)
-                        /* bug: multiple same warnings, when user on multiple groups! */
-                        msg(C_MSG, "%s <%s> has removed you from his/her contact list\n",
-                            getnick(p->login, p->nick, Config.notif_aliases), p->login);
+                
+                if (msn.AL.count + msn.BL.count > msn.RL.count) match_color = C_ERR;
+                else if (msn.AL.count + msn.BL.count < msn.RL.count) match_color = C_DBG;
+                
+                msg(match_color, "FL/AL/BL/RL contacts: %d/%d/%d/%d\n", msn.FL.count, msn.AL.count, msn.BL.count, msn.RL.count);
+                    
+                msn_list_cleanup(&msn.FL, &msn.RL);
 
                 /* update FL with IL */
                 for (p = msn.IL.head; p != NULL; p = p->next)
@@ -566,16 +597,18 @@ void *msn_ndaemon(void *dummy)
         } else if (is3(com, "QNG")) {
             
         /* pong */
-            
-            struct timeval tv;
-            double sec;
-            int isec, next = 0;
-            
-            sscanf(s + 4, "%d", &next);
-            gettimeofday(&tv, NULL);
-            isec = tv.tv_sec - tv_ping.tv_sec;
-            sec = ((double) isec + ((double) (tv.tv_usec - tv_ping.tv_usec)) / 1000000);
-            msg(C_MSG, "RTT = %g sec, NEXT = %d\n", sec, next);
+            if (show_ping_result > 0) {  /* ok, a harmless race condition! :-) */
+                struct timeval tv;
+    	        double sec;
+                int isec, next = 0;
+	            
+                show_ping_result--;
+                sscanf(s + 4, "%d", &next);
+                gettimeofday(&tv, NULL);
+                isec = tv.tv_sec - tv_ping.tv_sec;
+                sec = ((double) isec + ((double) (tv.tv_usec - tv_ping.tv_usec)) / 1000000);
+                msg(C_MSG, "RTT = %g sec, NEXT = %d\n", sec, next);
+            }
         } else if (is3(com, "REA")) {
 
         /* screen name change */
@@ -639,7 +672,7 @@ void *msn_ndaemon(void *dummy)
                     UNLOCK(&SX);
                     pthread_create(&sb->thrid, NULL, msn_sbdaemon, (void *) sb);
                 }
-            } else msg(C_DBG, "<<< %s", s);
+            } else msgn(C_DBG, strlen(s)+6, "<<< %s\n", s);
         } else if (is3(com, "RNG")) {
 
         /* invitation to switchboard */
@@ -681,8 +714,9 @@ void *msn_ndaemon(void *dummy)
                 else {
                     /* reuse inactive switchboard */
                     if (sb->thrid != -1) {
-                        pthread_cancel(sb->thrid);
-                        pthread_join(sb->thrid, NULL);
+                        pthread_t tmp = sb->thrid;
+                        pthread_cancel(tmp);
+                        pthread_join(tmp, NULL);
                     }
                     strcpy(sb->sbaddr, sbaddr);
                     strcpy(sb->hash, hash);
@@ -707,11 +741,23 @@ void *msn_ndaemon(void *dummy)
             else msg(C_DBG, "%s", s);
             if (r == 5) msg(C_MSG, "Disconnected\n");
             break;
+        } else if (is3(com, "NOT")) {
+            
+        /* sever notification -- just ignore */
+            
+            if (sscanf(s + 4, "%d", &msglen) == 1) {
+                msgdata = (char *) Malloc(msglen+1);
+                r = bfFlushN(&buf, msgdata, msglen);
+                bfReadX(&buf, msgdata + r, msglen - r);
+                msgdata[msglen] = 0;
+                if (Config.log_traffic && msglen > 0) fprintf(flog, "%s", msgdata);
+                free(msgdata);
+            }
         } else
 
         /* error code or unhandled command */
 
-            if (!scan_error(com)) msg(C_DBG, "<<< %s", s);
+            if (!scan_error(com)) msgn(C_DBG, strlen(s)+6, "<<< %s", s);
     }
     pthread_cleanup_pop(0);
     logout_cleanup((void *) r);

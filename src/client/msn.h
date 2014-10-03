@@ -106,6 +106,7 @@ char *msn_ios_str(int code);
 
 msn_stat_t msn_stat_id(char *s);
 
+int writestr(int fd, char *s);
 int msn_png(int fd);
 int msn_out(int fd);
 int msn_qry(int fd, unsigned int tid, char *hash);

@@ -2,7 +2,7 @@
  *    gtmess.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2006  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -26,19 +26,38 @@ TODO LIST
 
 DELETE EVERYTHING AND WRITE THE CLIENT FROM SCRATCH IN C++ :-)
 
-[TEST/WIP]
-update manpage of gtmess
-full console (sb & notification) logging
-gtmess-gw command-line args to change default net addresses
-FLN: update_nicks = 0: never, 1: when nick < email, 2:always
-SOUND
+
+
+NEXT VERSION
+-------------
+
+soft-logout
+
+pcspeaker support <Tibor>
+per-contact settings <Tibor>
+more colors in sb win <Tibor>
+
+auto Be-Right-Back ---> Away
+uninvitable when busy
+ignore list (uninvitable)
+per-contact "ignore" (uninvitable)  + = blocked, - = ignored, blocked > ignored > none
+^K-P = push immediately into history buffer and clear line
+
+Invite option on Reverse/Allow list
+
 
 MAYBE in SOME future version
-----------------------------
-allow multi-line input or \xx sequences
-ignore list (uninvitable)
+-----------------------------
+check possibility of duplicate switchboard invitations!
+
+fix max_nick_len --> w_prt.w (fit width in participant win) or TRUNCATE!
+use xxxx() when xxxx_r() function not available
+port to MacOS
+
+
+utf8encode/decode (alternate version using iconv ONLY)
 auto file accept
-use MSNP9 ClientIP info
+(MMSNP9 NAT)/proxy pupport
 runtime CVR
 use wcsrtombs to determine max buf size
 shell expansion on editbox!
@@ -53,12 +72,13 @@ show ETA on transfers!
 cache notif/passport server 
 MSNFTP: show both IPs or always remote !
 support for unavailable connectivity (act as server for receiving a file)
-auto PNG QNG (keep connection alive!)
 use iconv() at invitation messages, too!
 phone numbers
 add global ui command line
 application/x-msmsgp2p ??
 advertise
+list menu should support selections (multiple users)
+group block/unblock
 
 if I ever have TOO MUCH FREE TIME 
 and there are no other features to add :-)
@@ -66,11 +86,9 @@ and there are no other features to add :-)
 fix issue with multiple file accepts (after cancel!)
 fix issue with number of threads spawned, at msnftpd!
 filesize limit is 2GB!!!
-should we rely on good luck (for lrand48) ?)
+should we rely on good luck (for lrand48) ?
 do not always assume UTF-8 encoding on server
 prove that cleanup handler restores locks :-)
-list menu should support selections (multiple users)
-group block/unblock
 fix issue whether type notif is sent during history browsing
 histlen
 */
@@ -117,7 +135,8 @@ histlen
 
 #include"gtmess.h"
 
-static struct cfg_entry ConfigTbl[] =
+/* var, str_val, int_val, type, int_low, int_high */
+struct cfg_entry ConfigTbl[] =
   {
     {"log_traffic", "", 0, 1, 0, 1},
     {"colors", "", 0, 1, 0, 2},
@@ -138,7 +157,7 @@ static struct cfg_entry ConfigTbl[] =
     {"syn_cache", "", 1, 1, 0, 1},
     {"msnftpd", "", MSNFTP_PORT, 1, 0, 65535},
     {"aliases", "", 1, 1, 0, 2},
-    {"msg_debug", "", 0, 1, 0, 1},
+    {"msg_debug", "", 0, 1, 0, 2},
     {"msg_notify", "", 1, 1, 0, 7200},
     {"idle_sec", "", 180, 1, 0, 7200},
     {"auto_login", "", 1, 1, 0, 1},
@@ -150,7 +169,8 @@ static struct cfg_entry ConfigTbl[] =
     {"update_nicks", "", 0, 1, 0, 2},
     {"snd_dir", "*data*", 0, 0, 0, 0},
     {"snd_exec", "/usr/bin/aplay -Nq %", 0, 0, 0, 0},
-    {"snd_redirect", "", 3, 1, 0, 3}
+    {"snd_redirect", "", 3, 1, 0, 3},
+    {"keep_alive", "", 0, 1, 0, 7200}
   };
 
 struct cfg_entry *OConfigTbl;
@@ -169,6 +189,7 @@ hash_table_t Aliases; /* alias list */
 
 pthread_cond_t cond_out = PTHREAD_COND_INITIALIZER;
 struct timeval tv_ping;
+int show_ping_result = 0;
 
 /*FILE *syn_cache_fp = NULL;*/
 extern FILE *flog;
@@ -277,6 +298,8 @@ void sched_draw_lst(time_t after)
 void *interval_daemon(void *dummy)
 {
     time_t now;
+    int last_ping = 0;
+
     while (1) {
         pthread_testcancel();
         sleep(1);
@@ -299,6 +322,11 @@ void *interval_daemon(void *dummy)
                 msn_chg(msn.nfd, nftid(), MS_IDL);
                 keyb_time = now;
                 iamback = 0;
+        }
+        
+        if (Config.keep_alive && now - last_ping > Config.keep_alive && msn.nfd != -1) {
+            do_ping();
+            last_ping = now;
         }
     }
 }
@@ -561,7 +589,7 @@ void print_usage(char *argv0)
                     "snd_dir=<s>\t\tdirectory for sound effects [*data*]\n"
                     "snd_exec=<s>\t\tcommand line for sound player\n"
                     "\t\t\t[%s]\n"
-                    "snd_redirect=<s>\t\tredirect stdout/err of player to /dev/null [3]\n"
+                    "snd_redirect=<s>\tredirect stdout/err of player to /dev/null [3]\n"
                     "\t\t\t0=none, 1=stdout, 2=stderr, 3=both\n"
                     "sound=<n>\t\tsound mode [1]\n"
                     "\t\t\t<n> = 0 for no sound, 1 for beep, 2 for sound effects\n"
@@ -644,10 +672,10 @@ int parse_cfg_entry(char *s)
             } else { /* integer */
                 if (sscanf(eq+1, "%d", &ival) == 1) {
                     if (ival < e->min) {
-                        msg(C_ERR, "parse_cfg_entry(): value too small, %d assumed\n", e->min);
+                        msg(C_ERR, "parse_cfg_entry(%s): value too small, %d assumed\n", variable, e->min);
                         ival = e->min;
                     } else if (ival > e->max) {
-                        msg(C_ERR, "parse_cfg_entry(): value too big, %d assumed\n", e->max);
+                        msg(C_ERR, "parse_cfg_entry(%s): value too big, %d assumed\n", variable, e->max);
                         ival = e->max;
                     }
                     e->ival = ival;
@@ -768,6 +796,7 @@ void config_init()
     strcpy(Config.snd_dir, ConfigTbl[c++].sval);
     strcpy(Config.snd_exec, ConfigTbl[c++].sval);
     Config.snd_redirect = ConfigTbl[c++].ival;
+    Config.keep_alive = ConfigTbl[c++].ival;
     NumConfigVars = c;
     
     sprintf(Config.datadir, "%s", DATADIR);
@@ -1000,7 +1029,7 @@ void menu_lists()
     msn_group_t pg;
     int inBL, inAL, inFL;
 
-    msg2(C_MNU, "(F)orward  (R)everse  (A)llow  (B)lock  (G)roup  E(x)port aliases");
+    msg2(C_MNU, "(F)orward  (R)everse  (A)llow  (B)lock  (G)roup  E(x)port aliases  (C)lean up");
     switch (tolower(getch())) {
         case KEY_RESIZE: redraw_screen(1); break;
         case 'f':
@@ -1132,6 +1161,16 @@ void menu_lists()
         case 'x':
             export_nicks();
             break;
+        case 'c': {
+            int c;
+            c = msn_list_cleanup(&msn.FL, &msn.RL);
+            msg(C_MSG, "FL: %d obsolete entries\n", c);
+            c = msn_list_cleanup(&msn.AL, &msn.RL);
+            msg(C_MSG, "AL: %d possibly obsolete entries\n", c);
+            c = msn_list_cleanup(&msn.BL, &msn.RL);
+            msg(C_MSG, "BL: %d possibly obsolete entries\n", c);
+            break;
+        }
     }
 }
 
@@ -1454,7 +1493,7 @@ void sb_keydown(int c)
         case -(KEY_F(7)): set_plskip(-1); break;
         case -'*':
         case -(KEY_F(8)): set_plskip(1); break;
-        case '\r': sb_blah(); break;
+        case '\r': if (!sb_type('\r')) sb_blah(); break;
         default: if (c > 0) sb_type(c);
     }            
 }
@@ -1503,7 +1542,7 @@ int main(int argc, char **argv)
 {
     int c, paste;
     
-    sprintf(copyright_str, "gtmess, version %s (%s), (c) 2002-2005 by George M. Tzoumas", VERSION, VDATE);
+    sprintf(copyright_str, "gtmess, version %s (%s), (c) 2002-2006 by George M. Tzoumas", VERSION, VDATE);
     printf("%s\n", copyright_str);
     
     setup_cfg_dir();
@@ -1561,7 +1600,7 @@ int main(int argc, char **argv)
     msg(C_DBG, 
         "gtmess version %s (%s)\n"
         "MSN Messenger Client for UNIX Console\n"
-        "(c) 2002-2005 by George M. Tzoumas\n"
+        "(c) 2002-2006 by George M. Tzoumas\n"
         "gtmess is free software, covered by the\nGNU General Public License.\n"
         "There is absolutely no warranty for gtmess.\n\n", VERSION, VDATE);
 
@@ -1647,7 +1686,7 @@ int main(int argc, char **argv)
                         case 'd': log_out(0); break;
                         case 'n': menu_change_name(msn.login, msn.nick); break;
                         case 'm': show_mbstatus(); break;
-                        case 'p': do_ping(); break;
+                        case 'p': show_ping_result++; do_ping(); break;
                         case 'i': menu_invite(); break;
                     }
                 } else if (wvis == 0) sb_keydown(-c); else xf_keydown(-c);

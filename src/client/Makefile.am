@@ -1,5 +1,5 @@
 #    gtmess - MSN Messenger client
-#    Copyright (C) 2002-2005  George M. Tzoumas
+#    Copyright (C) 2002-2006  George M. Tzoumas
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 #    This file must be processed by automake
 
 AUTOMAKE_OPTIONS = gnu
-bin_PROGRAMS = gtmess gtmess-gw
+bin_PROGRAMS = gtmess
 AM_CFLAGS = -DDATADIR=\"${pkgdatadir}\"
 EXTRA_DIST = hash_cfg.inp
  
@@ -29,10 +29,6 @@ gtmess_SOURCES = gtmess.c editbox.c hash_cfg.c hash_tbl.c hlist.c md5.c msn.c ns
 
 #gtmess_LDFLAGS = -L../inty
 gtmess_LDADD = ../inty/libinty.a
-
-gtmess_gw_SOURCES = gtmess-gw.c
-#gtmess_gw_LDFLAGS = -L../inty
-gtmess_gw_LDADD = ../inty/libinty.a
 
 hash_cfg.c: hash_cfg.inp
 	gperf -t -LANSI-C hash_cfg.inp > hash_cfg.c

@@ -1,0 +1,5 @@
+?package(gtmess):needs="X11|text|vc|wm" section="Apps/Net"\
+  title="gtmess" \
+  icon32x32="/usr/share/pixmaps/gtmess_icon2-32.png" \
+  icon16x16="/usr/share/pixmaps/gtmess_icon2-16.png" \
+  command="/usr/bin/gtmess_w"

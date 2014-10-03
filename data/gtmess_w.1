@@ -1,0 +1,52 @@
+.TH gtmess_w 1 "November 7, 2006" "" "gtmess messenger graphical launcher"
+
+.SH NAME
+gtmess_w - launch gtmess in a terminal window
+
+.SH SYNOPSIS
+gtmess_w [termapp]
+
+.SH DESCRIPTION
+.PP
+gtmess_w is a shell script that launches gtmess in a terminal window.
+It is meant to be run in a graphical desktop environment as a shortcut, along 
+with the provided icon.
+The script supports several terminal clients and provides
+suggested default settings for them. Supported terminal clients are:
+.B urxvt
+(client and daemon),
+.BR rxvt , 
+.BR wterm ,
+.BR konsole ,
+.B gnome-terminal
+and 
+.BR xterm .
+It prefers 
+.B konsole
+under KDE and
+.B gnome-terminal
+under GNOME. In other environments, it uses the first terminal available
+in the above order.
+To force the use of a specific terminal from the above, just
+put it as the argument
+.IR termapp .
+
+
+.SH SEE ALSO
+.BR gtmess "(1), "
+.BR gtmess-notify "(1)"
+
+.SH AUTHORS
+
+gtmess_w - launch gtmess in a terminal window
+.br
+Copyright (C) 2002-2006  George M. Tzoumas
+
+.PP
+This script is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+.PP
+The source code of this script is ABSOLUTELY FREE.
+You can do whatever you want with it ;-)

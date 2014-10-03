@@ -1,4 +1,24 @@
 *******************************
+* Version 0.92 (7 Nov 2006)   *
+*******************************
+! display empty string when ctime_r() fails
++ support for transparent background
+! fixed sb bug about existing connections and pthread_cancel() <Tibor>
+! fixed harmless bug in some timekeeping variable <Tibor>
+* improved gtmess_w script
++ multi-line input
++ enhanced line editor (unlimited buffer size)
+! fixed gcc4 compile-time bug
+! fixed msg_debug cfg var value
+! fixed buffer overruns in notif/sb windows (huge messages)
++ NOTifications are handled correctly <Tibor>
++ connection keep alive [keep_alive] {Tibor}
++ contact list cleanup
+! fixed a wchar handling bug
+! url-encoded strings are always utf-8
+- removed gtmess_gw (no longer supported by MS)
+
+*******************************
 * Version 0.91 (18 Mar 2005)  * 
 *******************************
 ! fixed contact list alias display (fit width)
@@ -109,3 +129,5 @@ Legend:
 * change/modification/update
 + addition
 - removal
+<X> comments/suggestions by X
+{X} contributed code by X

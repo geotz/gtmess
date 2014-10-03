@@ -65,6 +65,7 @@ typedef struct {
 
 void *msn_ndaemon(void *dummy);
 void msn_init(msn_t *msn);
+int  msn_list_cleanup(msn_clist_t *LL, msn_clist_t *RL);
 
 extern msn_t msn;
 #endif

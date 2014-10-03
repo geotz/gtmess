@@ -30,13 +30,13 @@ int stroffset(char *s, int n, int len);
 int seqlen(int c);
 int strwidth(char *s);
 int widthoffset(char *s, int width);
+int wstrwidth(const wchar_t *s, size_t n);
 
-#ifndef HAVE_WCSWIDTH
-
-int wcswidth(const wchar_t *s, size_t n);
-#define wcwidth(c) 1
-
+#ifndef HAVE_WCWIDTH
+#define wcwidth(c) (1)
 #endif
+
+#define wcwidth_nl(c) ((c) == '\n'? 1: wcwidth(c))
 
 #ifndef HAVE_MBSRTOWCS
 

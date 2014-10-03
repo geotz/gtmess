@@ -1,37 +1,37 @@
-.TH gtmess 1 "March 18, 2005" "" "gtmess messenger"
+.\" 
+.TH "gtmess" "1" "November 3, 2006" "" "gtmess messenger"
+.SH "NAME"
+gtmess \- MSN messenger client
 
-.SH NAME
-gtmess - MSN messenger client
-
-.SH SYNOPSIS
+.SH "SYNOPSIS"
 gtmess [options]
 
-.SH DESCRIPTION
-.PP
+.SH "DESCRIPTION"
+.PP 
 gtmess is an MSN messenger client, which allows you to use
 the MSN messenger service. It is a console application that
 uses the curses library to present a friendly user interface.
-This manpage corresponds to version 0.91.
+This manpage corresponds to version 0.92.
 
-.SH OPTIONS
-.TP
-.BR -h ", " --help
+.SH "OPTIONS"
+.TP 
+.BR \-h ", " \-\-help
 Short help.
 
-.TP
-.BI -O variable = value
+.TP 
+.BI \-O variable = value
 Assigns the
 .I value
 to the configuration
 .BR variable .
 
-.TP
-.BI --version
+.TP 
+.BI \-\-version
 Print the program version and CVR string to stdout and exit.
 
-.SH CONFIGURATION VARIABLES
+.SH "CONFIGURATION VARIABLES"
 The following list shows all configuration variables in alphabetic order.
-The value of a variable is either an integer or a (line-terminated) 
+The value of a variable is either an integer or a (line\-terminated) 
 string of characters.
 In the following descriptions,
 .I N
@@ -42,16 +42,16 @@ represents a character string value and
 represents a boolean value, a special case of an integer value 
 with only two possible values, 0 and 1. 1 stands for True and 0 for False.
 
-.TP
+.TP 
 .BI aliases "" = N
 When
 .I N
-is 2, the user-defined contact aliases are displayed instead of nick names.
+is 2, the user\-defined contact aliases are displayed instead of nick names.
 A value of 1 displays aliases only when nicknames are too long (see
 .B max_nick_len
 variable) or when nicknames contain the email address (which is very irritating).
 A value of 0 disables the use of aliases completely and nick names are always
-displayed. User-defined contact aliases are stored into 
+displayed. User\-defined contact aliases are stored into 
 .B ~/.gtmess/aliases 
 (see the
 .B FILES
@@ -61,7 +61,7 @@ window. See also the
 variable. The default value is
 .BR 1 .
 
-.TP
+.TP 
 .BI auto_login "" = B
 When enabled, the login procedure starts as soon as the client is invoked,
 provided that
@@ -72,7 +72,7 @@ variables are nonempty.
 The default value is
 .BR 1 .
 
-.TP
+.TP 
 .BI cert_prompt "" = B
 If enabled and a certificate cannot be verified against
 the list of trusted certificate authorities (see the
@@ -80,10 +80,10 @@ the list of trusted certificate authorities (see the
 section),
 the user is asked if the login process should continue. 
 Three options are given,
-.IR Yes ,
+.I R Yes ,
 .I No 
 and
-.IR Always .
+.I R Always .
 The meaning of each option is obvious.
 The login procedure requires more than one SSL connection, so option
 .I Always
@@ -93,7 +93,7 @@ even if certificates cannot be verified.
 The default value is
 .BR 1 .
 
-.TP
+.TP 
 .BI colors "" = N
 Sets initial color mode.
 Possible values are 0, 1 or 2. With 0, color is selected automatically
@@ -102,7 +102,7 @@ The default value is
 .B 0
 (automatic).
 
-.TP
+.TP 
 .BI common_name_prompt "" = B
 Like
 .BR cert_prompt ,
@@ -112,24 +112,24 @@ the initialization of an SSL connection.
 The default value is
 .BR 1 .
 
-.TP
+.TP 
 .BI console_encoding "" = S
 Sets the character encoding to be used for displaying the text on the console.
 .I S
 is the name of the encoding. To see all valid encoding names, look at
 the output of the
-.BR "iconv -l" " command"
+.BR "iconv \-l" " command"
 (on systems that provide it). If
 .I S
 is
 .B *locale*
 then the console encoding is that of the 
-.IR LC_CTYPE 
+.I R LC_CTYPE 
 property of the current locale.
 The default value is
 .BR *locale* .
 
-.TP
+.TP 
 .BI cvr "" = S
 Sets the consumer versioning (CVR) string that is sent to the server during
 the login process. This string provides information about the client. For more
@@ -137,22 +137,21 @@ information you should look at the protocol specification. The protocol requires
 (from version MSNP8 and above) your login account to be the last part
 of the CVR string. Since gtmess uses MSNP9, your login account 
 is appended automatically at the end.
-The default value is computed at configure-time and is of the following form:
-.br
-0x0409 <system> <os-version> <architecture> GTMESS <clientversion> MSMSGS
-.br
+The default value is computed at configure\-time and is of the following form:
+.br 
+0x0409 <system> <os\-version> <architecture> GTMESS <clientversion> MSMSGS
+.br 
 For example:
-.BR "0x0409 Linux 2.6.8-1-686 i686 GTMESS 0.9 MSMSGS" .
+.BR "0x0409 Linux 2.6.8\-1\-686 i686 GTMESS 0.9 MSMSGS" .
 
 .TP 
 .BI gtmesscontrol_ignore "" = S
-Ignore gtmess-specific messages that are substrings of
-.IR S "."
+Ignore gtmess\-specific messages that are substrings of
+.I R S "."
 To accept all such messages, leave
 .I S
 empty. To ignore all such messages, use the special value
-.BR *all* ,
-which is also the default value.
+.BR *all*. By default, all such messages are accepted.
 
 .TP 
 .BI idle_sec "" = N
@@ -188,12 +187,12 @@ can be a number from 0 to 8 representing the following statuses:
 .BR "On the Phone" ,
 8 = 
 .BR "Out to Lunch" .
-.br
+.br 
 The default value is
 .B 2
 (Online).
 
-.TP
+.TP 
 .BI invitable "" = B
 If disabled, others cannot invite you to conversation windows because
 the client does not respond to the invitations they send. So, if you
@@ -203,13 +202,22 @@ sessions. Note that this option overrides the BLP setting which is stored
 at the server and is about users not on your forward list.
 This option is enabled by default.
 
-.TP
+.TP 
+.BI keep_alive "" = N
+If greater than zero, the client sends a ping request in every 
+.I N
+seconds. This will help to keep the connection alive on some networks.
+The default value is
+.B 0
+(disabled).
+
+.TP 
 .BI login "" = S
 Sets the default login account. If
 .I S
 does not contain an `@' character, then the string `@hotmail.com' is appended.
 
-.TP
+.TP 
 .BI log_traffic "" = B
 If enabled, network traffic between the client and the notification
 server is recorded into file 
@@ -217,17 +225,17 @@ server is recorded into file
 The default value is
 .BR 0 .
 
-.TP
+.TP 
 .BI log_console "" = N
 Sets console logging level. 0 disables logging, 1 enables switchboard window logging,
 2 enables notification window logging, and 3 enables both. Log files are stored into
 .BI ~/.gtmess/ account /log/
-in a per-contact scheme. The notification window messages are stored in the special
+in a per\-contact scheme. The notification window messages are stored in the special
 file
 .BR _nserver.log .
 This option is disabled by default.
 
-.TP
+.TP 
 .BI max_nick_len "" = N
 Specifies the maximum allowed nickname length before displaying the alias.
 If
@@ -237,7 +245,7 @@ line of the contact list window.
 The default value is
 .BR 0 .
 
-.TP
+.TP 
 .BI msg_debug "" = N
 Defines the client behaviour on unrecognised messages. If
 .I N
@@ -251,7 +259,7 @@ is useful for development purposes.
 The default value is
 .BR 0 .
 
-.TP
+.TP 
 .BI msg_notify "" = N
 If
 .I N
@@ -269,7 +277,7 @@ in Idle mode.
 The default value is
 .B 1.
 
-.TP
+.TP 
 .BI msnftpd "" = N
 Specifies the port number the MSNFTP server is listening to.
 The MSNFTP server is a thread that runs in the background and enables
@@ -278,7 +286,7 @@ of 0 disables the server.
 The default value is
 .BR 6891 .
 
-.TP
+.TP 
 .BI notif_aliases "" = N
 This variable has exactly the same meaning as the
 .B aliases
@@ -287,7 +295,7 @@ The default value is
 .BR 0 .
 
 
-.TP
+.TP 
 .BI online_only "" = B
 If enabled, only contacts with online status are shown on the screen.
 The default value is
@@ -297,25 +305,25 @@ The default value is
 .BI password "" = S
 Sets the default password.
 
-.TP
+.TP 
 .BI popup "" = B
 Enables/disables the popup notification window at the lower right corner of
 the screen. This is an external Tcl/Tk script.
 The default value is
 .BR 1 .
 
-.TP
+.TP 
 .BI server "" = S
 Sets the initial server to connect to. For the MSN Messenger protocol,
 this can be a dispatch or a notification server.
 .I S
 is of the form
-.IR hostname [ :port ].
+.I R hostname [ :port ].
 If port is not specified, 1863 is assumed.
 The default value is 
 .BR messenger.hotmail.com .
 
-.TP
+.TP 
 .BI snd_dir "" = S
 Sets the location of the sound effect (.wav) files. The default
 value is
@@ -325,18 +333,18 @@ which corresponds to the
 directory in the data prefix, usually
 .BR /usr/local/share/gtmess .
 
-.TP
+.TP 
 .BI snd_exec "" = S
 Sets the playback program for the sound effects. The default
 value is
-.B /usr/bin/aplay -Nq %
+.B /usr/bin/aplay \-Nq %
 which corresponds to the playback utility of the ALSA system.
 Note that this string is parsed in a naive way. Therefore, each
 argument should be separated by exactly one space character and there is no 
 form of escape sequence for space characters. The percent character
 substitutes to the full path of the audio file in the sound effects directory.
 
-.TP
+.TP 
 .BI snd_redirect "" = N
 Redirects standard output and standard error streams of the sound player into 
 .BR /dev/null .
@@ -344,7 +352,7 @@ A value of 0 performs no redirection, 1 redirects stdout, 2 redirects stderr and
 3 redirects both. The default value is
 .BR 3 .
 
-.TP
+.TP 
 .BI sound "" = N
 Sets sound mode.
 .I N
@@ -361,7 +369,7 @@ There are 6 sound effects that correspond to various events (guess from the name
 .BR ring.wav ,
 .BR meout.wav .
 
-.TP
+.TP 
 .BI syn_cache "" = B
 If enabled, the contact/group lists are cached for future use. This option
 seems to have no meaning nowadays, as the msn server always rejects the cached version
@@ -370,13 +378,13 @@ completely in the future.
 The default value is
 .BR 0 .
 
-.TP
+.TP 
 .BI time_user_types "" = N
 Sets how often typing notifications are sent. It is the time interval in seconds.
 The default value is
 .BR 5 .
 
-.TP
+.TP 
 .BI update_nicks "" = N
 Sets how the nicknames are updated on the msn server. 
 When a contact is initially online or changes his/her nickname while online, the server
@@ -389,12 +397,12 @@ Note that you can always update the nickname of a specific contact manually (ren
 The default value is
 .BR 0 .
 
-.SH USER INTERFACE
-.PP
+.SH "USER INTERFACE"
+.PP 
 The screen is divided in 7 parts. Four lines and three windows.
 
 The first line of the screen displays your nickname, your account and
-your status. The right-hand corner shows the system's clock (local time).
+your status. The right\-hand corner shows the system's clock (local time).
 
 The bottom line displays the copyright string and the menus 
 or the input boxes.
@@ -408,11 +416,11 @@ from the operating system, as well as the notification server.
 The switchboard
 window is separated from the messages window by two lines. The first line
 is the edibox where you type your text when you chat. 
-The second line is a kind of window-bar that displays a character for each open 
+The second line is a kind of window\-bar that displays a character for each open 
 switchboard window. The window bar is displayed in three different modes, depending
 on the number of open switchboard windows:
 
-.TP
+.TP 
 .B Text
 In this mode, each window is represented by the name of the first contact
 that joined it. The name of the selected sb window (which is displayed on top)
@@ -420,14 +428,14 @@ is enclosed in square brackets. Braces instead of square brackets
 denote that the window has unread messages (something got typed in the window while
 it was in the background and the user has not seen it yet).
 
-.TP
+.TP 
 .B Icons
 The selected switchboard window is represented
-with an `O'. A `-' represents a switchboard window that is open but not
+with an `O'. A `\-' represents a switchboard window that is open but not
 on the foreground, while a `+' means additionally that the designated
 window has unread messages .
 
-.TP
+.TP 
 .B Stats
 If there are too many open windows, then the window bar displays
 the only the number of the current window. It also displays how many
@@ -435,66 +443,66 @@ windows exist on the left and right of the current one and how many
 of them have unread messages. The 5 numbers displayed correspond to these
 quantities respectively: left_unread, left, current, right_unread, right.
 
-.PP
+.PP 
 In the following description of the keyboard controls, `^' denotes holding CTRL, while
 `$' denotes holding SHIFT. `@' denotes holding ALT (or mod1 or pressing ESC
 first).
 
 .SS MENUS
 
-.PP
+.PP 
 The functions of the main menu can be accesed by pressing ESC first, 
 or by holding down the default modifier key (ALT) and then pressing one
 of the following keys (case insensitive):
 
-.TP
+.TP 
 .B C
 Connect to server
 
-.TP
+.TP 
 .B D
 Logout from notification server
 
-.TP
+.TP 
 .B S
 Change status
 
-.TP
+.TP 
 .B L
 Manage contact/group lists
 
-.TP
+.TP 
 .B N
 Change nickname
 
-.TP
+.TP 
 .B O
 Options
 
-.TP
+.TP 
 .B M
 Display mailbox status
 
-.TP
+.TP 
 .B P
 Ping the server and calculate RTT
 
-.TP
+.TP 
 .B I
 Invite a contact from your Forward List to the active switchboard window. This
 is actually a shortcut for 
-.IR "" Alt-L-F- contact -I,
+.I R "" Alt\-L\-F\- contact \-I,
 although only online contacts are shown.
 
-.TP
+.TP 
 .B T
 Write a note to the notification window.
 
-.TP
+.TP 
 .B /
 Enter special client command (none available yet)
 
-.PP
+.PP 
 The shortcut key for the menu is shown in parentheses. Some menu
 entries may display a nested menu. The menu tree of the application is
 the following (for readability purposes the parentheses have been omitted
@@ -509,15 +517,15 @@ been used instead of abbreviations):
 
 .IP F 12
 .B Forward
-- add a contact in your forward list
+\- add a contact in your forward list
 
 .IP B 12
 .B Block
-- add a contact in your block list
+\- add a contact in your block list
 
 .IP G 8
 .B Group
-- add a new group
+\- add a new group
 
 .IP C 4
 .B Connect
@@ -528,7 +536,7 @@ been used instead of abbreviations):
 .IP S 4
 .B Status
 .IP N 8
-.B On-line
+.B On\-line
 .IP I 8
 .B Idle 
 .IP A 8
@@ -548,7 +556,7 @@ been used instead of abbreviations):
 .B List
 .IP F 8
 .B Forward 
-- you are presented with a contact selection menu where you can pick up
+\- you are presented with a contact selection menu where you can pick up
 up a contact from your list and do the following
 .IP B 16
 .B Block
@@ -561,7 +569,7 @@ the contact from the list
 the selected contact (by adding him/her to the allow list)
 .IP N 16
 .B Rename
-- change the name of the contact (see also the
+\- change the name of the contact (see also the
 .B update_nicks
 variable)
 .IP C 16
@@ -594,7 +602,7 @@ you can block him/her instead)
 the contact from your allow list
 .IP B 16
 .B Block
-- remove the contact from your allow list and add to your block list
+\- remove the contact from your allow list and add to your block list
 
 .IP B 8
 .B Block
@@ -603,7 +611,7 @@ the contact from your allow list
 the contact from your block list
 .IP A 16
 .B Allow
-- remove the contact from your block list and add to your allow list
+\- remove the contact from your block list and add to your allow list
 
 .IP G 8
 .B Group
@@ -616,9 +624,22 @@ the selected group
 
 .IP X 8
 .B Export aliases
-- export the forward list into 
+\- export the forward list into 
 .B ~/.gtmess/aliases 
 so that you can edit it
+
+.IP C 8
+.B List cleanup
+\- helps you remove obsolete entries from your contact lists. Shows
+which contacts have removed you from their contact list, so that there is no
+point in having them in your forward (FL), allow (AL) and block (BL) lists.
+Having some contact in your FL while not in RL is pointless. Having
+a contact in your AL while not in RL is pointless unless you have disabled the
+"All others" (BLP) flag. Having a contact in your BL while not in RL is
+pointless unless you have the BLP flag enabled and that contact is disturbing you.
+Normally, there should be AL \+ BL \= RL, that is each contact in the reverse list
+is either blocked or allowed. Upon login, gtmess displays these numbers in different
+color, according to whether AL \+ BL is less than, equal or greater than RL.
 
 .IP N 4
 .B Name
@@ -628,15 +649,17 @@ so that you can edit it
 
 .IP R 8
 .B "RL Prompt"
-- prompt when others add you to their forward list
+\- prompt when others add you to their forward list. This option is stored
+on the server.
 
 .IP A 8
 .B "All others"
-- allow others (not on your forward list) to start conversations with you
+\- allow others (not on your forward list) to start conversations with you. This
+is also referred to as the BLP flag. This option is stored on the server.
 
 .IP V 8
 .B Var
-- set the value of a configuration variable; takes effect immediately
+\- set the value of a configuration variable; takes effect immediately
 
 .IP Q 8
 .B Query
@@ -648,7 +671,7 @@ configuration variables into
 .BR ~/.gtmess/config ; 
 in fact, only those variables with values other than the default are written
 
-.IP 1-6 8
+.IP 1\-6 8
 .B Playback
 respective sound effect (for testing)
 
@@ -661,321 +684,344 @@ respective sound effect (for testing)
 .IP I 4
 .B Invite
 
-.IP N 4
+.IP T 4
 .B Note
 
 .SS SWITCHBOARD (chat window) CONTROLS
 
-.TP
+.TP 
 .B ^N
 new switchboard session
 
-.TP
+.TP 
 .B ^W
 leave current switchboard session and close the window
 
-.TP
+.TP 
 .B ^X
 leave current swithboard session, but leave the window open
 
 
-.TP
+.TP 
 .B F1
 previous switchboard session
 
-.TP
+.TP 
 .B F2
 next switchboard session
 
-.TP
+.TP 
 .B F3
 next switchboard session that has unread messages
 
-.TP
+.TP 
 .B PgUp
 scroll down switchboard window
 
-.TP
+.TP 
 .B PgDn
 scroll up switchboard window
 
-.TP
+.TP 
 .B @F7
 participant list scroll down
 
-.TP
+.TP 
 .B @F8
 participant list scroll up
 
 .SS SWITCHBOARD TEXT INPUT
 
-.PP
+.PP 
 Type any string and press enter to send it to server (talk).
 While you are typing, typing notifications are being sent in 
 .B time_user_types
 sec intervals.
 If the string you type begins with `/', then it forms a special command 
 (and typing notifications are not being sent while you are typing it).
-.br
+.br 
 Type `//' if you want to send a message with one `/' in the beginning.
 
 .SS SWITCHBOARD COMMANDS
 
-.TP
+.TP 
 .BI "/ " string
 This command sends
 .I string
 to the server without a typing notification. This actually happens
-because the string gets typed in command-entry mode (`/'). Note that there is
+because the string gets typed in command\-entry mode (`/'). Note that there is
 a space after the first slash.
 
-.TP
+.TP 
 .BI "/send " string
 Send a raw command string to server.
 
-.TP
+.TP 
 .BI "/invite " useraccount
 Invite the user with account
 .I useraccount
 to join the switchboard session. You can also use the shorcut
 .B /i
 for this command. Example:
-.br
+.br 
 .B /i myfriend@hotmail.com
 
-.TP
+.TP 
 .BI "/spoof " fake
 Send a fake typing notification from user
-.IR fake .
+.I R fake .
 
-.TP
+.TP 
 .BI "/file " filename
 Send a request to send the file
-.IR filename .
+.I R filename .
 
 .SS GTMESS SPECIFIC SWITCHBOARD COMMANDS
 
-.TP
+.TP 
 .B /beep
 Send a beep to others so that everybody pay attention.
 
-.TP
+.TP 
 .B /gtmess
 Tell everybody you are using gtmess.
 
-.TP
+.TP 
 .BI "/msg " text
 Send a message to other gtmess users. The message appears on their notification window.
 
-.TP
+.TP 
 .BI "/dlg " text
 Send a message to other gtmess users. The message appears on their switchboard window.
 
 .SS MISCELLANEOUS CONTROLS
 
-.TP
+.TP 
 .B ^L
 redraw screen from scratch
 
-.TP
+.TP 
 .B ^G
 produce a console beep
 
-.TP
+.TP 
 .B F4
 display / hide the transfers window
 
-.TP
+.TP 
 .B F5
 messages window scroll down
 
-.TP
+.TP 
 .B F6
 messages window scroll up
 
-.TP
+.TP 
 .B F7
 contact list scroll down
 
-.TP
+.TP 
 .B F8
 contact list scroll up
 
-.TP
+.TP 
 .B F10
 exit the client
 
-.PP
+.PP 
 .B NOTE:
 You can emulate the function keys F1 to F10 by pressing ESC first and
-then a digit from `1' to `0'. For instance, ESC-1 is equivalent to F1, 
-ESC-2 is F2, ESC-0 is F10. ALT-<digit> might also work.
-To emulate Alt+F7 or Alt+F8 you can press ESC-& or ESC-* (or ALT-&, ALT-*).
+then a digit from `1' to `0'. For instance, ESC\-1 is equivalent to F1, 
+ESC\-2 is F2, ESC\-0 is F10. ALT\-<digit> might also work.
+To emulate Alt+F7 or Alt+F8 you can press ESC\-& or ESC\-* (or ALT\-&, ALT\-*).
 
 .SS EDITBOX CONTROLS
-.PP
+.PP 
 When you are presented with an edit box to type a string, you can use
 the following keys:
 
-.TP
+.TP 
 .B "arrow LEFT/RIGHT"
 move cursor left/right
 
-.TP
+.TP 
 .B HOME/END
 move cursor to home/end
 
-.TP
+.TP 
 .B INSERT
 toggle insert mode
 
-.TP
+.TP 
 .B DELETE
 delete character at cursor and move the rest to the left
 
-.TP
+.TP 
 .B ^T
 delete word
 
-.TP
+.TP 
 .B ^A
 move one word left
 
-.TP
+.TP 
 .B ^D 
 move one word right
 
-.TP
+.TP 
 .BR BACKSPACE " or " ^H
 delete character on the left
 
-.TP
+.TP 
 .B ESC
 cancel editing (leaves string unmodified)
 
-.TP
+.TP 
 .B ENTER
 exit edit mode and save string
 
-.TP
+.TP 
 .B "arrow UP/DOWN"
 recall previous/next line from history
 
-.TP
+.TP 
 .B ^K
-enter clipboard mode
+enter escape mode
 
-.SS EDITBOX CLIPBOARD MODE CONTROLS
-.PP
-Clipboard mode is valid for exactly one keystroke and is automatically exited
-after it. Invalid keystrokes exit the mode. You cannot cut or copy a masked field 
+.SS EDITBOX ESCAPE MODE CONTROLS
+.PP 
+Escape mode is valid for exactly one keystroke and is automatically exited
+after it. Typical operations in this mode are cliboard operations. 
+Invalid keystrokes exit the mode. You cannot cut or copy a masked field 
 (i.e. password), though you can paste on it. The following are valid keystrokes
-in clipboard mode:
+in escape mode:
 
-.TP
-.B C
-copy whole line to clipboard buffer
-
-.TP
+.TP 
 .B B
 set block begin
 
-.TP
+.TP 
+.B C
+copy whole line to clipboard buffer
+
+.TP 
 .B K
 copy from block begin to current position
 
-.TP
+.TP 
 .B V
 paste buffer contents
 
-.TP
+.TP 
 .B X
 cut line to buffer
 
-.TP
+.TP 
 .B Z
 clear line (without affecting the buffer)
 
+.TP 
+.B N
+insert newline (shown as "|")
+
+.TP 
+.B ENTER
+toggle multi-line mode; in multi-line mode ENTER adds
+a newline character; the string will be accepted as soon as 
+you turn off the mode (^K\-ENTER again)
+
+.TP 
+.B A
+word left (to avoid conflicts with program `screen')
+
+.TP 
+.B D
+word right
+
+.TP 
+.B T
+delete word
+
 .SS CONTACT/GROUP SELECTION MODE
-.PP
+.PP 
 When you are presented with a list of contacts or groups, you can use
 the following keys:
 
-.TP
+.TP 
 .BR ] " or " "arrow RIGHT/DOWN"
 next entry
 
-.TP
+.TP 
 .B [ " or " "arrow LEFT/UP"
 previous entry
 
-.TP
+.TP 
 .BR { " or " HOME
 first entry
 
-.TP
+.TP 
 .BR } " or " END
 last entry
 
-.TP
+.TP 
 .B q
 show contact/group information
 
-.TP
+.TP 
 .BR SPACE " or " ENTER
 select
 
-.TP
+.TP 
 .BR ESC " or " BACKSPACE " or " ^H
 cancel selection
 
 
 .SS TRANSFERS WINDOW CONTROLS
-.PP
+.PP 
 When the transfers window is visible, you can use the following keys:
 
-.TP
+.TP 
 .BR ] " or " "arrow DOWN"
 next entry
 
-.TP
+.TP 
 .BR [ " or " "arrow UP"
 previous entry
 
-.TP
+.TP 
 .BR } " or " "arrow RIGHT"
 scroll left
 
-.TP
+.TP 
 .BR { " or " "arrow LEFT"
 scroll right
 
-.TP
+.TP 
 .B a
 accept incoming invitation
 
-.TP
+.TP 
 .B r
 reject incoming invitation
 
-.TP
+.TP 
 .B c
 cancel (abort) incoming/outgoing transfer or outgoing invitation
 
-.TP
+.TP 
 .B q
 quick printout
 
-.TP
+.TP 
 .B DELETE
 delete entry
 
-.TP
+.TP 
 .B ?
 mini help
 
 .SS TYPING NOTIFICATIONS
-.PP
+.PP 
 When a user is typing a message, a typing notification is usually sent by the user's client.
 Not all clients are able to send or receive typing notifications. However, gtmess both sends
 and receives typing notifications. It is also able to do some kind of spoofing 
@@ -985,18 +1031,17 @@ user is typing a message in some switchboard window. Although it is possible to
 know the specific s/b window, the current version does not distinguish between s/b windows.
 Hopefully this will be fixed in the future.
 
-
-.SH ADVANCED FEATURES
-.PP
+.SH "ADVANCED FEATURES"
+.PP 
 There are some features of the protocol that gtmess takes advantage of, while
 the original client for windows does not use them. These features are:
 
-.TP
+.TP 
 .B *
 Get notified when somebody has opened a chat window to you
 (but has not sent a message yet).
 
-.TP
+.TP 
 .B *
 Allow you to log in with a different initial status.
 
@@ -1006,12 +1051,12 @@ In the past, you if logged in as
 other users would still receive some offline events and if you originally were offline,
 they could suspect that you had just logged in. Nowadays this server bug has been fixed.
 
-.TP
+.TP 
 .B *
 Allow you to send a fake typing notification. This does not affect all clients.
-However, you can have fun with the original client!
+It used to affect older versions of the original client!
 
-.TP
+.TP 
 .B *
 Allow you to know if somebody is online, but has blocked you.
 To find out if a user is blocking you do the following: Open a switchboard window and
@@ -1021,7 +1066,7 @@ Otherwise, if you receive an error 217 then we cannot tell.
 When you receive error 217 there are two cases:
 1) The user is really offline and you can't find out if he or she has blocked you. 
 2) The user appears offline and hasn't blocked you. 
-.br
+.br 
 To sum up, if a user is logged in
 and has blocked you, you will receive error 216.
 
@@ -1031,47 +1076,47 @@ Nowadays the bug has been fixed, so block detection does not work any more. It i
 mentioned here for historic purposes.
 
 
-.SH FILES
-.TP
+.SH "FILES"
+.TP 
 .B ~/.gtmess/
 Main configuration directory. This directory relies in the user's home directory
-and stores the following gtmess-specific files:
+and stores the following gtmess\-specific files:
 
-.TP
+.TP 
 .B ~/.gtmess/aliases
 The aliases file. It contains lines of the form
-.IR email " " alias .
+.I R email " " alias .
 Lines beginning with `#' are considered to be comments, and therefore ignored.
 The alias export feature provides a convenient way to create an initial version
 of this file and then edit it manually.
 
-.TP
+.TP 
 .B ~/.gtmess/config
 The configuration file. It contains lines of the form
-.IR variable = value .
+.I R variable = value .
 Lines beginning  with `#' are considered to be comments, and therefore ignored.
 
-.TP
+.TP 
 .B ~/.gtmess/received/
 Received files from other users are stored
 in this directory.
 
-.TP
+.TP 
 .B ~/.gtmess/msn.log
 The traffic log (see the
 .I log_traffic 
 variable).
 
-.TP
+.TP 
 .B ~/.gtmess/notify.pip
-This file is a named pipe that is used by the gtmess-notify script to pop up notification
+This file is a named pipe that is used by the gtmess\-notify script to pop up notification
 windows. The client writes data in this file.
 
-.TP
+.TP 
 .BI ~/.gtmess/ account /log/
 The directory where console logs are stored.
 
-.TP
+.TP 
 .B ./root.pem
 Trusted root certificates, verified upon the initialization 
 of an SSL connection. Gtmess first looks into the current directory
@@ -1080,14 +1125,13 @@ for this file, then into
 and then into the default data prefix, usually
 .BR /usr/local/share/gtmess .
 
-.TP
+.TP 
 .B /usr/local/share/gtmess/snd/
 This is the location of the sound effect files. Note that the prefix
 .B /usr/local/share/gtmess
 might be different in your system.
 
-.SH BUGS
-
+.SH "BUGS"
 This is a list of known bugs and limitations. 
 They will be removed as soon as possible.
 
@@ -1097,24 +1141,45 @@ If you send a file, you cannot see the IP of the receiver.
 When you receive a file, you cannot be server. 
 When you send a file, you cannot be client.
 
-There is no option to keep an idle connection alive.
-
 There may occur conflicts in the authorization cookies of file transfers (though rare).
 
-Messages are always assumed to be UTF-8 encoded.
+Messages are always assumed to be UTF\-8 encoded.
 
 
-.SH SEE ALSO
-.BR gtmess-gw "(1), "
-.BR gtmess-notify "(1)"
+.SH "SEE ALSO"
+.BR gtmess\-notify "(1), "
+.BR "gtmess\_w" "(1)"
 
 
-.SH ACKNOWLEDGEMENTS
+.SH "MAKING OF"
+.TP 
+.B Operating System
+Debian Linux
+.TP 
+.B Desktop Environment
+WindowMaker
+.TP 
+.B Code Editor
+NEdit
+.TP 
+.B Sound Effects
+ZynAddSubFX
+.TP 
+.B Audio Editor
+Audacity
+.TP 
+.B Graphics Editor
+The GIMP
+.TP 
+.B File Manager
+Midnight Commander
+
+.SH "ACKNOWLEDGEMENTS"
 Credits go to the following people:
 
 .B "Mike Mintz"
 for his excellent site on the MSN Messenger Protocol.
-.br
+.br 
 .I http://www.hypothetic.org/docs/msn/index.php
 
 .B "L. Peter Deutsch"
@@ -1122,7 +1187,7 @@ for his MD5 module.
 
 .B "Eric Rescorla"
 for his article on SSL programming:
-.IR "An introduction to OpenSSL Programming" .
+.I R "An introduction to OpenSSL Programming" .
 
 .B Qi Wenmin, kuuldor, David Lefevre
 for some useful patches they sent me.
@@ -1130,49 +1195,32 @@ for some useful patches they sent me.
 .B "Kosta Fliangos"
 for kindly providing his FreeBSD box for testing.
 
+.B "The aMSN team"
+for some useful ideas I got from their client.
 
-.SH MAKING OF
-.TP
-.B Operating System
-Debian Linux Sarge (2.6.10)
-.TP
-.B Desktop Environment
-WindowMaker 0.91.0
-.TP
-.B Code Editor
-NEdit 5.5
-.TP
-.B Sound Effects
-ZynAddSubFX 1.4.3
-.TP
-.B Audio Editor
-Audacity 1.2.1
-.TP
-.B Graphics Editor
-The GIMP 1.2.3
-.TP
-.B File Manager
-Midnight Commander 4.6.1-pre1
 
-.SH AUTHORS
+.SH "CONTRIBUTORS"
+.B "Tibor Billes"
+has corrected quite a few bugs and is also actively contributing code to the project.
 
-gtmess - MSN Messenger client
-.br
-Copyright (C) 2002-2005  George M. Tzoumas
+.SH "AUTHORS"
+gtmess \- MSN Messenger client
+.br 
+Copyright (C) 2002\-2006  George M. Tzoumas
 
-.PP
+.PP 
 This program is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation; either version 2 of the License, or
 (at your option) any later version.
 
-.PP
+.PP 
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
-.PP
+.PP 
 You should have received a copy of the GNU General Public License
 along with this program; if not, write to the Free Software
-Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111\-1307  USA

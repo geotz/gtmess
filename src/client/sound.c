@@ -2,7 +2,7 @@
  *    sound.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2006  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
  */
 
 #include<stdio.h>
+#include<string.h>
 #include<sys/types.h>
 #include<sys/stat.h>
 #include<sys/wait.h>
@@ -64,7 +65,7 @@ void exec_soundplayer(snd_t snd) {
         }
         args[ac] = NULL;
         execve(args[0], args, environ);
-        exit(0);
+        _exit(0);
     }
 }
 

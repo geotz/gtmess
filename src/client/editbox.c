@@ -2,7 +2,7 @@
  *    editbox.c
  *
  *    editbox control for curses
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2006  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -23,6 +23,7 @@
 #include<string.h>
 #include<wchar.h>
 #include<curses.h>
+#include<assert.h>
 
 #include"editbox.h"
 #include"utf8.h"
@@ -84,13 +85,11 @@ int eb_mblen(ebox_t *e, wchar_t w, char *dest)
     return wcrtomb(dest, w, &mbs);
 }
 
-void eb_init(ebox_t *e, int nc, int nb, int width, char *s, wchar_t *ws)
+void eb_init(ebox_t *e, int nc, int width)
 {
     e->nc = nc;
-    e->nb = nb;
+    e->nb = 6*nc;
     e->insertmode = 1;
-    e->text = s;
-    e->wtext = ws;
     e->width = width;
     e->ii = e->sl = e->bl = 0;
     e->left = 0;
@@ -104,14 +103,42 @@ void eb_init(ebox_t *e, int nc, int nb, int width, char *s, wchar_t *ws)
     e->mbseq[3] = e->mbseq[4] = e->mbseq[5] = e->mbseq[6] = 0;
     e->mbseqp = &e->mbseq[0];
     hlist_init(&e->HL, EBHLEN);
+    e->mline = 0;
+    e->grow = 0;
+    e->text = (char *) malloc(e->nb+1);
+    e->text[0] = 0;
+    assert(e->text != NULL);
+    e->wtext = (wchar_t *) malloc((e->nc+1)*sizeof(wchar_t));
+    e->wtext[0] = 0;
+    assert(e->wtext != NULL);
+}
+
+void _eb_grow(ebox_t *e)
+{
+    e->nc *= 2;
+    e->nb = 6*e->nc;
+    e->text = (char *) realloc(e->text, e->nb+1);
+    e->wtext = (wchar_t *) realloc(e->wtext, (e->nc+1)*sizeof(wchar_t));
+}
+
+void eb_growfor(ebox_t *e, size_t cap)
+{
+    if (e->grow) while (e->nc <= cap) _eb_grow(e);
+}
+
+
+void eb_free(ebox_t *e)
+{
+    hlist_free(&e->HL);
+    if (e->text != NULL) free(e->text);
+    if (e->wtext != NULL) free(e->wtext);
 }
 
 void eb_settext(ebox_t *e, char *s)
 {
-    if (e->text != (unsigned char *) s) {
-        memset(e->text, 0, e->nb+1);
-        strncpy(e->text, s, e->nb);
-    }
+    if (e->grow) eb_growfor(e,strlen(s));
+    memset(e->text, 0, e->nb+1);
+    strncpy(e->text, s, e->nb);
     eb_mkwtext(e);
     e->sl = e->bl = 0;
     while (e->wtext[e->sl]) e->sl++;
@@ -129,8 +156,9 @@ void eb_settext(ebox_t *e, char *s)
     eb_flush(e);
 }
 
-void eb_pastechar(ebox_t *e, wchar_t c)
+int eb_pastechar(ebox_t *e, wchar_t c)
 {
+    int res = 0;
     eb_mkwtext(e);
     if (e->insertmode) {
         if (e->sl < e->nc && e->bl+eb_mblen(e, c, NULL) <= e->nb) {
@@ -138,6 +166,8 @@ void eb_pastechar(ebox_t *e, wchar_t c)
             e->wtext[e->ii++] = c;
             e->wtext[++e->sl] = 0;
             e->bl += eb_mblen(e, c, NULL);
+            eb_growfor(e,e->sl);
+            res = 1;
         }
     } else if (e->ii < e->nc) {
         int newbl;
@@ -147,9 +177,12 @@ void eb_pastechar(ebox_t *e, wchar_t c)
             e->wtext[e->ii++] = c;
             e->bl = newbl;
             if (e->ii > e->sl) e->wtext[++e->sl] = 0;
+            eb_growfor(e,e->sl);
+            res = 1;
         }
     }
     eb_flush(e);
+    return res;
 }
 
 void eb_history_add(ebox_t *e, char *s, int len)
@@ -316,6 +349,16 @@ int eb_keydown(ebox_t *e, int key)
                     for (c = clipboard; *c; c++) eb_pastechar(e, *c);
                     break;
                 }
+                case 'n':
+                case 'N': /* soft-newline */
+                    e->esc = 0;
+                    eb_pastechar(e, (wchar_t) '\n');
+                    break;
+                case '\r':
+                    e->esc = 0;
+                    e->mline ^= 1;
+                    if (e->mline == 0) return 0;
+                    break;
                 default:
                     e->esc = 0;
             } else if ((key >= 32) && (key <= 255)) {
@@ -342,6 +385,8 @@ int eb_keydown(ebox_t *e, int key)
                         eb_pastechar(e, wc);
                     }
                 }
+            } else if (e->mline && key == '\r') {
+                eb_pastechar(e, (wchar_t) '\n'); 
             } else return 0;
             break;
     }
@@ -360,7 +405,7 @@ void eb_draw(ebox_t *e, WINDOW *w)
     num_print = num_print_ii = i = 0;
     if (e->ii > e->left + 8)
         if (e->utf8) 
-            while (wcswidth(&e->wtext[e->left], e->ii-e->left) > e->width-1) e->left++;
+            while (wstrwidth(&e->wtext[e->left], e->ii-e->left) > e->width-1) e->left++;
         else while ((e->ii-e->left) > e->width-1) e->left++;
     else {
         e->left = e->ii - 8;
@@ -369,13 +414,14 @@ void eb_draw(ebox_t *e, WINDOW *w)
     while (num_print < e->width - 1) {
         ws = e->wtext[e->left + i];
         if (ws == 0) break;
+        if (ws == '\n') ws = (wchar_t) '|';
         if (e->mask) waddch(w, '*');
         else {
             char s[8] = {0};
             eb_mblen(e, ws, s);
             waddstr(w, s);
         }
-        if (e->utf8) num_print += wcwidth(ws);
+        if (e->utf8) num_print += wcwidth_nl(ws);
         else num_print++;
         i++;
         if (e->left + i == e->ii) num_print_ii = num_print;

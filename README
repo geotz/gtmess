@@ -106,16 +106,23 @@ backspace/^H		delete character at the left
 ESC			cancel
 ENTER			exit edit mode and save string
 arrow up/down           recall previous/next line from history
-^K			enter clipboard mode (escape mode)
-* clipboard mode
+^K			enter edit escape mode (cliboard etc.)
+* edit escape mode
 	B		set block begin
 	C		copy whole line to clipboard
 	K		copy from block begin to current pos
 	V		paste clipboard contents
 	X		cut line to clipboard
 	Z		clear line (without affecting clipboard)
+	N		insert newline (shown as "|")
+	ENTER		toggle multi-line mode; in multi-line mode ENTER adds
+			a newline character; string will be accepted when you
+			turn off the mode  (^K-ENTER again)
+	A		word left
+	D		word right
+	T		delete word
         
-* clipboard mode is valid only for one keystroke (CBKVXZ), 
+* clipboard mode is valid only for one keystroke (ACDBKNTVXZ), 
   and is automatically exited after it
 * invalid keystokes exit the mode
 * you cannot cut & copy a masked field (i.e. password), though you can paste on it
@@ -145,21 +152,6 @@ q			information
 delete			kill entry (and cancel of course)
 ?			mini help
 
-
-**************************************************
-gtmess-gw - HTTP gateway for MSN Messenger Clients
-**************************************************
-
-* installs a notification server at port 1863 and 
-  a switchboard server at port 1864
-* both servers forward the packets through the http gateway
-* useful if you are behind a firewall
-* you can use it with gtmess as follows:
-    1) start the gateway
-	gtmess-gw (better in another terminal or in the background)
-    2) start gtmess
-	gtmess -Oserver=127.0.0.1
-* -h option shows mini help
 
 ******************************************
 gtmess-notify - popup notification windows

@@ -2,7 +2,7 @@
  *    screen.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2006  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -61,11 +61,15 @@ extern int w_msg_top;
 extern char copyright_str[];
 
 int  get_string(cattr_t attr, int mask, const char *prompt, char *dest);
-void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, FILE *fp_log, const char *fmt, va_list ap);
+void vwmsg(TWindow *w, int size, time_t *sbtime, cattr_t attr, FILE *fp_log, const char *fmt, va_list ap);
 
 void msg(cattr_t attr, const char *fmt, ...);
+void msgn(cattr_t attr, int size, const char *fmt, ...);
+void vmsg(cattr_t attr, int size, const char *fmt, va_list ap);
 void msg2(cattr_t attr, const char *fmt, ...);
 void dlg(cattr_t attr, const char *fmt, ...);
+void dlgn(cattr_t attr, int size, const char *fmt, ...);
+void vdlg(cattr_t attr, int size, const char *fmt, va_list ap);
 
 void draw_all();
 void draw_rest();

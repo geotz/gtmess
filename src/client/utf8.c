@@ -2,7 +2,7 @@
  *    utf8.c
  *
  *    utf8 support routines
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2006  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -25,13 +25,13 @@
 
 #include"utf8.h"
 
-#ifndef HAVE_WCSWIDTH
-int wcswidth(const wchar_t *s, size_t n)
+
+int wstrwidth(const wchar_t *s, size_t n)
 {
-    int l = wcslen(s);
+    int l  = 0;
+    for (; *s != 0; s++) l += wcwidth_nl(*s);
     if (l <= n) return l; else return n;
 }
-#endif
 
 int strlen_utf8(char *s, int *len)
 {
@@ -106,7 +106,7 @@ int strwidth(char *s)
     w = (wchar_t *) malloc((len+1)*sizeof(wchar_t));
     memset(&mbs, 0, sizeof(mbs));
     mbsrtowcs(w, &str, len+1, &mbs);
-    width = wcswidth(w, wcslen(w));
+    width = wstrwidth(w, wcslen(w));
     free(w);
     return width;
 }
@@ -126,7 +126,7 @@ int widthoffset(char *s, int width)
     mbsrtowcs(w, &str, len+1, &mbs);
     wlen = wcslen(w);
     for (i = 0; i < wlen; i++) {
-        if (wcswidth(w, i+1) > width) {
+        if (wstrwidth(w, i+1) > width) {
             free(w);
             return stroffset(s, i+1, len+1);
         }

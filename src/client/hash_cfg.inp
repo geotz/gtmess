@@ -55,3 +55,4 @@ update_nicks, 26
 snd_dir, 27
 snd_exec, 28
 snd_redirect, 29
+keep_alive, 30

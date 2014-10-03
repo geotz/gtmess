@@ -2,7 +2,7 @@
  *    sboard.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2006  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -48,8 +48,6 @@ typedef struct msn_sboard_s {
     int w_dlg_top; /* top line (for scrolling) */
     pthread_t thrid;
     int sfd;
-    char input[SXL];
-    wchar_t winput[SXL];
     time_t tm_last_char; /* when last char was typed */
     ebox_t EB; /* editbox */
     int plskip; /* PL list line skip (for display) */
@@ -81,7 +79,7 @@ msn_sboard_t *msn_sblist_add(msn_sblist_t *q, char *sbaddr, char *hash,
 int msn_sblist_rem(msn_sblist_t *q);
 
 void sb_blah();
-void sb_type(int c);
+int sb_type(int c);
 void sboard_leave_all(int panic);
 int  sboard_leave();
 int  sboard_kill();

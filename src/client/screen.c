@@ -2,7 +2,7 @@
  *    screen.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2005  George M. Tzoumas
+ *    Copyright (C) 2002-2006  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -82,7 +82,8 @@ void wprintx(WINDOW *w, char *txt, int indent)
 {
     int maxwidth, ymax, width, wlen, nlines;
     char *text, *word;
-    char tw[SXL];
+    char twbuf[SXL], *tw;
+    int alloc;
     
     getmaxyx(w, ymax, maxwidth);
     maxwidth--;
@@ -90,12 +91,18 @@ void wprintx(WINDOW *w, char *txt, int indent)
     width = indent;
     while (get_next_word(&text, &word, &wlen, &nlines) != NULL) {
         if (width > 0 && width+wlen >= maxwidth) waddch(w, '\n');
+        tw = twbuf; alloc = 0;
+        if (wlen >= SXL) {
+            tw = (char *) malloc(wlen+1);
+            alloc = 1;
+        }
         strncpy(tw, word, wlen);
         tw[wlen] = 0;
         if (nlines > 0) for (; nlines > 0; --nlines) waddch(w, '\n');
         waddstr(w, tw);
         waddch(w, ' ');
         getyx(w, ymax, width);
+        if (alloc && tw != NULL) free(tw);
     }
     for (; nlines > 0; --nlines) waddch(w, '\n');
 }
@@ -123,18 +130,14 @@ void gs_draw_ebox(ebox_t *e, cattr_t attr, int pl)
 int get_string(cattr_t attr, int mask, const char *prompt, char *dest)
 {
     int r;
-    char s[SML];
-    wchar_t ws[SML];
     int c, pl;
     ebox_t E;
 
-    strncpy(s, dest, SML);
-    s[SML - 1] = 0;
     pl = strlen(prompt);
-    eb_init(&E, SML-1, SML-1, SCOLS-1-pl, s, ws);
+    eb_init(&E, SML-1, SCOLS-1-pl);
     E.utf8 = utf8_mode;
     E.mask = mask;
-    eb_settext(&E, s);
+    eb_settext(&E, dest);
     c = -1;
     
     gs_draw_prompt(attr, prompt);    
@@ -153,19 +156,29 @@ int get_string(cattr_t attr, int mask, const char *prompt, char *dest)
     }
     r = (c == 13);
     if (r) {
-        if (strcmp(dest, s) == 0) r <<= 1;
-        strcpy(dest, s);
+        if (strcmp(dest, E.text) == 0) r <<= 1;
+        else strcpy(dest, E.text);
     }
     move(SLINES - 1, SCOLS - 1);
+    eb_free(&E);
     return r;
 }
 
 /* print a message */
-void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, FILE *fp_log, const char *fmt, va_list ap)
+void vwmsg(TWindow *w, int size, time_t *sbtime, cattr_t attr, FILE *fp_log, const char *fmt, va_list ap)
 {
-    char tmp[SXL], *s;
+    char tmpbuf[SXL], *tmp, *s;
+    int alloc;
     time_t now2;
     int indent = 0;
+
+    if (size < SXL) {
+        tmp = tmpbuf;
+        alloc = 0;
+    } else {
+        tmp = (char *) malloc(size);
+        alloc = 1;
+    }
 
     vsprintf(tmp, fmt, ap);
 
@@ -189,7 +202,7 @@ void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, FILE *fp_log, const char *f
     LOCK(&time_lock);
     if (difftime(now2, *sbtime) > 60) {
         *sbtime = now2;
-        sbtime -= now2 % 60;
+        *sbtime -= now2 % 60;
         wprintw(w->wh, "[%02d:%02d] ", now_tm.tm_hour, now_tm.tm_min);
         if (fp_log != NULL) {
             fprintf(fp_log, "[%02d:%02d] ", now_tm.tm_hour, now_tm.tm_min);
@@ -205,25 +218,51 @@ void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, FILE *fp_log, const char *f
         fputs(tmp, fp_log);
         fflush(fp_log);
     }
+    
+    if (alloc && tmp != NULL) free(tmp);
 }
 
 /* message window */
 void msg(cattr_t attr, const char *fmt, ...)
 {
     va_list ap;
-    char txt[SML];
+    
+    va_start(ap, fmt);
+    vmsg(attr, SML, fmt, ap);
+    va_end(ap);
+}
+
+void msgn(cattr_t attr, int size, const char *fmt, ...)
+{
+    va_list ap;
+    
+    va_start(ap, fmt);
+    vmsg(attr, size, fmt, ap);
+    va_end(ap);
+}
+
+void vmsg(cattr_t attr, int size, const char *fmt, va_list ap)
+{
+    char txtbuf[SML], *txt;
+    int alloc;
     char *s;
     int y, x, newtop;
     time_t now2;
     int indent = 0;
     
-    va_start(ap, fmt);
+    if (size < SML) {
+        txt = txtbuf;
+        alloc = 0;
+    } else {
+        txt = (char *) malloc(size);
+        alloc = 1;
+    }
     vsprintf(txt, fmt, ap);
-    va_end(ap);
     for (s = txt; *s; s++) if (*s == '\r') *s = ' ';
     
     if (!fullscreen) {
         fprintf(stderr, "%s\n", txt);
+        if (alloc && txt != NULL) free(txt);
         return;
     }
     
@@ -269,6 +308,7 @@ void msg(cattr_t attr, const char *fmt, ...)
     UNLOCK(&w_msg.lock);
     move(y, x);
     refresh();
+    if (alloc && txt != NULL) free(txt);
 }
 
 void msg2(cattr_t attr, const char *fmt, ...)
@@ -535,17 +575,33 @@ void draw_sbbar(int r)
     if (r) refresh();
 }
 
-/* switchboard conversation window */
 void dlg(cattr_t attr, const char *fmt, ...)
+{
+    va_list ap;
+    
+    va_start(ap, fmt);
+    vdlg(attr, SXL, fmt, ap);
+    va_end(ap);
+}
+
+void dlgn(cattr_t attr, int size, const char *fmt, ...)
+{
+    va_list ap;
+    
+    va_start(ap, fmt);
+    vdlg(attr, size, fmt, ap);
+    va_end(ap);
+}
+
+
+/* switchboard conversation window */
+void vdlg(cattr_t attr, int size, const char *fmt, va_list ap)
 {
     msn_sboard_t *sb = (msn_sboard_t *) pthread_getspecific(key_sboard);
     int y, x, newtop;
-    va_list ap;
 
     if (sb == NULL) return;
-    va_start(ap, fmt);
-    vwmsg(&sb->w_dlg, &sb->dlg_now, attr, sb->fp_log, fmt, ap);
-    va_end(ap);
+    vwmsg(&sb->w_dlg, size, &sb->dlg_now, attr, sb->fp_log, fmt, ap);
     
     getyx(sb->w_dlg.wh, y, x);
     newtop = y - sb->w_dlg.h + 1;
@@ -661,8 +717,12 @@ void screen_init(int colors)
     initscr();
     if (colors == 1 || (colors == 0 && has_colors())) {
         start_color();
+#ifdef HAVE_USE_DEFAULT_COLORS
         use_default_colors();
 #define COLOR_BG -1
+#else
+#define COLOR_BG COLOR_BLACK
+#endif
         init_pair(1, COLOR_RED, COLOR_BG);
         lstatattrs[MS_FLN] = lstatattrs[MS_HDN] =
                 attrs[C_ERR] = COLOR_PAIR(1);

@@ -1,0 +1,19 @@
+Source: gtmess
+Section: Networking
+Priority: optional
+Maintainer: George M. Tzoumas <geotz@hotmail.com>
+Build-Depends: debhelper (>= 5), autotools-dev
+Standards-Version: 3.7.2
+
+Package: gtmess
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Suggests: tk8.4, rxvt-unicode
+Description: console MSN messenger client
+ gtmess is a console MSN Messenger client for Linux and other
+ Unix systems that conform to the POSIX standard. It supports
+ the MSNP9 protocol version. Apart from the basic stuff like
+ file transfers and chat windows, it offers some advanced
+ features like message logging, contact list cleanup, spoofing
+ the typing user (on some clients) and popup notifier (via
+ tcl/tk). It is UTF-8 compliant.
