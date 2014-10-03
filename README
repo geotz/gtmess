@@ -171,7 +171,7 @@ arrow up/down           recall previous/next line from history
 	D		word right
 	T		delete word
         
-* clipboard mode is valid only for one keystroke (ACDBKNTVXZ), 
+* clipboard mode is valid only for one keystroke (ACDBKNPTVXZ), 
   and is automatically exited after it
 * invalid keystokes exit the mode
 * you cannot cut & copy a masked field (i.e. password), though you can paste on it

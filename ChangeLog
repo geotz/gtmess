@@ -1,4 +1,10 @@
 *******************************
+* Version 0.98 (Jun 2012)     *
+*******************************
+! properly close logfile at logout <Tibor>
+* skip redundant self-status changes
+
+*******************************
 * Version 0.97 (Dec 2011)     *
 *******************************
 ! proper size_t printing -> fixed infamous "socket read error" bug!

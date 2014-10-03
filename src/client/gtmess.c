@@ -327,9 +327,9 @@ void _gtmess_exit(int panic)
     LOCK(&scr_lock);
     scr_shutdown = 1;
     UNLOCK(&scr_lock);
-    if (Config.log_traffic) fclose(flog);
     
     log_out(panic, 0);
+
     interval_done();
     pass_done();
     unotif_done();
@@ -338,6 +338,7 @@ void _gtmess_exit(int panic)
     if (msn_ic[0] != (iconv_t) -1) iconv_close(msn_ic[0]);
     if (msn_ic[1] != (iconv_t) -1) iconv_close(msn_ic[1]);
     if (msn.nfd != -1 || SL.count > 0) usleep(500000);
+    if (Config.log_traffic) fclose(flog);
 
     screen_done();
 
@@ -411,6 +412,7 @@ void *interval_daemon(void *dummy)
         if (Config.keep_alive && now - last_ping > Config.keep_alive && msn.nfd != -1) {
             do_ping();
             last_ping = now;
+//            if (msn.status > MS_FLN) msn_chg(msn.nfd, nftid(), msn.status);
         }
     }
 }

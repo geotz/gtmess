@@ -323,13 +323,14 @@ void *msn_ndaemon(void *dummy)
         } else if (is3(com, "CHG")) {
 
         /* status change */
-
+            msn_stat_t old;
             sscanf(s + 4, "%*s %s", arg2);
             LOCK(&msn.lock);
+            old = msn.status;
             msn.status = msn_stat_id(arg2);
             draw_status(0);
             UNLOCK(&msn.lock);
-            msg(C_MSG, "Your status has changed to %s\n", msn_stat_name[msn.status]);
+            if (old != msn.status) msg(C_MSG, "Your status has changed to %s\n", msn_stat_name[msn.status]);
         } else if (is3(com, "GTC")) {
 
         /* reverse list prompting */
