@@ -1,7 +1,7 @@
 #! /bin/sh
 
 # gtmess - MSN Messenger client
-# (c) 2002-2007 by George M. Tzoumas
+# (c) 2002-2010 by George M. Tzoumas
 #
 # This script opens a terminal window and runs gtmess in it.
 # It can be used as a desktop shortcut.
@@ -16,6 +16,7 @@
 # Make sure the programs are in your PATH!
 
 APP="gtmess"
+APPARGS="-Opopup=1"
 
 which $APP 2>/dev/null || exit 1
 
@@ -55,27 +56,29 @@ case "$TERMPROG" in
     urxvt)
         # try to use the daemon first
         urxvtc $URXVT_FLAGS -e $APP
-        test $? -eq 2 && urxvt $URXVT_FLAGS -e $APP
+        test $? -eq 2 && urxvt $URXVT_FLAGS -e "$APP $APPARGS"
         ;;
         
 
     rxvt)
-        rxvt $RXVT_FLAGS -e $APP
+        rxvt $RXVT_FLAGS -e "$APP $APPARGS"
         ;;
 
     wterm)
-        wterm $WTERM_FLAGS -e $APP
+        wterm $WTERM_FLAGS -e "$APP $APPARGS"
         ;;
         
     konsole)
-        konsole $KONSOLE_FLAGS -e $APP
+        konsole $KONSOLE_FLAGS -e "$APP $APPARGS"
         ;;
     
     gnome-terminal)
-        gnome-terminal $GTERM_FLAGS -e $APP
+        gnome-terminal $GTERM_FLAGS -e "$APP $APPARGS"
         ;;
 
     *)
-        xterm $XTERM_FLAGS -e $APP
+        xterm $XTERM_FLAGS -e "$APP $APPARGS"
         ;;
 esac
+
+killall gtmess-notify > /dev/null 2>&1

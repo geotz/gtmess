@@ -34,21 +34,14 @@
 #include "nserver.h"
 #include "screen.h"
 
-int pfd;    /* pipe file descriptor */
-
 void unotif_init(int asound, int apopup)
 {
-    char tmp[256];
     
     if (asound == 2) sound_init();
-    sprintf(tmp, "%s/notify.pip", Config.cfgdir);
-    if (apopup) pfd = open(tmp, O_RDWR);
-    else pfd = -1;
 }
 
 void unotif_done()
 {
-    if (pfd >= 0) close(pfd);
     sound_done();
 }
 
@@ -56,8 +49,14 @@ void unotify(char *mesg, char effect)
 {
     if ((Config.nonotif_mystatus & (1 << msn.status)) == (1 << msn.status)) return;
     playsound(effect);
-    if (pfd == -1) return;
-    write(pfd, mesg, strlen(mesg));
+    if (Config.popup && Config.pop_exec[0]) {
+        char cmd[SCL], *s1, *s2;
+        sprintf(cmd, Config.pop_exec, mesg);
+        s1 = strchr(cmd, '\'');
+        s2 = strrchr(cmd, '\'');
+        for (s1++; s1 != s2; s1++) if (*s1 == '\'') *s1 = ' '; /* get rid of mid-quotes */
+        system(cmd);
+    }
 }
 
 int can_notif(char *login) 

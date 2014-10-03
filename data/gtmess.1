@@ -1,5 +1,5 @@
 .\" 
-.TH "gtmess" "1" "December 26, 2007" "" "gtmess messenger"
+.TH "gtmess" "1" "August 23, 2010" "" "gtmess messenger"
 .SH "NAME"
 gtmess \- MSN messenger client
 
@@ -11,7 +11,7 @@ gtmess [options]
 gtmess is an MSN messenger client, which allows you to use
 the MSN messenger service. It is a console application that
 uses the curses library to present a friendly user interface.
-This manpage corresponds to version 0.94.
+This manpage corresponds to version 0.96.
 
 .SH "OPTIONS"
 .TP 
@@ -46,13 +46,19 @@ with only two possible values, 0 and 1. 1 stands for True and 0 for False.
 .BI aliases "" = N
 When
 .I N
-is 2, the user\-defined contact aliases are displayed instead of nick names.
-A value of 1 displays aliases only when nicknames are too long (see
+is 
+.BR 2 , 
+the user\-defined contact aliases are displayed instead of nick names.
+A value of 
+.B 1 
+displays aliases only when nicknames are too long (see
 .B max_nick_len
 variable) or when nicknames contain the email address (which is very irritating).
-A value of 0 disables the use of aliases completely and nick names are always
+A value of 
+.B 0 
+disables the use of aliases completely and nick names are always
 displayed. User\-defined contact aliases are stored into 
-.B ~/.gtmess/aliases 
+.I ~/.gtmess/aliases 
 (see the
 .B FILES
 section). This variable affects the use of aliases everywhere but the notification
@@ -87,13 +93,13 @@ the list of trusted certificate authorities (see the
 section),
 the user is asked if the login process should continue. 
 Three options are given,
-.I R Yes ,
-.I No 
+.BR Yes ,
+.B No
 and
-.I R Always .
+.BR Always .
 The meaning of each option is obvious.
 The login procedure requires more than one SSL connection, so option
-.I Always
+.B Always
 means that successive SSL connections will also continue upon unverified certificates.
 If this option is disabled, then the procedure always continues without asking the user, 
 even if certificates cannot be verified.
@@ -103,8 +109,19 @@ The default value is
 .TP 
 .BI colors "" = N
 Sets initial color mode.
-Possible values are 0, 1 or 2. With 0, color is selected automatically
-(according to curses). 1 forces color mode, while 2 forces black and white.
+Possible values are 
+.BR 0 , 
+.B 1 
+or 
+.BR 2 . 
+With 
+.BR 0 , 
+color is selected automatically
+(according to curses). 
+.B 1 
+forces color mode, while 
+.B 2 
+forces black and white.
 The default value is
 .B 0
 (automatic).
@@ -125,13 +142,13 @@ Sets the character encoding to be used for displaying the text on the console.
 .I S
 is the name of the encoding. To see all valid encoding names, look at
 the output of the
-.BR "iconv \-l" " command"
+.IR "iconv \-l" " command"
 (on systems that provide it). If
 .I S
 is
 .B *locale*
 then the console encoding is that of the 
-.I R LC_CTYPE 
+.IR LC_CTYPE 
 property of the current locale.
 The default value is
 .BR *locale* .
@@ -156,6 +173,19 @@ For example:
 Ignore `Connection reset by peer' error messages in chat windows. These messages
 may occur very often as the server closes inactive connections. Therefore,
 they are not displayed by default.
+
+.TP 
+.BI force_nick "" = S
+The nickname chosen by the user is not stored permantently on the server any more,
+due to protocol changes concerning MSNP12. When this option is set, gtmess sets
+the nickname to
+.IR S
+just after login. By default, this option is not set (empty string) which
+means that gtmess will not force a nickname change upon login. In this case
+the server will provide the stored nickname which could be either a proper nickname
+(which was stored by some msn client supporting a newer protocol version) or
+a nickname consisting of the email address of the account.
+
 
 .TP 
 .BI gtmesscontrol_ignore "" = S
@@ -183,24 +213,24 @@ The default value is
 Sets the initial status after login. For the MSN Messenger protocol
 .I N
 can be a number from 0 to 8 representing the following statuses:
-0 = 
-.BR Offline , 
-1 = 
-.BR "Appear Offline" , 
-2 = 
-.BR Online ,
-3 =
-.BR Idle ,
-4 =
-.BR Away ,
-5 =
-.BR Busy ,
-6 =
-.BR "Be Right Back" ,
-7 =
-.BR "On the Phone" ,
-8 = 
-.BR "Out to Lunch" .
+.BR 0 " =" 
+.IR Offline , 
+.BR 1 " ="
+.IR "Appear Offline" , 
+.BR 2 " ="
+.IR Online ,
+.BR 3 " ="
+.IR Idle ,
+.BR 4 " ="
+.IR Away ,
+.BR 5 " ="
+.IR Busy ,
+.BR 6 " ="
+.IR "Be Right Back" ,
+.BR 7 " ="
+.IR "On the Phone" ,
+.BR 8 " ="
+.IR "Out to Lunch" .
 .br 
 The default value is
 .B 2
@@ -212,7 +242,9 @@ If disabled, others cannot invite you to conversation windows because
 the client does not respond to the invitations they send. So, if you
 want to chat, you have to invite others to the conversation windows yourself.
 If enabled, then gtmess automatically accepts invitations to switchboard
-sessions. Note that this option overrides the BLP setting which is stored
+sessions. Note that this option overrides the 
+.I BLP 
+setting which is stored
 at the server and is about users not on your forward list.
 This option is enabled by default.
 
@@ -222,31 +254,41 @@ If greater than zero, the client sends a ping request in every
 .I N
 seconds. This will help to keep the connection alive on some networks.
 The default value is
-.B 0
-(disabled).
+.BR 60 .
+Note that due to changes in the protocol, the server is more willing to close
+inactive connections. You are not advised to set this option too low.
 
 .TP 
 .BI login "" = S
 Sets the default login account. If
 .I S
-does not contain an `@' character, then the string `@hotmail.com' is appended.
+does not contain an `@' character, then the string 
+.I @hotmail.com
+is appended.
 
 .TP 
 .BI log_traffic "" = B
 If enabled, network traffic between the client and the notification
 server is recorded into file 
-.BR ~/.gtmess/msn.log .
+.IR ~/.gtmess/msn.log .
 The default value is
 .BR 0 .
 
 .TP 
 .BI log_console "" = N
-Sets console logging level. 0 disables logging, 1 enables switchboard window logging,
-2 enables notification window logging, and 3 enables both. Log files are stored into
-.BI ~/.gtmess/ account /log/
+Sets console logging level. 
+.B 0 
+disables logging, 
+.B 1 
+enables switchboard window logging,
+.B 2 
+enables notification window logging, and 
+.B 3 
+enables both. Log files are stored into
+.IB ~/.gtmess/ account /log/
 in a per\-contact scheme. The notification window messages are stored in the special
 file
-.BR _nserver.log .
+.IR _nserver.log .
 This option is disabled by default.
 
 .TP 
@@ -254,21 +296,38 @@ This option is disabled by default.
 Specifies the maximum allowed nickname length before displaying the alias.
 If
 .I N
-is 0, then aliases are displayed only if the nickname does not fit on a single
+is 
+.BR 0 , 
+then aliases are displayed only if the nickname does not fit on a single
 line of the contact list window.
 The default value is
 .BR 0 .
 
 .TP 
+.BI max_retries "" = N
+Due to a strange bug of gtmess (or maybe feature of the openssl library),
+you frequently get `socket read error' upon initial login attempts.
+The error seems to go away just by retrying. Gtmess will retry
+.I N
+more times, before giving up. The default value is
+.BR 4 .
+
+.TP 
 .BI msg_debug "" = N
 Defines the client behavior on unrecognized messages. If
 .I N
-is 0, then those messages are silently ignored.
+is 
+.BR 0 , 
+then those messages are silently ignored.
 If
 .I N
-is 1, then the type of the message is displayed, and if
+is 
+.BR 1 , 
+then the type of the message is displayed, and if
 .I N
-is 2, the whole message is displayed. This option
+is 
+.BR 2 , 
+the whole message is displayed. This option
 is useful for development purposes.
 The default value is
 .BR 0 .
@@ -277,7 +336,9 @@ The default value is
 .BI msg_notify "" = N
 If
 .I N
-is greater than 0, gtmess notifies you when a new message is received even
+is greater than 
+.BR 0 , 
+gtmess notifies you when a new message is received even
 when the corresponding chat window is in the foreground. This
 feature is useful in graphical environments where the gtmess (console) window 
 may not be visible all the time. However, you will not be notified
@@ -286,7 +347,9 @@ if less than
 seconds have passed since the previous message. This is to avoid
 too many notifications that might be annoying. In fact, if
 .I N
-is 1, then the extra notification will occur only when the user is
+is 
+.BR 1 , 
+then the extra notification will occur only when the user is
 in Idle mode.
 The default value is
 .B 1.
@@ -296,7 +359,9 @@ The default value is
 Specifies the port number the MSNFTP server is listening to.
 The MSNFTP server is a thread that runs in the background and enables
 outgoing file transfers by allowing incoming connections. A value
-of 0 disables the server.
+of 
+.B 0 
+disables the server.
 The default value is
 .BR 6891 .
 
@@ -312,7 +377,8 @@ in the order presented in the paragraph describing
 The default value is
 .B 368
 which stands for the set of statuses {Away, Busy, Be-Right-Back, Out-To-Lunch}, as its
-binary representation is 101110000.
+binary representation is 
+.IR 101110000 .
 
 .TP 
 .BI notif_aliases "" = N
@@ -333,11 +399,50 @@ The default value is
 Sets the default password.
 
 .TP 
+.BI passp_server "" = S
+This option caches the default passport login server, which by default is
+.BR login.live.com/login2.srf ,
+in order to speed-up the login process.
+When this option is set to the empty string, a server will be requested from
+.IR nexus.passport.com .
+
+.TP 
 .BI popup "" = B
-Enables/disables the popup notification window at the lower right corner of
-the screen. This is an external Tcl/Tk script.
-The default value is
+Enables/disables the popup notification window, each time launching the script
+defined by the
+.B pop_exec 
+variable. The default value is
 .BR 1 .
+
+.TP 
+.BI pop_exec "" = S
+Sets the script to be used for notification windows. 
+For Linux systems, the default
+value is
+.B which notify-send >/dev/null 2>&1 && notify-send gtmess '%s' > /dev/null 2>&1
+which corresponds to the freedesktop.org notification scheme. For Darwin/MacOS
+the default value is
+.B which -s growlnotify && growlnotify -a gtmess -m '%s' -t gtmess
+which makes use of the Growl notification system.
+The provided  
+.I gtmess\-notify 
+script (see also the corresponding manpage) can be launched by specifying the following string:
+.BR "test -n \(dq$DISPLAY\(dq && which notify-send > /dev/null 2>&1 && notify-send gtmess '%s' > /dev/null 2>&1" .
+In this case, make sure that 
+.I gtmess-notify 
+is already running (that is 
+.I notify.pip 
+is opened
+for reading), otherwise an attempt
+to write to 
+.I notify.pip 
+will block!
+
+Note that this string will be passed to system() and
+only a single `%s' is allowed which will be substituted
+with the message string. Single quotes in the message string will be replaced by spaces.
+Leaving this variable empty is another way to disable popups.
+
 
 .TP 
 .BI safe_msg "" = N
@@ -377,30 +482,48 @@ Sets the location of the sound effect (.wav) files. The default
 value is
 .B *data*
 which corresponds to the
-.B snd/
+.I snd/
 directory in the data prefix, usually
 .BR /usr/local/share/gtmess .
 
 .TP 
 .BI snd_exec "" = S
 Sets the playback program for the sound effects. The default
-value is
+value on Linux systems is
 .B /usr/bin/aplay -Nq %s > /dev/null 2>&1 &
 which corresponds to the playback utility of the ALSA system.
+On Darwin/MacOS systems, the default value is
+.B /usr/bin/afplay %s > /dev/null 2>&1 &
+which corresponds to the system's audio playback utility.
 Note that this string will be passed to system() and
 only a single `%s' is allowed which will be substituted
 with the full path of the audio file.
+An empty string disables this option (which is equivalent to setting
+.B sound
+to
+.BR 0 ).
 
 .TP 
 .BI sound "" = N
 Sets sound mode.
 .I N
-can be 0, 1, 2, 3 or 4. 0 disables all sound, 1 produces always a (console) beep,
-while 2 plays sound effects (using the external command defined by
+can be 
+.BR 0 ", " 1 ", " 2 ", " 3 " or " 4 . 
+.B 0 
+disables all sound, 
+.B 1 
+produces always a (console) beep,
+while 
+.B 2 
+plays sound effects (using the external command defined by
 .BR snd_exec ).
-Value 3 produces pcspeaker sounds using the external program 
-.BR beep,
-and value 4 produces pcspeaker sounds by directly accessing
+Value 
+.B 3 
+produces pcspeaker sounds using the external program 
+.IR beep,
+and value 
+.B 4 
+produces pcspeaker sounds by directly accessing
 the speaker on linux systems. However, this last option requires special
 privileges and might not work at all, or work only as root. It works
 in linux VTs, however (i.e., ctrl-alt-F1).
@@ -408,12 +531,12 @@ The default value is
 .B 1
 (beep).
 There are 6 sound effects that correspond to various events (guess from the name):
-.BR online.wav ,
-.BR offline.wav ,
-.BR newemail.wav ,
-.BR type.wav ,
-.BR ring.wav ,
-.BR meout.wav .
+.IR online.wav ,
+.IR offline.wav ,
+.IR newemail.wav ,
+.IR type.wav ,
+.IR ring.wav ,
+.IR meout.wav .
 
 .TP 
 .BI syn_cache "" = B
@@ -436,9 +559,15 @@ Sets how the nicknames are updated on the msn server.
 When a contact is initially online or changes his/her nickname while online, the server
 lets you know about his/her nickname. Gtmess uses the new nickname when provided,
 otherwise it uses the last nickname stored on the server (on your forward list). 
-A value of 0 never updates
-nicknames, and a value of 2 always updates modified nicknames upon logout.
-A value of 1 updates nicknames only if they do not contain the email address.
+A value of 
+.B 0 
+never updates
+nicknames, and a value of 
+.B 2 
+always updates modified nicknames upon logout.
+A value of 
+.B 1 
+updates nicknames only if they do not contain the email address.
 Note that you can always update the nickname of a specific contact manually (rename function).
 The default value is
 .BR 0 .
@@ -450,10 +579,14 @@ a web browser to open urls that a users sends to you. Those urls are automatical
 parsed and displayed in the transfers window. The default
 value is
 .B opera --remote 'openURL(%s,new-page)' >/dev/null 2>&1 &
-which corresponds to opening the url using the Opera web browser.
+for Linux, which corresponds to opening the url using the Opera web browser.
+Under Darwin/MacOS, the default value is
+.B /usr/bin/open '%s' > /dev/null 2>&1
+which will open the url with the default web browser.
 As in 
 .BR snd_exec ,
 only one occurrence of `%s' is allowed that will be replaced by the url.
+An empty string disables this option.
 
 
 .SH "USER INTERFACE"
@@ -582,6 +715,9 @@ change the name of the contact (see also the
 .B update_nicks
 variable)
 .TP 
+.B Lists/Forward/Ungroup
+remove contact from all groups (a contact may belong to no particular group)
+.TP 
 .B Lists/Forward/Copy
 the contact to another group
 .TP
@@ -616,6 +752,9 @@ the contact
 (you don't have to add the contact to your forward list if you don't want to,
 you can block him/her instead)
 .TP
+.B Lists/Pending
+In this list you manage pending add requests.
+.TP
 .B Lists/Group/Empty
 remove all contacts in a group (use with care!)
 .TP
@@ -630,14 +769,23 @@ so that you can edit it
 .B "Lists/Clean up"
 helps you remove obsolete entries from your contact lists. Shows
 which contacts have removed you from their contact list, so that there is no
-point in having them in your FL, AL and BL.
-Having some contact in your FL while not in RL is pointless. Having
-a contact in your AL while not in RL is pointless unless you have disabled the
-"All others" (BLP) flag. Having a contact in your BL while not in RL is
-pointless unless you have the BLP flag enabled and that contact is disturbing you.
-Normally, there should hold AL \+ BL \= RL, that is each contact in the reverse list
-is either blocked or allowed. Upon login, gtmess displays these numbers in different
-color, according to whether AL \+ BL is less than, equal or greater than RL.
+point in having them in your FL, AL and BL. Note that this is 100% accurate anymore,
+due to protocol changes.
+Consequently, you can having some contact in your FL while not in RL. Having
+a contact in your AL while not in RL may be pointless unless you have disabled the
+"All others" (BLP) flag. Similarly, having a contact in your BL while not in RL might
+have no meaning, unless you have the BLP flag enabled and that contact is disturbing you.
+Ideally, there should hold AL \+ BL \= RL, that is each contact in the reverse list
+is either blocked or allowed. Occasionally, you will have same PL (Pending List) requests
+that you must decide whether to add or block.
+
+.TP
+.B "Server/Nickname"
+set the nickname
+
+.TP
+.B "Server/Personal msg"
+set the Personal Message, usually displayed after the nickname
 
 .TP
 .B "Server/RL Prompt"
@@ -776,6 +924,10 @@ invite contact to current session & leave menu
 .TP
 .B q
 contact information
+
+.TP
+.B m
+invoke a context menu regarding the selected contact
 
 .TP
 .B ENTER/SPACE
@@ -1129,10 +1281,12 @@ Get notified when somebody has opened a chat window to you
 Allow you to log in with a different initial status.
 
 .B NOTE:
-In the past, you if logged in as 
-.B "Appear Offline"
-other users would still receive some offline events and if you originally were offline,
-they could suspect that you had just logged in. Nowadays this server bug has been fixed.
+If you log in as 
+.BR "Appear Offline" ,
+other users will still receive some offline events, at least under protocol version MSNP12.
+Therefore, if you were offline in the first place,
+they can suspect that you have just logged in. Gtmess will detect this `fact' and warn for
+a user possibly appearing offline (aka Invisible) ;)
 
 .TP 
 .B *
@@ -1168,7 +1322,7 @@ and stores the following gtmess\-specific files:
 .TP 
 .B ~/.gtmess/aliases
 The aliases file. It contains lines of the form
-.I R email " " alias .
+.IR email " " alias .
 Lines beginning with `#' are considered to be comments, and therefore ignored.
 The alias export feature provides a convenient way to create an initial version
 of this file and then edit it manually.
@@ -1176,7 +1330,7 @@ of this file and then edit it manually.
 .TP 
 .B ~/.gtmess/config
 The configuration file. It contains lines of the form
-.I R variable = value .
+.IR variable = value .
 Lines beginning  with `#' are considered to be comments, and therefore ignored.
 
 .TP 
@@ -1192,8 +1346,13 @@ variable).
 
 .TP 
 .B ~/.gtmess/notify.pip
-This file is a named pipe that is used by the gtmess\-notify script to pop up notification
-windows. The client writes data in this file.
+This file is a named pipe that is used by the 
+.I gtmess\-notify 
+script to pop up notification
+windows. It is not used directly in this version of gtmess, you can safely
+remove it. ATTENTION: If the named pipe is not already open, 
+an attempt to write to this file by a script through gtmess will block (unless the 
+process that writes to the file runs in background)!
 
 .TP 
 .BI ~/.gtmess/ account /log/
@@ -1225,8 +1384,6 @@ might be different in your system.
 .SH "BUGS"
 This is a list of known bugs and limitations. 
 
-Notification or Passport login servers are not cached.
-
 If you send a file, you cannot see the IP of the receiver. 
 When you receive a file, you cannot be server. 
 When you send a file, you cannot be client.
@@ -1235,6 +1392,11 @@ There may occur conflicts in the authorization cookies of file transfers (though
 
 Messages are always assumed to be UTF\-8 encoded.
 
+When running `gtmess -h', the default values shown for the scripts (*_exec) 
+are overriden by the user configuration file.
+
+You might get `socket read error' when trying to log in. 
+Retrying usually solves this problem.
 
 .SH "SEE ALSO"
 .BR gtmess\-notify "(1), "
@@ -1299,7 +1461,7 @@ to the project.
 .SH "AUTHORS"
 gtmess \- MSN Messenger client
 .br 
-Copyright (C) 2002\-2007  George M. Tzoumas
+Copyright (C) 2002\-2010  George M. Tzoumas
 
 .PP 
 This program is free software; you can redistribute it and/or modify

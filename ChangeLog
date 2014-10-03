@@ -1,5 +1,16 @@
 *******************************
-* Version 0.96beta3           *
+* Version 0.96 (Aug 2009)     *
+*******************************
+! fixed a memleak regarding PSM parsing
+* better macos/darwin integration (snd/url_exec)
+* notify.pip no longer required (created on-demand)
+  you can safely delete it
+* user-defined notification script [pop_exec]
++ popup script defaults to Growl (growlnotify) under Darwin/MacOS
++ popup script defaults to notify-send under Linux
+
+*******************************
+* Version 0.96beta3 (Feb 2009)*
 *******************************
 + auto-retry initial connection [max_retries]
 + remove contact from all groups

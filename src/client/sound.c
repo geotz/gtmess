@@ -99,9 +99,11 @@ void exec_soundplayer(char snd) {
     char soundfile[SCL];
     char cmd[SCL];
     
-    sprintf(soundfile, "%s/%s", Config.snd_dir, snd_files[snd]);
-    sprintf(cmd, Config.snd_exec, soundfile);
-    system(cmd);
+    if (Config.snd_exec[0]) {
+        sprintf(soundfile, "%s/%s", Config.snd_dir, snd_files[snd]);
+        sprintf(cmd, Config.snd_exec, soundfile);
+        system(cmd);
+    }
 }
 
 void playsound(char snd)

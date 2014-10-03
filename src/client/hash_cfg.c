@@ -59,12 +59,12 @@ struct hct_entry {
     int id; 
 };
 
-#define TOTAL_KEYWORDS 40
+#define TOTAL_KEYWORDS 41
 #define MIN_WORD_LENGTH 3
 #define MAX_WORD_LENGTH 20
 #define MIN_HASH_VALUE 3
-#define MAX_HASH_VALUE 63
-/* maximum key range = 61, duplicates = 0 */
+#define MAX_HASH_VALUE 65
+/* maximum key range = 63, duplicates = 0 */
 
 #ifdef __GNUC__
 __inline
@@ -78,32 +78,32 @@ hash (register const char *str, register unsigned int len)
 {
   static unsigned char asso_values[] =
     {
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64,  5, 64, 64, 64, 30,
-       5,  0, 25, 10, 64, 15, 64, 64, 20, 20,
-      15, 25, 20, 64,  0, 15, 10, 10,  0, 30,
-      25, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
-      64, 64, 64, 64, 64, 64
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66,  5, 66, 66, 66, 30,
+       5,  0, 25, 10, 66, 15, 66, 66, 20, 20,
+      15, 25,  0, 66,  0, 25, 10, 10,  0, 20,
+      25, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66, 66, 66, 66, 66,
+      66, 66, 66, 66, 66, 66
     };
   register int hval = len;
 
@@ -134,10 +134,15 @@ in_word_set (register const char *str, register unsigned int len)
       {""}, {""}, {""},
 #line 35 "hash_cfg.inp"
       {"cvr", 5},
-      {""}, {""},
+      {""},
+#line 33 "hash_cfg.inp"
+      {"popup", 3},
 #line 39 "hash_cfg.inp"
       {"server", 9},
-      {""}, {""}, {""},
+      {""},
+#line 70 "hash_cfg.inp"
+      {"pop_exec", 40},
+      {""},
 #line 66 "hash_cfg.inp"
       {"force_nick", 36},
       {""}, {""},
@@ -185,8 +190,8 @@ in_word_set (register const char *str, register unsigned int len)
       {"msg_notify", 18},
 #line 69 "hash_cfg.inp"
       {"max_retries", 39},
-#line 46 "hash_cfg.inp"
-      {"aliases", 16},
+#line 67 "hash_cfg.inp"
+      {"passp_server", 37},
 #line 63 "hash_cfg.inp"
       {"safe_msg", 33},
       {""},
@@ -199,12 +204,11 @@ in_word_set (register const char *str, register unsigned int len)
       {"err_connreset", 34},
 #line 42 "hash_cfg.inp"
       {"initial_status", 12},
-#line 33 "hash_cfg.inp"
-      {"popup", 3},
+      {""},
 #line 43 "hash_cfg.inp"
       {"online_only", 13},
-#line 67 "hash_cfg.inp"
-      {"passp_server", 37},
+#line 46 "hash_cfg.inp"
+      {"aliases", 16},
 #line 55 "hash_cfg.inp"
       {"notif_aliases", 25},
       {""}, {""},
@@ -216,13 +220,15 @@ in_word_set (register const char *str, register unsigned int len)
       {"password", 11},
 #line 44 "hash_cfg.inp"
       {"syn_cache", 14},
-#line 52 "hash_cfg.inp"
-      {"gtmesscontrol_ignore", 22},
+      {""},
 #line 38 "hash_cfg.inp"
       {"console_encoding", 8},
       {""}, {""}, {""}, {""}, {""}, {""},
 #line 37 "hash_cfg.inp"
-      {"common_name_prompt", 7}
+      {"common_name_prompt", 7},
+      {""},
+#line 52 "hash_cfg.inp"
+      {"gtmesscontrol_ignore", 22}
     };
 
   if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)

@@ -877,7 +877,7 @@ void *msn_ndaemon(void *dummy)
                     msgn(C_DBG, strlen(msgdata)+2, "%s\n", msgdata);
                 }
                 psm1 = strafter(msgdata, "<PSM>");
-                if (psm1) psm2 = strstr(psm1, "</PSM>");
+                if (psm1) psm2 = strstr(psm1, "</PSM>"); else psm2 = NULL;
                 if (psm2) *psm2 = 0;
                 if (psm1 && psm2) {
                     char psm[SML];

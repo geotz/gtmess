@@ -1,7 +1,7 @@
 #! @WISHPROG@
 
 # gtmess - MSN Messenger client
-# (c) 2002-2004 by George M. Tzoumas
+# (c) 2002-2004,2010 by George M. Tzoumas
 #
 # This script pops up a notification window with
 # the contents of the named pipe ~/.gtmess/notify.pip.
@@ -14,11 +14,14 @@
 # The source code of this script is ABSOLUTELY FREE.
 # You can do whatever you want with it ;-)
 
+package require Tclx 8.0
+
 set ylimit [exec xdpyinfo | grep dimensions | awk {{split($2,a,"x"); print a[2]}}]
 set ylimit [expr $ylimit - 190]
 # set ylimit 450
 
-set f [open $env(HOME)/.gtmess/notify.pip]
+exec sh -c "test -p $env(HOME)/.gtmess/notify.pip || mkfifo -m 600 $env(HOME)/.gtmess/notify.pip"
+set f [open $env(HOME)/.gtmess/notify.pip "r+"]
 
 set nh 0
 set nw 0
@@ -83,5 +86,14 @@ proc notif { } {
 }
 
 fileevent $f readable "notif"
+
+proc myint {} {
+   global env
+   exec rm -f $env(HOME)/.gtmess/notify.pip
+   exit 0
+}
+
+signal trap SIGINT myint
+signal trap SIGTERM myint
 
 wm state . withdrawn

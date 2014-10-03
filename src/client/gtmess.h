@@ -82,6 +82,7 @@ typedef struct {
     char passp_server[SCL];
     char psm[SML];
     int max_retries;
+    char pop_exec[SCL];
     
     char cfgdir[SCL];
     char datadir[SCL];

@@ -76,7 +76,7 @@ O	options
 I	invite
 T	enter note
 Q	quit
-/	enter special client command (none for now)
+/	enter special client command (none for now, try "test colors" for fun)
 
 Menu navigation (F9)
 --------------------
@@ -156,7 +156,7 @@ arrow up/down           recall previous/next line from history
 	X		cut line to clipboard
 	Z		clear line (without affecting clipboard)
 	N		insert newline (shown as "|")
-	ENTER		toggle multi-line mode; in multi-line mode ENTER adds
+	ENTER	toggle multi-line mode; in multi-line mode ENTER adds
 			a newline character; string will be accepted when you
 			turn off the mode  (^K-ENTER again)
 	A		word left
@@ -173,10 +173,11 @@ Contact/Group Selection Mode:
 -------------------------------------------------------------------------
 ]/arrow right/down	next entry
 [/arrow left/up		previous entry
-{/home			first entry
-}/end			last entry
+{/home		first entry
+}/end		last entry
 q			information
-space/enter		select
+m			invoke contact context menu
+space/enter	select
 ESC			cancel selection
 
 Transfers Window
@@ -190,7 +191,7 @@ r			reject incoming invitation
 c			cancel (abort) incoming/outgoing transfer
 			or outgoing invitation
 q			information
-delete			kill entry (and cancel of course)
+delete		kill entry (and cancel of course)
 
 
 ******************************************
@@ -198,7 +199,7 @@ gtmess-notify - popup notification windows
 ******************************************
 
 * pops up a notification window starting from lower right of the screen
-* watches the named pipe '~/.gtmess/notify.pip' for new lines and displays
+* creates & watches the named pipe '~/.gtmess/notify.pip' for new lines and displays
   the line text
 
 ******************************************

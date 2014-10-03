@@ -31,7 +31,7 @@ NEXT version
 -------------
 fix clist scrolling...?
 possible bug upon initial Connect...() ? why all those socket read errors?
-dirty fix by max_retries
+(currently dirty fix by max_retries)
 
 
 MAYBE in SOME future version
@@ -157,6 +157,20 @@ histlen
 
 #define interval_done() pthread_cancel(ithrid)
 
+#if defined (__APPLE__)
+#define SNDEXEC "/usr/bin/afplay %s > /dev/null 2>&1 &"
+#define URLEXEC "/usr/bin/open '%s' > /dev/null 2>&1"
+#define POPEXEC "which -s growlnotify && growlnotify -a gtmess -m '%s' -t gtmess"
+#elif defined (__linux__)
+#define SNDEXEC "/usr/bin/aplay -Nq %s > /dev/null 2>&1 &"
+#define URLEXEC "opera --remote 'openURL(%s,new-page)' >/dev/null 2>&1 &"
+#define POPEXEC "test -n \"$DISPLAY\" && which notify-send > /dev/null 2>&1 && notify-send gtmess '%s' > /dev/null 2>&1"
+#else
+#define SNDEXEC ""
+#define URLEXEC ""
+#define POPEXEC ""
+#endif
+
 /* var, str_val, int_val, type, int_low, int_high */
 struct cfg_entry ConfigTbl[] =
   {
@@ -190,8 +204,8 @@ struct cfg_entry ConfigTbl[] =
     {"notif_aliases", "", 0, 1, 0, 1},
     {"update_nicks", "", 0, 1, 0, 2},
     {"snd_dir", "*data*", 0, 0, 0, 0},
-    {"snd_exec", "/usr/bin/aplay -Nq %s > /dev/null 2>&1 &", 0, 0, 0, 0},
-    {"url_exec", "opera --remote 'openURL(%s,new-page)' >/dev/null 2>&1 &", 0, 0, 0, 0},
+    {"snd_exec", SNDEXEC, 0, 0, 0, 0},
+    {"url_exec", URLEXEC, 0, 0, 0, 0},
     {"keep_alive", "", 60, 1, 0, 7200},
     {"nonotif_mystatus", "", 368, 1, 0, 511},
     {"skip_says", "", 20, 1, 0, 7200},
@@ -201,7 +215,8 @@ struct cfg_entry ConfigTbl[] =
     {"force_nick", "", 0, 0, 0, 0},
     {"passp_server", "login.live.com/login2.srf", 0, 0, 0, 0},
     {"psm", "", 0, 0, 0, 0},
-    {"max_retries", "", 4, 1, 0, 31}
+    {"max_retries", "", 4, 1, 0, 31},
+    {"pop_exec", POPEXEC, 0, 0, 0, 0}
   };
 
 struct cfg_entry *OConfigTbl;
@@ -687,6 +702,8 @@ void print_usage(char *argv0)
                     "passp_server=<s>\tdefault passport login server [login.live.com/login2.srf]\n"
                     "\t\t\tif empty, then a server will be requested from nexus.passport.com\n"
                     "popup=<b>\t\tenable/disable popup notification window [1]\n"
+                    "pop_exec=<s>\t\tcommand line for popup notification message\n"
+                    "\t\t\t[%s]\n"
                     "psm=<s>\t\t\tset personal message upon login (empty = do not set) []\n"
                     "safe_msg=<n>\t\tprevents inadvertently closing chat window with\n"
                     "\t\t\ttoo recent messages (just before <n> seconds,\n"
@@ -705,10 +722,10 @@ void print_usage(char *argv0)
                     "update_nicks=<n>\tupdate nicknames on server [0]\n"
                     "\t\t\t0=never, 1=smart, 2=always\n"
                     "url_exec=<s>\t\tcommand line for url browser\n"
-                    "\n"
+                    "\t\t\t[%s]\n"
                     "EXAMPLE:\n"
                     "\t%s -Ologin=george -Opassword=secret123 -Oinitial_status=1\n",
-             argv0, ConfigTbl[28].sval, ConfigTbl[4].ival, argv0);
+             argv0, ConfigTbl[40].sval, ConfigTbl[28].sval, ConfigTbl[4].ival, ConfigTbl[29].sval, argv0);
 }
 
 int play_menu(menu_t *m)
@@ -810,7 +827,8 @@ int parse_cfg_entry(char *s)
             if (e->type == 0) { /* string */
                 if (strcmp(variable, "password") == 0) 
                     cipher_string((unsigned char *) eq+1, (unsigned char *) "gTme$$", 0);
-                else if ((strcmp(variable, "snd_exec") == 0) || (strcmp(variable, "url_exec") == 0)) {
+                else if ((strcmp(variable, "snd_exec") == 0) || (strcmp(variable, "url_exec") == 0)
+                          || (strcmp(variable, "pop_exec") == 0)) {
                     if (!valid_shell_string(eq+1)) {
                         beep();
                         msg(C_ERR, "parse_cfg_entry(%s): invalid string, should contain exactly one %%s\n", variable);
@@ -960,6 +978,7 @@ void config_init()
     Strcpy(Config.passp_server, ConfigTbl[c++].sval, SCL);
     Strcpy(Config.psm, ConfigTbl[c++].sval, SML);
     Config.max_retries = ConfigTbl[c++].ival;
+    Strcpy(Config.pop_exec, ConfigTbl[c++].sval, SCL);
     NumConfigVars = c;
     
     sprintf(Config.datadir, "%s", DATADIR);
@@ -2073,7 +2092,7 @@ int log_in(int startup)
     msg2(C_MNU, "Logging in ...");
     
     retry = Config.max_retries;
-    while (retry > 0) {
+    while (retry >= 0) {
         while ((r = do_login()) == 1);
         if (r == 0) return 0;
         msn.nfd = -1;
@@ -2293,8 +2312,6 @@ void setup_cfg_dir()
         mkdir(Config.cfgdir, 0700);
         sprintf(tmp, "%s/received", Config.cfgdir);
         mkdir(tmp, 0700);
-        sprintf(tmp, "%s/notify.pip", Config.cfgdir);
-        mkfifo(tmp, 0600);
     }
 }
 

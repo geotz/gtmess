@@ -1,4 +1,4 @@
-.TH gtmess-notify 1 "March 15, 2005" "" "gtmess messenger notification popups"
+.TH gtmess-notify 1 "August 22, 2010" "" "gtmess messenger notification popups"
 
 .SH NAME
 gtmess-notify - popup notification windows
@@ -26,26 +26,25 @@ Then we can popup anything, like:
 
 $ echo "hello world" > ~/.gtmess/notify.pip
 
-However, the script terminates when the last client closes
-the pipe. So we 'd better keep it open.
-Or we can just run gtmess :-)
+When we're done we can kill it:
 
-$ gtmess-notify &
-.br
-some_other_terminal> gtmess
-.br
-$ echo "now" > ~/.gtmess/notify.pip
-.br
-$ echo "it works!" > ~/.gtmess/notify.pip
+$ killall gtmess-notify
 
 .SH FILES
 .TP
 .B ~/.gtmess/notify.pip
-The named pipe where the text to be displayed is read from.
+The named pipe where the text to be displayed is read from. If
+the file does not exist it is created. When the script catches a SIGINT
+signal, it deletes the pipe and exits.
 
 .SH SEE ALSO
 .BR gtmess "(1), "
-.BR gtmess\_w "(1)"
+.BR gtmess\_w "(1), "
+.BR notify-send "(1), "
+.BR growlnotify "(1)"
+
+.SH "BUGS"
+Script fails to remove the pipe upon SIGTERM (at least in Darwin). 
 
 .SH CREDITS
 
@@ -55,7 +54,7 @@ Inspired from the aMSN messenger client.
 
 gtmess-notify - popup notification windows
 .br
-Copyright (C) 2002-2004  George M. Tzoumas
+Copyright (C) 2002-2004,2010  George M. Tzoumas
 
 .PP
 This script is distributed in the hope that it will be useful,

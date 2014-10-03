@@ -305,7 +305,7 @@ int xf_keydown(int c)
                 UNLOCK(&SX);
                 break;
             }
-            if (x->xclass == XF_URL) {
+            if (x->xclass == XF_URL && Config.url_exec[0]) {
                 char s[SML+80];
                 sprintf(s, Config.url_exec, x->data.url.name);
                 system(s);
