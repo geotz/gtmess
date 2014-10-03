@@ -2,7 +2,7 @@
  *    gtmess.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2009  George M. Tzoumas
+ *    Copyright (C) 2002-2010  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -30,8 +30,8 @@ DELETE EVERYTHING AND WRITE THE CLIENT FROM SCRATCH IN C++ :-)
 NEXT version
 -------------
 fix clist scrolling...?
-possible bug upon initial Connect...() ?
-fix challenge on big-endian
+possible bug upon initial Connect...() ? why all those socket read errors?
+dirty fix by max_retries
 
 
 MAYBE in SOME future version
@@ -200,7 +200,8 @@ struct cfg_entry ConfigTbl[] =
     {"auto_cl", "", 1, 1, 0, 1},
     {"force_nick", "", 0, 0, 0, 0},
     {"passp_server", "login.live.com/login2.srf", 0, 0, 0, 0},
-    {"psm", "", 0, 0, 0, 0}
+    {"psm", "", 0, 0, 0, 0},
+    {"max_retries", "", 4, 1, 0, 31}
   };
 
 struct cfg_entry *OConfigTbl;
@@ -658,7 +659,7 @@ void print_usage(char *argv0)
                     "console_encoding=<s>\tconsole encoding (iconv -l) [*locale*]\n"
                     "cvr=<s>\t\t\tconsumer versioning (CVR) string\n"
                     "err_connreset=<b>\tignore `Connection reset by peer' error messages on SB [1]\n"
-                    "force_nick=<s>\tsetup nickname upon login (empty = do not set) []\n"
+                    "force_nick=<s>\t\tsetup nickname upon login (empty = do not set) []\n"
                     "gtmesscontrol_ignore=<s>ignore gtmess-specific messages, <s>=*all* or\n"
                     "\t\t\tignore only messages that are substrings of <s>\n"
                     "idle_sec=<n>\t\tseconds before auto-idle status [180], 0=never, <= 7200\n"
@@ -672,6 +673,7 @@ void print_usage(char *argv0)
                     "log_traffic=<b>\t\tlog network traffic [0]\n"
                     "log_console=<n>\t\tlog console messages [0], 0=none, 1=sb, 2=ns, 3=both\n"
                     "max_nick_len=<n>\tmax nickname length before use of alias [0], 0=fit\n"
+                    "max_retries=<n>\tmaximum number of retries when login fails [4]\n"
                     "msg_debug=<n>\t\thandle unknown msgs [0], 0 = ignore,\n"
                     "\t\t\t1 = show type, 2 = show whole msg\n"
                     "msg_notify=<n>\t\textra notification on received messages [1],\n"
@@ -685,7 +687,7 @@ void print_usage(char *argv0)
                     "passp_server=<s>\tdefault passport login server [login.live.com/login2.srf]\n"
                     "\t\t\tif empty, then a server will be requested from nexus.passport.com\n"
                     "popup=<b>\t\tenable/disable popup notification window [1]\n"
-                    "psm=<s>\t\tset personal message upon login (empty = do not set) []\n"
+                    "psm=<s>\t\t\tset personal message upon login (empty = do not set) []\n"
                     "safe_msg=<n>\t\tprevents inadvertently closing chat window with\n"
                     "\t\t\ttoo recent messages (just before <n> seconds,\n"
                     "\t\t\t-1=disable) [0]\n"
@@ -957,6 +959,7 @@ void config_init()
     Strcpy(Config.force_nick, ConfigTbl[c++].sval, SCL);
     Strcpy(Config.passp_server, ConfigTbl[c++].sval, SCL);
     Strcpy(Config.psm, ConfigTbl[c++].sval, SML);
+    Config.max_retries = ConfigTbl[c++].ival;
     NumConfigVars = c;
     
     sprintf(Config.datadir, "%s", DATADIR);
@@ -1597,7 +1600,7 @@ int menu_list_PL(void *arg)
         inRL = msn_clist_find(&msn.CL, msn_RL, p->login) != NULL;
         UNLOCK(&msn.lock);
         m = play_menu(&menu_PL);
-        if (m == 2) switch (menu_RL.cur) {
+        if (m == 2) switch (menu_PL.cur) {
             case 0: /* Add */
                 /* m = menu_glist(&msn.lock, &msn.GL, &pg, NULL, "TO");
                 if (m >= 0) {*/
@@ -2048,7 +2051,7 @@ void menus_init()
 
 int log_in(int startup)
 {
-    int r;
+    int r, retry;
     if (msn.nfd != -1) {
         msg(C_ERR, "You are already logged in\n");
         return 0;
@@ -2069,11 +2072,17 @@ int log_in(int startup)
     } else if (!get_string(C_EBX, 1, "Password: ", msn.pass, SML)) return 0;
     msg2(C_MNU, "Logging in ...");
     
-    while ((r = do_login()) == 1);
-    if (r == 0) return 0;
-    msn.nfd = -1;
-    
-    msg(C_ERR, "Failed to connect to server\n");
+    retry = Config.max_retries;
+    while (retry > 0) {
+        while ((r = do_login()) == 1);
+        if (r == 0) return 0;
+        msn.nfd = -1;
+
+        msg(C_ERR, "Failed to connect to server\n");
+        if (r == -400) break; /* do not retry when passport authentication fails */
+        if (retry) msg(C_ERR, "Retrying %d more time%s ...\n", retry, (retry > 1)? "s": ZS);
+        --retry;
+    }
     return -1;
 }
 
@@ -2413,7 +2422,7 @@ int main(int argc, char **argv)
 {
     int c, paste, escape, mstatus;
     
-    sprintf(copyright_str, "F9.Menu TAB.Contacts ?.Help | gtmess %s (%s), (c) 2002-2009 by GeoTz", VERSION, VDATE);
+    sprintf(copyright_str, "F9.Menu TAB.Contacts ?.Help | gtmess %s (%s), (c) 2002-2010 by GeoTz", VERSION, VDATE);
     printf("%s\n", &copyright_str[30]);
     
     queue_init(&msg_q);
@@ -2472,7 +2481,7 @@ int main(int argc, char **argv)
     msg(C_DBG, 
         "gtmess version %s (%s)\n"
         "MSN Messenger Client for UNIX Console\n"
-        "(c) 2002-2007 by George M. Tzoumas\n"
+        "(c) 2002-2010 by George M. Tzoumas\n"
         "gtmess is free software, covered by the\nGNU General Public License.\n"
         "There is absolutely no warranty for gtmess.\n\n", VERSION, VDATE);
 

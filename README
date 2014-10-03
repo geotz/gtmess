@@ -57,6 +57,7 @@ Contact List Mode
 i		invite contact to current session (i.e. after ^N)
 I		invite contact to current session & leave menu
 q		information
+m		contact context menu
 ENTER/SPACE	new chat session & invite contact & leave menu
 +/b		block/unblock contact
 :		toggle ignore contact

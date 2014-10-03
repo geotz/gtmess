@@ -2150,8 +2150,8 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 
 PACKAGE="gtmess"
-VERSION="0.96beta2"
-VDATE="Dec 2009"
+VERSION="0.96beta3"
+VDATE="Jan 2010"
 am__api_version="1.9"
 ac_aux_dir=
 for ac_dir in "$srcdir" "$srcdir/.." "$srcdir/../.."; do

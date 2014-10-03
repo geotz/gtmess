@@ -2,7 +2,7 @@
  *    msn.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2009  George M. Tzoumas
+ *    Copyright (C) 2002-2010  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -870,17 +870,10 @@ int msn_chl(const char *challenge, const char *product_id, char *hash)
     sscanf(md5, "%8x%8x%8x%8x", &i[0], &i[1], &i[2], &i[3]);
 
     /* the string md5hex returned is big endian */
-    if (is_little_endian()) {
-        i[0] = convert_endianess(i[0]) & 0x7FFFFFFF;
-        i[1] = convert_endianess(i[1]) & 0x7FFFFFFF;
-        i[2] = convert_endianess(i[2]) & 0x7FFFFFFF;
-        i[3] = convert_endianess(i[3]) & 0x7FFFFFFF;
-    } else {
-        i[0] &= 0x7FFFFFFF;
-        i[1] &= 0x7FFFFFFF;
-        i[2] &= 0x7FFFFFFF;
-        i[3] &= 0x7FFFFFFF;
-    }
+    i[0] = convert_endianess(i[0]) & 0x7FFFFFFF;
+    i[1] = convert_endianess(i[1]) & 0x7FFFFFFF;
+    i[2] = convert_endianess(i[2]) & 0x7FFFFFFF;
+    i[3] = convert_endianess(i[3]) & 0x7FFFFFFF;
 
     strcpy(chg, challenge); strcat(chg, product_id);
     for (loop = strlen(chg); loop % 8; loop++) chg[loop] = '0';
@@ -912,20 +905,12 @@ int msn_chl(const char *challenge, const char *product_id, char *hash)
 
     sscanf(md5, "%8x%8x%8x%8x", &h1, &h2, &h3, &h4);
 
-    if (is_little_endian()) {
-        high = convert_endianess(high);
-        low = convert_endianess(low);
-        hash_[0] = h1^high;
-        hash_[1] = h2^low;
-        hash_[2] = h3^high;
-        hash_[3] = h4^low;
-
-    } else {
-        hash_[0] = convert_endianess(h1)^high;
-        hash_[1] = convert_endianess(h2)^low;
-        hash_[2] = convert_endianess(h3)^high;
-        hash_[3] = convert_endianess(h4)^low;
-    }
+    high = convert_endianess(high);
+    low = convert_endianess(low);
+    hash_[0] = h1^high;
+    hash_[1] = h2^low;
+    hash_[2] = h3^high;
+    hash_[3] = h4^low;
 
     sprintf(hash, "%08x%08x%08x%08x", hash_[0], hash_[1], hash_[2], hash_[3]);
     free(chg);
@@ -1087,7 +1072,8 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
     int err;
     char s[SXL], rep[SXL], tmp[SML];
     
-    sprintf(s, "VER %u MSNP12 CVR0\r\n", tid++);
+/*    sprintf(s, "VER %u MSNP12 CVR0\r\n", tid++);*/
+    sprintf(s, "VER %u MSNP12\r\n", tid++);
     if (writestr(fd, s) < 0) return -1;
 
     if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;

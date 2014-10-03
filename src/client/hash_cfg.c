@@ -35,7 +35,7 @@
  *    hash_cfg.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2009  George M. Tzoumas
+ *    Copyright (C) 2002-2010  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -59,7 +59,7 @@ struct hct_entry {
     int id; 
 };
 
-#define TOTAL_KEYWORDS 39
+#define TOTAL_KEYWORDS 40
 #define MIN_WORD_LENGTH 3
 #define MAX_WORD_LENGTH 20
 #define MIN_HASH_VALUE 3
@@ -90,7 +90,7 @@ hash (register const char *str, register unsigned int len)
       64, 64, 64, 64, 64,  5, 64, 64, 64, 30,
        5,  0, 25, 10, 64, 15, 64, 64, 20, 20,
       15, 25, 20, 64,  0, 15, 10, 10,  0, 30,
-      15, 64, 64, 64, 64, 64, 64, 64, 64, 64,
+      25, 64, 64, 64, 64, 64, 64, 64, 64, 64,
       64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
       64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
       64, 64, 64, 64, 64, 64, 64, 64, 64, 64,
@@ -183,7 +183,8 @@ in_word_set (register const char *str, register unsigned int len)
       {""},
 #line 48 "hash_cfg.inp"
       {"msg_notify", 18},
-      {""},
+#line 69 "hash_cfg.inp"
+      {"max_retries", 39},
 #line 46 "hash_cfg.inp"
       {"aliases", 16},
 #line 63 "hash_cfg.inp"
@@ -193,8 +194,7 @@ in_word_set (register const char *str, register unsigned int len)
       {"time_user_types", 4},
 #line 61 "hash_cfg.inp"
       {"nonotif_mystatus", 31},
-#line 53 "hash_cfg.inp"
-      {"max_nick_len", 23},
+      {""},
 #line 64 "hash_cfg.inp"
       {"err_connreset", 34},
 #line 42 "hash_cfg.inp"
@@ -210,7 +210,8 @@ in_word_set (register const char *str, register unsigned int len)
       {""}, {""},
 #line 54 "hash_cfg.inp"
       {"log_console", 24},
-      {""},
+#line 53 "hash_cfg.inp"
+      {"max_nick_len", 23},
 #line 41 "hash_cfg.inp"
       {"password", 11},
 #line 44 "hash_cfg.inp"

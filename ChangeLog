@@ -1,7 +1,7 @@
 *******************************
-* Version 0.96beta2           *
+* Version 0.96beta3           *
 *******************************
-~ challenge fails on bigendian systems
++ auto-retry initial connection [max_retries]
 + remove contact from all groups
 * skip redundant status changes
 + context menu with `m' when Contact List selected

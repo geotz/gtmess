@@ -2,7 +2,7 @@
  *    gtmess.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2009  George M. Tzoumas
+ *    Copyright (C) 2002-2010  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -81,6 +81,7 @@ typedef struct {
     char force_nick[SCL];
     char passp_server[SCL];
     char psm[SML];
+    int max_retries;
     
     char cfgdir[SCL];
     char datadir[SCL];
