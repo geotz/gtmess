@@ -1,4 +1,4 @@
-.TH gtmess 1 "November 15, 2003" "" "gtmess messenger"
+.TH gtmess 1 "December 19, 2004" "" "gtmess messenger"
 
 .SH NAME
 gtmess - MSN messenger client
@@ -11,34 +11,26 @@ gtmess [options]
 gtmess is an MSN messenger client, which allows you to use
 the MSN messenger service. It is a console application that
 uses the curses library to present a friendly user interface.
-This manpage corresponds to version 0.8.2.
+This manpage corresponds to version 0.9.
 
 .SH OPTIONS
 .TP
-.B -h
-Short list of options.
+.BR -h ", " --help
+Short help.
 
 .TP
-.B -w
-Create the default configuration directory ~/.gtmess and
-write the configuration file. The contents of the file derive from the command
-line
-.B -O 
-flags that follow.
-The configuration file name is
-.BR ~/.gtmess/config .
-The incoming files directory ~/.gtmess/received and the named pipe
-~/.gtmess/notify.pip are also created.
-
-.TP
-.BI -O var = value
-Assigns the value
+.BI -O variable = value
+Assigns the
 .I value
-to the configuration variable
-.IR var .
+to the configuration
+.BR variable .
+
+.TP
+.BI --version
+Print the program version and CVR string to stdout and exit.
 
 .SH CONFIGURATION VARIABLES
-The following list shows all configuration variables in alphabetical order.
+The following list shows all configuration variables in alphabetic order.
 The value of a variable is either an integer or a (line-terminated) 
 string of characters.
 In the following descriptions,
@@ -48,13 +40,38 @@ represents an integer value,
 represents a character string value and
 .I B
 represents a boolean value, a special case of an integer value 
-with only two possible values, 0 and 1. 0 is for True and 1 is for False.
+with only two possible values, 0 and 1. 1 stands for True and 0 for False.
+
+.TP
+.BI aliases "" = N
+When
+.I N
+is 2, the user-defined contact aliases are displayed instead of nick names.
+A value of 1 displays aliases only when nicknames are too long (see
+.B max_nick_len
+variable) or when nicknames contain the email address (which is very irritating).
+A value of 0 disables the use of aliases completely and nick names are always
+displayed. User-defined contact aliases are stored into 
+.B ~/.gtmess/aliases 
+(see the
+.B FILES
+section). The default value is
+.BR 1.
+
+.TP
+.BI auto_login "" = B
+When enabled, the login procedure starts as soon as the client is invoked,
+provided that
+.B login
+and
+.B password
+variables are nonempty.
+The default value is
+.BR 1.
 
 .TP
 .BI cert_prompt "" = B
-If
-.I B
-is 1 and a certificate cannot be verified against
+If enabled and a certificate cannot be verified against
 the list of trusted certificate authorities (see the
 .B FILES
 section),
@@ -68,11 +85,8 @@ The meaning of each option is obvious.
 The login procedure requires more than one SSL connection, so option
 .I Always
 means that successive SSL connections will also continue upon unverified certificates.
-If
-.I B
-is 0, then the procedure always continues without asking the user, 
+If this option is disabled, then the procedure always continues without asking the user, 
 even if certificates cannot be verified.
-.br
 The default value is
 .BR 1 .
 
@@ -81,7 +95,6 @@ The default value is
 Sets initial color mode.
 Possible values are 0, 1 or 2. With 0, color is selected automatically
 (according to curses). 1 forces color mode, while 2 forces black and white.
-.br 
 The default value is
 .B 0
 (automatic).
@@ -93,7 +106,6 @@ Like
 the user is asked if the login process should continue,
 when the common name does not match the host name upon
 the initialization of an SSL connection.
-.br
 The default value is
 .BR 1.
 
@@ -103,24 +115,52 @@ Sets the character encoding to be used for displaying the text on the console.
 .I S
 is the name of the encoding. To see all valid encoding names, look at
 the output of the
-.BR "iconv -l" " command."
-.br
+.BR "iconv -l" " command"
+(on systems that provide it). If
+.I S
+is
+.B *locale*
+then the console encoding is that of the 
+.IR LC_CTYPE 
+property of the current locale.
 The default value is
-.BR ISO_8859-7 .
+.BR *locale* .
 
 .TP
 .BI cvr "" = S
 Sets the consumer versioning (CVR) string that is sent to the server during
 the login process. This string provides information about the client. For more
 information you should look at the protocol specification. The protocol requires
-from version MSNP8 and above your login account to be the last part
-of the CVR string. In this case, your login account 
-is appended automatically at the end by the client. On the other hand, 
-older protocol versions (MSNP7) do not require an extra string at the end 
-and therefore, nothing is appended.
+(from version MSNP8 and above) your login account to be the last part
+of the CVR string. Since gtmess uses MSNP9, your login account 
+is appended automatically at the end.
+The default value is computed at configure-time and is of the following form:
 .br
+0x0409 <system> <os-version> <architecture> GTMESS <clientversion> MSMSGS
+.br
+For example:
+.BR "0x0409 Linux 2.6.8-1-686 i686 GTMESS 0.9 MSMSGS" .
+
+.TP 
+.BI gtmesscontrol_ignore "" = S
+Ignore gtmess-specific messages that are substrings of
+.IR S "."
+To accept all such messages, leave
+.I S
+empty. To ignore all such messages, use the special value
+.BR *all* ,
+which is also the default value.
+
+.TP 
+.BI idle_sec "" = N
+If greater than zero, specifies how many seconds should pass
+without the user pressing any key before his/her status is automatically
+set to Idle. If
+.I N
+is zero, this feature is disabled. Note that the status is automatically
+set to Idle only if the previous status is Online.
 The default value is
-.BR "0x0409 linux 2.2.4 i386 GTMESS 0.8.2 MSMSGS" .
+.BR 180 .
 
 .TP 
 .BI initial_status "" = N
@@ -147,45 +187,87 @@ can be a number from 0 to 8 representing the following statuses:
 .BR "Out to Lunch" .
 .br
 The default value is
-.B 1
-(Appear Offline).
-.br
-.B NOTE:
-This does not guarantee that you have logged in unnoticed! For more information see the
-.B ADVANCED FEATURES
-section.
+.B 2
+(Online).
+
+.TP
+.BI invitable "" = B
+If disabled, others cannot invite you to conversation windows because
+the client does not respond to the invitations they send. So, if you
+want to chat, you have to invite others to the conversation windows yourself.
+If enabled, then gtmess automatically accepts invitations to switchboard
+sessions. Note that this option overrides the BLP setting which is stored
+at the server and is about users not on your forward list.
+This option is enabled by default.
 
 .TP
 .BI login "" = S
 Sets the default login account. If
 .I S
-does not contain a `@' character, then the string `@hotmail.com' is appended.
+does not contain an `@' character, then the string `@hotmail.com' is appended.
 
 .TP
 .BI log_traffic "" = B
-If 
-.I B
-is 1, network traffic between the client and the server is logged into 
-file ~/.gtmess/msn.log.
-.br 
+If enabled, network traffic between the client and the notification
+server is recorded into file 
+.BR ~/.gtmess/msn.log .
 The default value is
 .BR 0 .
 
 .TP
-.BI msnftpd "" = B
-If 
-.I B
-is 1, then a server thread runs in the background listening on port 6891. This enables
-outgoing file transfers by allowing others to connect on this port.
-.br 
+.BI max_nick_len "" = N
+Specifies the maximum allowed nickname length before displaying the alias.
+If
+.I N
+is 0, then aliases are displayed only if the nickname does not fit on a single
+line of the contact list window.
 The default value is
-.BR 1 .
+.BR 0.
 
+.TP
+.BI msg_debug "" = N
+Defines the client behaviour on unrecognised messages. If
+.I N
+is 0, then those messages are ignored silently.
+If
+.I N
+is 1, then the type of the message is displayed, and if
+.I N
+is 2, the whole message is displayed. This option
+is useful for development purposes.
+The default value is
+.BR 0.
+
+.TP
+.BI msg_notify "" = N
+If
+.I N
+is greater than 0, gtmess notifies you when a new message is received even
+when the corresponding chat window is in the foreground. This
+feature is useful in graphical environments where the gtmess (console) window 
+may not be visible all the time. However, you will not be notified
+if less than
+.I N
+seconds have passed since the previous message. This is to avoid
+too many notifications thay might be annoying. In fact, if
+.I N
+is 1, then the extra notification will occur only when the user is
+in Idle mode.
+The default value is
+.B 1.
+
+.TP
+.BI msnftpd "" = N
+Specifies the port number the MSNFTP server is listening to.
+The MSNFTP server is a thread that runs in the background and enables
+outgoing file transfers by allowing incoming connections. A value
+of 0 disables the server.
+The default value is
+.BR 6891 .
 
 .TP
 .BI online_only "" = B
 If enabled, only contacts with online status are shown on the screen.
-.br
 The default value is
 .BR 0.
 
@@ -197,7 +279,6 @@ Sets the default password.
 .BI popup "" = B
 Enables/disables the popup notification window at the lower right corner of
 the screen. This is an external Tcl/Tk script.
-.br
 The default value is
 .BR 1.
 
@@ -209,7 +290,6 @@ this can be a dispatch or a notification server.
 is of the form
 .IR hostname [ :port ].
 If port is not specified, 1863 is assumed.
-.br
 The default value is 
 .BR messenger.hotmail.com .
 
@@ -219,37 +299,38 @@ Sets sound mode.
 .I N
 can be 0, 1 or 2. 0 disables all sound, 1 produces always a (console) beep,
 while 2 plays sound effects (through a sound device).
-.br
 The default value is
 .B 1
 (beep).
 
 .TP
 .BI syn_cache "" = B
-If enabled, the contact/group lists are cached for future use.
-.br
+If enabled, the contact/group lists are cached for future use. This option
+seems to have no meaning nowadays, as the msn server always rejects the cached version
+of the list. It has been disabled in this version of the client and will be removed
+completely in the future.
 The default value is
-.BR 1.
+.BR 0.
 
 .TP
 .BI time_user_types "" = N
 Sets how often typing notifications are sent. It is the time interval in seconds.
-.br
 The default value is
-.BR 4.
+.BR 5.
 
 .SH USER INTERFACE
 .PP
-The screen is divided in 7 parts. Four status lines and three windows.
+The screen is divided in 7 parts. Four lines and three windows.
 The first line of the screen displays your nickname, your account and
-your status. The bottom line displays the copyright string and the menus 
-or the edit boxes.
+your status. The right-hand corner shows the system's clock (local time).
+The bottom line displays the copyright string and the menus 
+or the input boxes.
 On the right is the contact list window. On the left of the contact list
 window is the switchboard (chat) window. Right below the switchboard window
 is the messages window. This window displays various messages and errors
 from the operating system, as well as the notification server. The switchboard
 window is separated from the messages window by two lines. The first line
-is the edibox where you type your text when you talk. The second line
+is the edibox where you type your text when you chat. The second line
 is a kind of window-bar that displays a character for each open switchboard
 window. The selected switchboard window (which is displayed) is represented
 with an `O'. A `-' represents a switchboard window that is open but not
@@ -258,7 +339,7 @@ window has unread messages (something got typed in the window while
 it was in the background and the user has not seen it yet).
 
 .PP
-The following keys are available. Symbol `^' denotes holding CTRL, while
+In the following description of the keyboard controls, `^' denotes holding CTRL, while
 `$' denotes holding SHIFT. `@' denotes holding ALT (or mod1 or pressing ESC
 first).
 
@@ -274,6 +355,10 @@ of the following keys (case insensitive):
 Connect to server
 
 .TP
+.B D
+Logout from notification server
+
+.TP
 .B S
 Change status
 
@@ -282,16 +367,12 @@ Change status
 Manage contact/group lists
 
 .TP
-.B O
-Options
-
-.TP
-.B D
-Logout from notification server
-
-.TP
 .B N
 Change nickname
+
+.TP
+.B O
+Options
 
 .TP
 .B M
@@ -307,6 +388,10 @@ Invite a contact from your Forward List to the active switchboard window. This
 is actually a shortcut for 
 .IR "" Alt-L-F- contact -I,
 although only online contacts are shown.
+
+.TP
+.B T
+Write a note to the notification window.
 
 .TP
 .B /
@@ -430,17 +515,51 @@ the selected group
 .B Rename
 the selected group
 
+.IP X 8
+.B Export aliases
+- export the forward list into 
+.B ~/.gtmess/aliases 
+so that you can edit it
+
 .IP N 4
 .B Name
 
 .IP O 4
 .B Options
 
+.IP R 8
+.B "RL Prompt"
+- prompt when others add you to their forward list
+
+.IP A 8
+.B "All others"
+- allow others (not on your forward list) to start conversations with you
+
+.IP V 8
+.B Var
+- set the value of a configuration variable; takes effect immediately
+
+.IP Q 8
+.B Query
+all configuration variables
+
+.IP W 8
+.B Write
+configuration variables into 
+.BR ~/.gtmess/config ; 
+in fact, only those variables with values other than the default are written
+
 .IP M 4
 .B Mail
 
 .IP P 4
 .B Ping
+
+.IP I 4
+.B Invite
+
+.IP N 4
+.B Note
 
 .SS SWITCHBOARD (chat window) CONTROLS
 
@@ -531,12 +650,33 @@ Send a fake typing notification from user
 Send a request to send the file
 .IR filename .
 
+.SS GTMESS SPECIFIC SWITCHBOARD COMMANDS
+
+.TP
+.B /beep
+Send a beep to others so that everybody pay attention.
+
+.TP
+.B /gtmess
+Tell everybody you are using gtmess.
+
+.TP
+.BI "/msg " text
+Send a message to other gtmess users. The message appears on their notification window.
+
+.TP
+.BI "/dlg " text
+Send a message to other gtmess users. The message appears on their switchboard window.
 
 .SS MISCELLANEOUS CONTROLS
 
 .TP
 .B ^L
 redraw screen from scratch
+
+.TP
+.B ^G
+produce a console beep
 
 .TP
 .B F4
@@ -561,6 +701,13 @@ contact list scroll up
 .TP
 .B F10
 exit the client
+
+.PP
+.B NOTE:
+You can emulate the function keys F1 to F10 by pressing ESC first and
+then a digit from `1' to `0'. For instance, ESC-1 is equivalent to F1, 
+ESC-2 is F2, ESC-0 is F10. ALT-<digit> might also work.
+To emulate Alt+F7 or Alt+F8 you can press ESC-& or ESC-* (or ALT-&, ALT-*).
 
 .SS EDITBOX CONTROLS
 .PP
@@ -748,16 +895,18 @@ Get notified when somebody has opened a chat window to you
 
 .TP
 .B *
-Allow you to login with a different initial status. 
-However, if you login as 
+Allow you to log in with a different initial status.
+
+.B NOTE:
+In the past, you if logged in as 
 .B "Appear Offline"
-other users will still receive some offline events and if you originally were offline,
-they will suspect that you logged in in this mode.
+other users would still receive some offline events and if you originally were offline,
+they could suspect that you had just logged in. Nowadays this server bug has been fixed.
 
 .TP
 .B *
 Allow you to send a fake typing notification. This does not affect all clients.
-However, the original client gets affected!
+However, you can have fun with the original client!
 
 .TP
 .B *
@@ -773,12 +922,25 @@ When you receive error 217 there are two cases:
 To sum up, if a user is logged in
 and has blocked you, you will receive error 216.
 
+.B NOTE:
+This feature was actually available due to a bug at the original messenger server.
+Nowadays the bug has been fixed, so block detection does not work any more. It is
+mentioned here for historic purposes.
+
 
 .SH FILES
 .TP
 .B ~/.gtmess/
 Main configuration directory. This directory relies in the user's home directory
 and stores the following gtmess-specific files:
+
+.TP
+.B ~/.gtmess/aliases
+The aliases file. It contains lines of the form
+.IR email " " alias .
+Lines beginning with `#' are considered to be comments, and therefore ignored.
+The alias export feature provides a convenient way to create an initial version
+of this file and then edit it by hand.
 
 .TP
 .B ~/.gtmess/config
@@ -803,28 +965,18 @@ This file is a named pipe that is used by the gtmess-notify script to pop up not
 windows. The client writes data in this file.
 
 .TP
-.BI ~/.gtmess/ account /syn
-The cached version of the contact/group lists for a user's account.
-
-.TP
-.B /usr/local/share/gtmess/root.pem
+.B ./root.pem
 Trusted root certificates, verified upon the initialization 
-of an SSL connection. 
-
-.SS NOTE
-The prefix 
-.B /usr/local/share/gtmess
-might be different on your system. You need not have any files in this directory,
-if gtmess has been compiled with `--enable-home' option. In this case,
-.B ~/.gtmess
-is used instead.
+of an SSL connection. Gtmess first looks into the current directory
+for this file, then into 
+.B ~/.gtmess/ 
+and then into the default data prefix, usually
+.BR /usr/local/share/gtmess .
 
 .SH BUGS
 
 This is a list of known bugs and limitations. 
 They will be removed as soon as possible.
-
-Supported protocol versions are MSNP7 and MSNP8.
 
 Notification or Passport login servers are not cached.
 
@@ -833,10 +985,6 @@ When you receive a file, you cannot be server.
 When you send a file, you cannot be client.
 
 There is no option to keep an idle connection alive.
-
-There is no limit on the number of threads created by the msnftp server.
-
-Filesize limit is 2GB.
 
 There may occur conflicts in the authorization cookies of file transfers (though rare).
 
@@ -853,23 +1001,30 @@ No automatic offline user rename.
 .SH ACKNOWLEDGEMENTS
 Credits go to the following people:
 
-.I "Mike Mintz"
+.B "Mike Mintz"
 for his excellent site on the MSN Messenger Protocol.
 .br
-.B http://www.hypothetic.org/docs/msn/index.php
+.I http://www.hypothetic.org/docs/msn/index.php
 
-.I "L. Peter Deutsch"
+.B "L. Peter Deutsch"
 for his MD5 module.
 
-.I "Eric Rescorla"
+.B "Eric Rescorla"
 for his article on SSL programming:
-.BR "An introduction to OpenSSL Programming" .
+.IR "An introduction to OpenSSL Programming" .
+
+.B Qi Wenmin, kuuldor, David Lefevre
+for some useful patches they sent me.
+
+.B "Kosta Fliangos"
+for kindly providing his FreeBSD box for testing.
+
 
 .SH AUTHORS
 
 gtmess - MSN Messenger client
 .br
-Copyright (C) 2002-2003  George M. Tzoumas
+Copyright (C) 2002-2004  George M. Tzoumas
 
 .PP
 This program is free software; you can redistribute it and/or modify

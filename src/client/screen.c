@@ -2,7 +2,7 @@
  *    screen.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -26,8 +26,11 @@
 #include<time.h>
 
 #include"screen.h"
+#include"sboard.h"
+#include"unotif.h"
 #include"queue.h"
 #include"xfer.h"
+#include"utf8.h"
 #include"gtmess.h"
 
 int attrs[] = {A_NORMAL, A_UNDERLINE, A_BOLD, A_NORMAL, A_STANDOUT, A_REVERSE, A_NORMAL};
@@ -40,119 +43,130 @@ TWindow w_msg, w_lst, w_back, w_xfer;
 pthread_mutex_t scr_lock;
 
 int wvis; /* 0 = sb window visible, 1 = transfers window visible */
-pthread_mutex_t WL;
 int w_msg_top = 0;
 
-typedef struct {
-    pthread_cond_t cond;
-    pthread_t thrid;
-    
-    queue_t evq;    
-} screen_t;
+/* last arguments to msg2() */
+char msg2_str[SML] = {0};
+cattr_t msg2_attr = C_MNU;
 
-typedef struct {
-    TWindow *w;
-    cattr_t attr;
-    char txt[SML];
-} scrmsg_t;
+time_t msg_now = 0;
+extern pthread_mutex_t time_lock;
 
-screen_t Screen;    
+int fullscreen = 0;
 
-int getword(char *dest, char *src, int max)
+char *get_next_word(char **text, char **word, int *len, int *numlines)
 {
-    char *word, *wb;
-    int wl;
-    
-    wl = 0;
-    word = wb = dest;
-    while (*src) {
-        *wb = *src++;
-        wl++;
-        if (isspace(*wb)) break;
-        if (wl >= max) break;
-        wb++;
+    char *s = *text;
+    int nl = 0;
+    /* skip whitespace */
+    while ((*s) && isspace(*s)) {
+        if (*s == '\n') nl++;
+        s++;
     }
-    word[wl] = 0;
-    return wl;
+    if (!(*s)) {
+        *text = s;
+        *word = NULL;
+        *len = 0;
+        *numlines = nl;
+        return NULL;
+    }
+    *word = s;
+    while ((*s) && !(isspace(*s))) s++;
+    *text = s;
+    *len = (s - *word);
+    *numlines = nl;
+    return *word;
 }
 
-void wprintx(WINDOW *w, char *txt)
+/* indent = initial indentation */
+void wprintx(WINDOW *w, char *txt, int indent)
 {
-    int mx, my, len;
-    char *word, wl;
+    int maxwidth, ymax, width, wlen, nlines;
+    char *text, *word;
+    char tw[SXL];
     
-    
-    getmaxyx(w, my, mx);
-    mx--;
-    len = 0;
-    word = strdup(txt);
-    while ((wl = getword(word, txt, mx)) > 0) {
-        if (len + wl > mx) {
-            waddch(w, '\n');
-            len = 0;
-        }
-        waddstr(w, word);
-        txt += wl;
-        len += wl;
+    getmaxyx(w, ymax, maxwidth);
+    maxwidth--;
+    text = txt;
+    width = indent;
+    while (get_next_word(&text, &word, &wlen, &nlines) != NULL) {
+        if (width > 0 && width+wlen >= maxwidth) waddch(w, '\n');
+        strncpy(tw, word, wlen);
+        tw[wlen] = 0;
+        if (nlines > 0) for (; nlines > 0; --nlines) waddch(w, '\n');
+        waddstr(w, tw);
+        waddch(w, ' ');
+        getyx(w, ymax, width);
     }
-    free(word);
+    for (; nlines > 0; --nlines) waddch(w, '\n');
 }
 
-
-void evd_sbbar(scrtxt_t *e)
+void gs_draw_prompt(cattr_t attr, const char *prompt)
 {
-    int y, x, i;
-    
-    getyx(stdscr, y, x);
-    move(w_msg.y - 1, 0);
-    for (i = 0; i < w_msg.w; i++) addch(ACS_HLINE);
-    move(w_msg.y - 1, 0);
-    attrset(e->attr);
-    addstr(e->txt);
-    move(y, x);
-}
-
-void evd_sbebdraw(scrsbebx_t *e)
-{
-    move(w_msg.y - 2, 0);
-    if (!e->null) {
-        attrset(e->attr);
-        e->ebox.text = e->txt;
-        eb_draw(&e->ebox, stdscr);
-    } else {
-        attrset(attrs[C_NORMAL]);
-        printw("%*c", w_msg.w, ' ');
-        move(LINES - 1, COLS - 1);
-    }
+    move(SLINES - 1, 0);
+    bkgdset(' ' | attrs[attr]);
+    clrtoeol();
+    bkgdset(' ' | attrs[C_NORMAL]);
+    move(SLINES - 1, 0);
+    attrset(attrs[attr] ^ A_REVERSE);
+    addstr(prompt);
     attrset(attrs[C_NORMAL]);
 }
 
-void evd_rplst(TWindow *w)
+void gs_draw_ebox(ebox_t *e, cattr_t attr, int pl)
 {
-    int y, x;
-    
-    getyx(stdscr, y, x);
-    copywin(w->wh, stdscr, 0, 0, W_PRT_Y, W_PRT_X,
-            W_PRT_Y + W_PRT_H - 1, W_PRT_X + W_PRT_W - 1, FALSE);
-    move(y, x);
-    delwin(w->wh);
+    move(SLINES - 1, pl);
+    attrset(attrs[attr]);
+    eb_draw(e, stdscr);
+    attrset(attrs[C_NORMAL]);
 }
 
-void evd_rdlg(TWindow *w)
+int get_string(cattr_t attr, int mask, const char *prompt, char *dest)
 {
-    int y, x;
+    int r;
+    char s[SML];
+    wchar_t ws[SML];
+    int c, pl;
+    ebox_t E;
 
-    getyx(stdscr, y, x);
-    copywin(w->wh, stdscr, 0, 0, W_DLG_Y, W_DLG_X,
-            W_DLG_Y + W_DLG_H - 1, W_DLG_X + W_DLG_W - 1, FALSE);
-    move(y, x);
-    delwin(w->wh);
+    strncpy(s, dest, SML);
+    s[SML - 1] = 0;
+    pl = strlen(prompt);
+    eb_init(&E, SML-1, SML-1, SCOLS-1-pl, s, ws);
+    E.utf8 = utf8_mode;
+    E.mask = mask;
+    eb_settext(&E, s);
+    c = -1;
+    
+    gs_draw_prompt(attr, prompt);    
+    while (1) {
+        if (c == 13 || c == 27) break;
+
+        gs_draw_ebox(&E, attr, pl);
+        c = getch();
+        if (c == KEY_RESIZE) {
+            redraw_screen(1);
+            eb_resize(&E, SCOLS-1-pl); 
+            gs_draw_prompt(attr, prompt);
+            continue;
+        }
+        eb_keydown(&E, c);
+    }
+    r = (c == 13);
+    if (r) {
+        if (strcmp(dest, s) == 0) r <<= 1;
+        strcpy(dest, s);
+    }
+    move(SLINES - 1, SCOLS - 1);
+    return r;
 }
 
 /* print a message */
-void vwmsg(TWindow *w, cattr_t attr, const char *fmt, va_list ap)
+void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, const char *fmt, va_list ap)
 {
     char tmp[SXL], *s;
+    time_t now2;
+    int indent = 0;
 
     vsprintf(tmp, fmt, ap);
 
@@ -161,307 +175,432 @@ void vwmsg(TWindow *w, cattr_t attr, const char *fmt, va_list ap)
     LOCK(&w->lock);
     wattrset(w->wh, attrs[attr]);
 /*    waddstr(w->wh, tmp);*/
-    wprintx(w->wh, tmp);
+    time(&now2);
+    LOCK(&time_lock);
+    if (difftime(now2, *sbtime) > 60) {
+        *sbtime = now2;
+        sbtime -= now2 % 60;
+        wprintw(w->wh, "[%02d:%02d] ", now_tm.tm_hour, now_tm.tm_min);
+        indent = 8;
+    } else indent = 0;
+    UNLOCK(&time_lock);
+    wprintx(w->wh, tmp, indent);
     wattrset(w->wh, attrs[C_NORMAL]);
     UNLOCK(&w->lock);
-}
-
-int get_string(cattr_t attr, int mask, const char *prompt, char *dest)
-{
-    int r;
-    char s[SML];
-    int c, pl;
-    ebox_t E;
-    screbx_t data;
-
-    strncpy(s, dest, SML);
-    s[SML - 1] = 0;
-    pl = strlen(prompt);
-    eb_init(&E, SML-1, COLS-1-pl, s);
-    E.mask = mask;
-    eb_settext(&E, s);
-    c = -1;
-    strcpy(data.prompt, prompt);
-    data.pl = pl;
-    data.attr = attrs[attr];
-    scr_event(SCR_EBINIT, &data, sizeof(data), 0);
-    while (1) {
-        if (c == 13 || c == 27) break;
-        data.ebox = E;
-        strcpy(data.txt, E.text);
-        scr_event(SCR_EBDRAW, &data, sizeof(data), 1);
-        c = getch();
-        eb_keydown(&E, c);
-    }
-    r = (c == 13);
-    if (r) {
-        if (strcmp(dest, s) == 0) r <<= 1;
-        strcpy(dest, s);
-    }
-    scr_event(SCR_HOME, NULL, 0, 1);
-    return r;
-}
-
-void evd_lst(scrlst_t *e)
-{
-    msn_contact_t *p;
-    msn_group_t *g;
-    time_t now;
-    char ch;
-    int lines, total;
-
-    LOCK(&w_lst.lock);
-    wclear(w_lst.wh);
-
-    lines = 0;
-    total = e->g.count;
-    if (Config.online_only == 0) total += e->p.count;
-    else 
-        for (p = e->p.head; p != NULL; p = p->next)
-            if (p->status >= MS_NLN) total++;
-    time(&now);
-    for (g = e->g.head; g != NULL; g = g->next) {
-        if (lines >= e->skip && lines < total + e->skip) {
-            wattrset(w_lst.wh, attrs[C_GRP]);
-            wprintw(w_lst.wh, "%s\n", g->name);
-        }
-        lines++;
-        for (p = e->p.head; p != NULL; p = p->next)
-            if (p->gid == g->gid) {
-                if (Config.online_only && p->status < MS_NLN) continue;
-                if (lines >= e->skip && lines < total + e->skip) {
-                    wattrset(w_lst.wh, lstatattrs[p->status]);
-                    if (now - p->tm_last_char <= Config.time_user_types) ch = '!';
-                    else if (p->blocked) ch = '+';
-                    else ch = ' ';
-                    wprintw(w_lst.wh, "%c%c %s\n", ch, msn_stat_char[p->status], p->nick);
-                }
-                lines++;
-            }
-    }
-    msn_clist_free(&e->p);
-    msn_glist_free(&e->g);
-    UNLOCK(&w_lst.lock);
-}
-
-void evd_rlst()
-{
-    int y, x;
-    
-    getyx(stdscr, y, x);
-    LOCK(&w_lst.lock);
-    copywin(w_lst.wh, stdscr, 0, 0, w_lst.y, w_lst.x,
-            w_lst.y + w_lst.h - 1, w_lst.x + w_lst.w - 1, FALSE);
-    UNLOCK(&w_lst.lock);
-    move(y, x);
-}
-
-void evd_home()
-{
-    move(LINES - 1, COLS - 1);
-}
-
-void evd_ebdraw(screbx_t *e)
-{
-    move(LINES - 1, e->pl);
-    attrset(e->attr);
-    e->ebox.text = e->txt;
-    eb_draw(&e->ebox, stdscr);
-    attrset(attrs[C_NORMAL]);
-}
-
-void evd_ebinit(screbx_t *e)
-{
-    move(LINES - 1, 0);
-    bkgdset(' ' | e->attr);
-    clrtoeol();
-    bkgdset(' ' | attrs[C_NORMAL]);
-    move(LINES - 1, 0);
-    attrset(e->attr ^ A_REVERSE);
-    addstr(e->prompt);
-    attrset(attrs[C_NORMAL]);
-}
-
-void evd_topline(scrtxt_t *e)
-{
-    int y, x;
-
-    getyx(stdscr, y, x);
-    move(0, 0);
-    bkgdset(' ' | e->attr);
-    clrtoeol();
-    bkgdset(' ' | attrs[C_NORMAL]);
-    attrset(e->attr);
-    addstr(e->txt);
-/*    addch(' ');
-    addch(ACS_VLINE); 
-    printw(" gtmess %s", VERSION);*/
-    attrset(attrs[C_NORMAL]);
-    move(y, x);
-}
-
-void msg2(cattr_t attr, const char *fmt, ...)
-{
-    va_list ap;
-    scrtxt_t data;
-
-    va_start(ap, fmt);
-    vsprintf(data.txt, fmt, ap);
-    va_end(ap);
-    data.attr = attr;
-    
-    scr_event(SCR_BOTLINE, &data, sizeof(data), 1);
-}
-
-void evd_botline(scrtxt_t *e)
-{
-    int y, x;
-    
-    e->txt[COLS-1] = 0;
-    getyx(stdscr, y, x);
-    move(LINES - 1, 0);
-    bkgdset(' ' | attrs[e->attr]);
-    clrtoeol();
-    bkgdset(' ' | attrs[C_NORMAL]);
-    attrset(attrs[e->attr]);
-    addstr(e->txt);
-    attrset(attrs[C_NORMAL]);
-    move(y, x);
-}
-
-void scr_vmsg(TWindow *w, cattr_t attr, const char *fmt, va_list ap)
-{
-    scrmsg_t data;
-    char *s;
-
-    vsprintf(data.txt, fmt, ap);
-    data.w = w;
-    data.attr = attr;
-
-    for (s = data.txt; *s; s++) if (*s == '\r') *s = ' ';
-    
-    scr_event(SCR_MSG, &data, sizeof(data), 0);
 }
 
 /* message window */
 void msg(cattr_t attr, const char *fmt, ...)
 {
     va_list ap;
+    char txt[SML];
+    char *s;
+    int y, x, newtop;
+    time_t now2;
+    int indent = 0;
     
     va_start(ap, fmt);
-    scr_vmsg(&w_msg, attr, fmt, ap);
+    vsprintf(txt, fmt, ap);
     va_end(ap);
-    scr_event(SCR_RMSG, &w_msg, 0, 1);
-}
-
-/*void write_msg(scrmsg_t *e, ...)
-{
-    va_list ap;
+    for (s = txt; *s; s++) if (*s == '\r') *s = ' ';
     
-    va_start(ap, e);
-    vwmsg(e->w, e->attr, "%s", ap);
-    va_end(ap);
-}*/
-
-void write_msg(scrmsg_t *e)
-{
-    int y, x, newtop;
+    if (!fullscreen) {
+        fprintf(stderr, "%s\n", txt);
+        return;
+    }
     
-    LOCK(&e->w->lock);
-    wattrset(e->w->wh, attrs[e->attr]);
-    waddstr(e->w->wh, e->txt);
-    wattrset(e->w->wh, attrs[C_NORMAL]);
-    getyx(e->w->wh, y, x);
-    newtop = y - e->w->h + 1;
+    LOCK(&w_msg.lock);
+    wattrset(w_msg.wh, attrs[attr]);
+    time(&now2);
+    LOCK(&time_lock);
+    if (difftime(now2, msg_now) > 60) {
+        msg_now = now2;
+        msg_now -= now2 % 60;
+        wprintw(w_msg.wh, "[%02d:%02d] ", now_tm.tm_hour, now_tm.tm_min);
+        indent = 8;
+    } else indent = 0;
+    UNLOCK(&time_lock);
+    wprintx(w_msg.wh, txt, indent);
+    wattrset(w_msg.wh, attrs[C_NORMAL]);
+    getyx(w_msg.wh, y, x);
+    newtop = y - w_msg.h + 1;
     if (w_msg_top < newtop) w_msg_top = newtop;
     if (w_msg_top < 0) w_msg_top = 0;
-    UNLOCK(&e->w->lock);
+    getyx(stdscr, y, x);
+    copywin(w_msg.wh, stdscr, w_msg_top, 0, w_msg.y, w_msg.x,
+            w_msg.y + w_msg.h - 1, w_msg.x + w_msg.w - 1, FALSE);
+    UNLOCK(&w_msg.lock);
+    move(y, x);
+    refresh();
 }
 
+void msg2(cattr_t attr, const char *fmt, ...)
+{
+    va_list ap;
+    char txt[SML];
+    int y, x;
+
+    va_start(ap, fmt);
+    vsprintf(txt, fmt, ap);
+    va_end(ap);
+    strcpy(msg2_str, txt);
+    msg2_attr = attr;
+    if (utf8_mode) txt[widthoffset(txt, SCOLS-2)] = 0;
+    else txt[SCOLS-2] = 0;
+    getyx(stdscr, y, x);
+    move(SLINES - 1, 0);
+    bkgdset(' ' | attrs[attr]);
+    clrtoeol();
+    bkgdset(' ' | attrs[C_NORMAL]);
+    attrset(attrs[attr]);
+    addstr(txt);
+    attrset(attrs[C_NORMAL]);
+    move(y, x);
+    refresh();
+}
+
+void draw_rest()
+{
+    int y, x;
+
+    getyx(stdscr, y, x);
+    move(1, SCOLS * 3 / 4);
+    vline(ACS_VLINE, SLINES - 2);
+    mvaddch(w_msg.y - 1, SCOLS * 3 / 4, ACS_RTEE);
+    move(y, x);
+}
+
+void draw_status(int r)
+{
+    int y, x;
+    char txt[SML];
     
-void refresh_msg(TWindow *w)
+    sprintf(txt, "%s (%s)", getnick(msn.login, msn.nick), msn_stat_name[msn.status]);
+    if (utf8_mode) txt[widthoffset(txt, SCOLS-6)] = 0;
+    else txt[SCOLS-6] = 0;
+    getyx(stdscr, y, x);
+    move(0, 0);
+    attrset(statattrs[msn.status]);
+    printw("%*c", SCOLS-5, ' ');
+/*    bkgdset(' ' | statattrs[msn.status]);
+    clrtoeol();
+    bkgdset(' ' | attrs[C_NORMAL]);*/
+    move(0, 0);
+    addstr(txt); 
+/*    addch(' ');
+    addch(ACS_VLINE); 
+    printw(" gtmess %s", VERSION);*/
+    attrset(attrs[C_NORMAL]);
+    move(y, x);
+    draw_time(r);
+}
+
+void draw_time(int r)
 {
     int y, x;
     
     getyx(stdscr, y, x);
-    LOCK(&w->lock);
-/*      prefresh(w->wh, 2, 0, w->y, w->x,
-              w->y + w->h - 1, w->x + w->w - 1);*/
-      copywin(w->wh, stdscr, w_msg_top, 0, w->y, w->x,
-              w->y + w->h - 1, w->x + w->w - 1, FALSE);
-    UNLOCK(&w->lock);
+    move(0, SCOLS-5);
+    bkgdset(' ' | statattrs[msn.status]);
+    clrtoeol();
+    bkgdset(' ' | attrs[C_NORMAL]);
+    attrset(statattrs[msn.status]);
+    LOCK(&time_lock);
+    printw("%02d:%02d", now_tm.tm_hour, now_tm.tm_min);
+    UNLOCK(&time_lock);
+    attrset(attrs[C_NORMAL]);
     move(y, x);
-}        
-
-void scr_event(int type, void *data, int size, int signal)
-{
-    pthread_mutex_lock(&scr_lock);
-    if (queue_put(&Screen.evq, type, data, size) == 0 && signal)
-        pthread_cond_signal(&Screen.cond);
-    pthread_mutex_unlock(&scr_lock);
+    if (r) refresh();
 }
 
-void evd_rest()
+
+void draw_lst(int r)
 {
+    msn_contact_t *p;
+    msn_group_t *g;
+    time_t now;
+    char ch;
+    int lines, total;
     int y, x;
 
-    getyx(stdscr, y, x);
-    move(1, COLS * 3 / 4);
-    vline(ACS_VLINE, LINES - 2);
-    mvaddch(w_msg.y - 1, COLS * 3 / 4, ACS_RTEE);
-    move(y, x);
-}
+    LOCK(&w_lst.lock);
+    wclear(w_lst.wh);
 
-void evd_xfer()
-{
-/*    int y, x;
-    
-    getyx(stdscr, y, x);*/
-    LOCK(&w_xfer.lock);
-        copywin(w_xfer.wh, stdscr, 0, 0, w_xfer.y, w_xfer.x,
-                w_xfer.y + w_xfer.h - 1, w_xfer.x + w_xfer.w - 1, FALSE);
-    UNLOCK(&w_xfer.lock);
-    move(LINES - 1, COLS - 1);
-/*    move(y, x);*/
-}
-
-void *screen_daemon(void *dummy)
-{
-    qelem_t *e;
-    int r = 0;
-    
-    pthread_mutex_lock(&scr_lock);
-    
-    while (1) {
-        pthread_cond_wait(&Screen.cond, &scr_lock);
-        r = Screen.evq.count > 0;
-        
-        while ((e = queue_get(&Screen.evq)) != NULL) {
-            switch (e->type) {
-                case SCR_DRAWREST: evd_rest(); break;
-                case SCR_MSG: write_msg(e->data); break;
-                case SCR_RMSG: refresh_msg(e->data); break;
-                case SCR_TOPLINE: evd_topline(e->data); break;
-                case SCR_BOTLINE: evd_botline(e->data); break;
-                case SCR_EBINIT: evd_ebinit(e->data); break;
-                case SCR_EBDRAW: evd_ebdraw(e->data); break;
-                case SCR_HOME: evd_home(); break;
-                case SCR_LST: evd_lst(e->data); break;
-                case SCR_RLST: evd_rlst(); break;
-                
-                case SCR_RDLG: evd_rdlg(e->data); break;
-                case SCR_RPLST: evd_rplst(e->data); break;
-                case SCR_SBEBDRAW: evd_sbebdraw(e->data); break;
-                case SCR_SBBAR: evd_sbbar(e->data); break;
-                
-                case SCR_XFER: evd_xfer(); break;
-            }
-                    
-            qelem_free(e);
+    lines = 0;
+    total = msn.GL.count;
+    if (Config.online_only == 0) total += msn.FL.count;
+    else 
+        for (p = msn.FL.head; p != NULL; p = p->next)
+            if (p->status >= MS_NLN) total++;
+    time(&now);
+    for (g = msn.GL.head; g != NULL; g = g->next) {
+        if (lines >= msn.flskip && lines < total + msn.flskip) {
+            wattrset(w_lst.wh, attrs[C_GRP]);
+            wprintw(w_lst.wh, "%s\n", g->name);
         }
+        lines++;
+        for (p = msn.FL.head; p != NULL; p = p->next)
+            if (p->gid == g->gid) {
+                if (Config.online_only && p->status < MS_NLN) continue;
+                if (lines >= msn.flskip && lines < total + msn.flskip) {
+                    wattrset(w_lst.wh, lstatattrs[p->status]);
+                    if (now - p->tm_last_char <= Config.time_user_types) ch = '!';
+                    else if (p->blocked) ch = '+';
+                    else ch = ' ';
+                    wprintw(w_lst.wh, "%c%c %s\n", ch, msn_stat_char[p->status], 
+                            getnick(p->login,p->nick));
+                }
+                lines++;
+            }
+    }
+    getyx(stdscr, y, x);
+    copywin(w_lst.wh, stdscr, 0, 0, w_lst.y, w_lst.x,
+            w_lst.y + w_lst.h - 1, w_lst.x + w_lst.w - 1, FALSE);
+    UNLOCK(&w_lst.lock);
+    move(y, x);
+    
+    if (r) refresh();
+}
+
+void draw_msg(int r)
+{
+    int y, x;
+    
+    getyx(stdscr, y, x);
+    LOCK(&w_msg.lock);
+    copywin(w_msg.wh, stdscr, w_msg_top, 0, w_msg.y, w_msg.x,
+            w_msg.y + w_msg.h - 1, w_msg.x + w_msg.w - 1, FALSE);
+    UNLOCK(&w_msg.lock);
+    move(y, x);
+    if (r) refresh();
+}
+
+void draw_dlg(msn_sboard_t *sb, int r)
+{
+    TWindow *w;
+    int x, y, ty;
+    
+    if (sb == NULL) w = &w_back;
+    else {
+        w = &sb->w_dlg;
+        /*if (sb->pending == 1) unotify(ZS, SND_PENDING), sb->pending++;*/
+/*        else if (sb != SL.head && sb->pending) unotify(ZS, SND_PENDING);*/
+    }
+    if (wvis != 0) return;
+    if (sb == SL.head) {
+        getyx(stdscr, y, x);
+        LOCK(&w->lock);
+        if (sb != NULL) ty = sb->w_dlg_top; else ty = 0;
         
+        copywin(w->wh, stdscr, ty, 0, W_DLG_Y, W_DLG_X,
+                W_DLG_Y + W_DLG_H - 1, W_DLG_X + W_DLG_W - 1, FALSE);
+        UNLOCK(&w->lock);
+        move(y, x);
         if (r) refresh();
     }
+}
+
+/* switchboard participants */
+void draw_plst(msn_sboard_t *sb, int r)
+{
+    msn_contact_t *p;
+    TWindow *w, data;
+    int lines, total;
+    int y, x;
+
+    if (wvis != 0) return;
+    if (sb == NULL) w = &w_back; else w = &sb->w_prt;
+    LOCK(&w->lock);
+    wclear(w->wh);
+
+    if (sb != NULL) {
+        lines = 0;
+        total = sb->PL.count + 1;
+        if (lines >= sb->plskip && lines < total + sb->plskip) {
+            wattrset(w->wh, attrs[C_GRP]);
+            wprintw(w->wh, "[%s]\n\n", getnick(sb->master, sb->mnick));
+        }
+        lines++;
+        for (p = sb->PL.head; p != NULL; p = p->next) {
+            if (lines >= sb->plskip && lines < total + sb->plskip) {
+                wattrset(w->wh, lstatattrs[MS_UNK]);
+                wprintw(w->wh, "  %s\n", getnick(p->login, p->nick));
+            }
+            lines++;
+        }
+    }
+    UNLOCK(&w->lock);
+    if (sb == SL.head) {
+        getyx(stdscr, y, x);
+        LOCK(&w->lock);
+        copywin(w->wh, stdscr, 0, 0, W_PRT_Y, W_PRT_X,
+                W_PRT_Y + W_PRT_H - 1, W_PRT_X + W_PRT_W - 1, FALSE);
+        UNLOCK(&w->lock);
+        move(y, x);
+        if (r) refresh();
+    }
+}
+
+void draw_sbbar(int r)
+{
+    int i, c;
+    int left, leftp, right, rightp;
+    msn_sboard_t *s;
+    int attr;
+    char txt[SML];
+    char *ch;
+    int y, x;
+    
+    attr = attrs[C_NORMAL];
+    ch = &txt[0];
+    
+    s = SL.start;
+    c = SL.count;
+    if (c < w_msg.w) {
+        for (i = 0; i < c; i++, s = s->next) {
+            if (s == SL.head) *ch++ = 'O';
+            else if (s->pending) *ch++ = '+';
+            else *ch++ = '-';
+        }
+        *ch = 0;
+    } else {
+        left = leftp = right = rightp = 0;
+        for (left = 0; s != SL.head; s = s->next, left++) if (s->pending) leftp++;
+        s = s->next;
+        for (right = 0; s != SL.start; s = s->next, right++) if (s->pending) right++;
+        sprintf(ch, "(+%d/%d)[%d](+%d/%d)", leftp, left, c, rightp, right);
+    }
+
+    getyx(stdscr, y, x);
+    move(w_msg.y - 1, 0);
+    for (i = 0; i < w_msg.w; i++) addch(ACS_HLINE);
+    move(w_msg.y - 1, 0);
+    attrset(attr);
+    addstr(txt);
+    move(y, x);
+    
+    if (r) refresh();
+}
+
+/* switchboard conversation window */
+void dlg(cattr_t attr, const char *fmt, ...)
+{
+    msn_sboard_t *sb = (msn_sboard_t *) pthread_getspecific(key_sboard);
+    int y, x, newtop;
+    va_list ap;
+
+    if (sb == NULL) return;
+    va_start(ap, fmt);
+    vwmsg(&sb->w_dlg, &sb->dlg_now, attr, fmt, ap);
+    va_end(ap);
+    
+    getyx(sb->w_dlg.wh, y, x);
+    newtop = y - sb->w_dlg.h + 1;
+    if (sb->w_dlg_top < newtop) sb->w_dlg_top = newtop;
+    if (sb->w_dlg_top < 0) sb->w_dlg_top = 0;
+
+    draw_dlg(sb, 0);
+    draw_sbbar(1);
+}
+
+void draw_sbebox(msn_sboard_t *sb, int r)
+{
+    if (wvis != 0) return;
+    if (sb != SL.head) return;
+    
+    move(w_msg.y - 2, 0);
+    if (sb != NULL) {
+        attrset(attrs[C_EBX]);
+        eb_draw(&sb->EB, stdscr);
+    } else {
+        attrset(attrs[C_NORMAL]);
+        printw("%*c", w_msg.w, ' ');
+        move(SLINES - 1, SCOLS - 1);
+    }
+    attrset(attrs[C_NORMAL]);
+    
+    if (r) refresh();
+}
+
+void draw_sb(msn_sboard_t *sb, int r)
+{
+    if (wvis == 0) {
+        draw_plst(sb, 0);
+        draw_dlg(sb, 0);
+        draw_sbebox(sb, 0);
+    } else draw_xfer(0);
+    draw_sbbar(r);
+}
+
+void draw_all()
+{
+    draw_msg(0);
+    draw_status(0);
+    draw_lst(0);
+    draw_sb(SL.head, 0);
+    draw_rest(1);
+}
+
+void screen_resize()
+{
+#ifdef HAVE_WRESIZE
+    msn_sboard_t *sb;
+    
+    if (COLS < 9) SCOLS = 9; else SCOLS = COLS;
+    if (SLINES < 9) SLINES = 9; else SLINES = LINES;
+    
+    LOCK(&w_msg.lock);
+    w_msg.w = SCOLS * 3 / 4;
+    w_msg.h = 2 * SLINES / 5 - 2;
+    wresize(w_msg.wh, W_MSG_LBUF, w_msg.w);
+    w_msg.x = 0;
+    w_msg.y = SLINES - 1 - w_msg.h;
+    UNLOCK(&w_msg.lock);
+
+    LOCK(&w_xfer.lock);
+    w_xfer.h = W_DLG_H + 1;
+    w_xfer.w = W_DLG_W + W_PRT_W;
+    w_xfer.x = W_DLG_X;
+    w_xfer.y = W_DLG_Y;
+    wresize(w_xfer.wh, w_xfer.h, w_xfer.w);
+    UNLOCK(&w_xfer.lock);
+    
+    LOCK(&w_lst.lock);
+    w_lst.w = SCOLS - w_msg.w - 1;
+    w_lst.h = SLINES - 2;
+    wresize(w_lst.wh, w_lst.h, w_lst.w);
+    w_lst.x = w_msg.x + w_msg.w + 1;
+    w_lst.y = 1;
+    UNLOCK(&w_lst.lock);
+
+    LOCK(&w_back.lock);
+    w_back.w = SCOLS;
+    w_back.h = SLINES;
+    wresize(w_back.wh, w_back.h, w_back.w);
+    w_back.x = 0;
+    w_back.y = 0;
+    UNLOCK(&w_back.lock);
+    
+    sb = SL.head;
+    if (sb != NULL) do {
+        LOCK(&sb->w_dlg.lock);
+        sb->w_dlg.w = W_DLG_W;
+        sb->w_dlg.h = W_DLG_H;
+        wresize(sb->w_dlg.wh, W_DLG_LBUF, sb->w_dlg.w);
+        sb->w_dlg.x = W_DLG_X;
+        sb->w_dlg.y = W_DLG_Y;
+        UNLOCK(&sb->w_dlg.lock);
+        LOCK(&sb->w_prt.lock);
+        sb->w_prt.w = W_PRT_W;
+        sb->w_prt.h = W_PRT_H;
+        wresize(sb->w_prt.wh, sb->w_prt.h, sb->w_prt.w);
+        sb->w_prt.x = W_PRT_X;
+        sb->w_prt.y = W_PRT_Y;
+        UNLOCK(&sb->w_prt.lock);
+        eb_resize(&sb->EB, w_msg.w);
+        sb = sb->next;
+    } while (sb != SL.head);
+#endif
 }
 
 void screen_init(int colors)
@@ -519,16 +658,20 @@ void screen_init(int colors)
     attrset(attrs[C_NORMAL]);
 
     clear();
-    move(LINES - 1, COLS - 1);
+    
+    SLINES = LINES;
+    SCOLS = COLS;
+    
+    move(SLINES - 1, SCOLS - 1);
     refresh();
 
-    w_msg.w = COLS * 3 / 4;
-    w_msg.h = 2 * LINES / 5 - 2;
+    w_msg.w = SCOLS * 3 / 4;
+    w_msg.h = 2 * SLINES / 5 - 2;
     w_msg.wh = newpad(W_MSG_LBUF, w_msg.w);
 /*    w_msg.wh = newwin(w_msg.h, w_msg.w, 0, 0);*/
     scrollok(w_msg.wh, TRUE);
     w_msg.x = 0;
-    w_msg.y = LINES - 1 - w_msg.h;
+    w_msg.y = SLINES - 1 - w_msg.h;
     pthread_mutex_init(&w_msg.lock, NULL);
     
     w_xfer.h = W_DLG_H + 1;
@@ -538,16 +681,16 @@ void screen_init(int colors)
     w_xfer.wh = newwin(w_xfer.h, w_xfer.w, 0, 0);
     pthread_mutex_init(&w_xfer.lock, NULL);
 
-    w_lst.w = COLS - w_msg.w - 1;
-    w_lst.h = LINES - 2;
+    w_lst.w = SCOLS - w_msg.w - 1;
+    w_lst.h = SLINES - 2;
     w_lst.wh = newwin(w_lst.h, w_lst.w, 0, 0);
     scrollok(w_lst.wh, TRUE);
     w_lst.x = w_msg.x + w_msg.w + 1;
     w_lst.y = 1;
     pthread_mutex_init(&w_lst.lock, NULL);
 
-    w_back.w = COLS;
-    w_back.h = LINES;
+    w_back.w = SCOLS;
+    w_back.h = SLINES;
     w_back.wh = newwin(w_back.h, w_back.w, 0, 0);
     w_back.x = 0;
     w_back.y = 0;
@@ -558,11 +701,5 @@ void screen_init(int colors)
 
     pthread_mutex_init(&scr_lock, NULL);
     
-    pthread_mutex_init(&WL, NULL);
-
-    pthread_cond_init(&Screen.cond, NULL);
-    
-    pthread_create(&Screen.thrid, NULL, screen_daemon, NULL);
-    pthread_detach(Screen.thrid);
+    fullscreen = 1;
 }
-

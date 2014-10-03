@@ -17,10 +17,7 @@
 
 #    This file must be processed by automake
 
-dist_man1_MANS = gtmess.1.gz
+dist_man1_MANS = gtmess.1 gtmess-gw.1
 dist_pkgdata_DATA = root.pem 
 pixmapdir = $(datadir)/pixmaps
-dist_pixmap_DATA = gtmess_icon.png
-
-gtmess.1.gz: gtmess.1
-	gzip < gtmess.1 > gtmess.1.gz
+dist_pixmap_DATA = gtmess_icon.png gtmess_icon-48.png gtmess_icon2-64.png gtmess_icon2-48.png

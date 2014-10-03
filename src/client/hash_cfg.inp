@@ -3,7 +3,7 @@
  *    hash_cfg.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -41,3 +41,11 @@ initial_status, 12
 online_only, 13
 syn_cache, 14
 msnftpd, 15
+aliases, 16
+msg_debug, 17
+msg_notify, 18
+idle_sec, 19
+auto_login, 20
+invitable, 21
+gtmesscontrol_ignore, 22
+max_nick_len, 23

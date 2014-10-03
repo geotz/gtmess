@@ -8,10 +8,11 @@ To see command line options:
 Keys:
 ^ = CTRL, @ = ALT (or ESC first), $ = SHIFT
 ===========================================
-^N	new switchboard session
-^W	leave sb (chat) session and close window
+^N	new switchboard (chat) session
+^W	leave sb session and close window
 ^X	leave sb session, but leave window open
 ^L	redraw screen (in case it gets garbled)
+^G	test console beep
 
 F1	previous sb session
 F2	next sb session
@@ -29,18 +30,23 @@ PgDn	switchboard window scroll up
 @F7	participant list scroll down (chat session)
 @F8	participant list scroll up
 
-ESC first, or ALT down :
+NOTÅ: Instead of F1-F10 you can use ESC-1 to ESC-0
+F7 = ESC-7, @F7 = ESC-&, @F8 = ESC-* 
+Also, try ALT-1..ALT-0, ALT-&, ALT-*
+
+ESC first, or ALT down:
 ------------------------
+A	add
 C	connect
+D	logout
 S	change status
 L	contact lists
-O	options
-A	add
-D	logout
 N	change name
+O	options
 M	mailbox status
 P	ping
 I	invite
+T	enter note
 /	enter special client command (none for now)
 
 Switchboard (chat) text input:
@@ -67,11 +73,24 @@ switchboard commands:
         
 /spoof <fake>
 	send a fake typing notification from user <fake>
-	(to have fun with the original client ;-)
+	(to have fun with the original client ;-))
 
 /file <filename>
 	send a request to send file <filename>
+
+gtmess specific switchboard commands:
+-------------------------------------
+/beep
+	send a beep (so everybody pay attention)
+
+/gtmess
+	tell others you are using gtmess
+
+/msg <text>
+	send a message to other gtmess users ONLY (appears in msg window)
        
+/dlg <text>
+	send a message to other gtmess users ONLY (appears in chat window)
 
 EDITBOX Controls (everywhere):
 ------------------------------
@@ -122,7 +141,7 @@ r			reject incoming invitation
 c			cancel (abort) incoming/outgoing transfer
 			or outgoing invitation
 q			information
-delete			delete entry
+delete			kill entry (and cancel of course)
 ?			mini help
 
 
@@ -136,7 +155,7 @@ gtmess-gw - HTTP gateway for MSN Messenger Clients
 * useful if you are behind a firewall
 * you can use it with gtmess as follows:
     1) start the gateway
-	gtmess-gw (better in another terminal)
+	gtmess-gw (better in another terminal or in the background)
     2) start gtmess
 	gtmess -Oserver=127.0.0.1
 

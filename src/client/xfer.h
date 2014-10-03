@@ -2,7 +2,7 @@
  *    xfer.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -25,8 +25,6 @@
 #include"msn.h"
 #include"sboard.h"
 
-#define MSNFTP_PORT 6891
-
 typedef enum {XF_UNKNOWN, XF_FILE} xclass_t;
 typedef enum {XS_UNKNOWN, XS_INVITE, XS_ACCEPT, 
                XS_CANCEL, XS_REJECT, XS_TIMEOUT, XS_FAIL,
@@ -34,12 +32,12 @@ typedef enum {XS_UNKNOWN, XS_INVITE, XS_ACCEPT,
                XS_CONNECT, XS_COMPLETE, XS_ABORT} xstat_t;
 
 typedef struct {
-    char fname[SML]; /* file name */
-    unsigned int size;        /* file size */
-    unsigned int sofar;       /* bytes transferred so far */
-    int port;        /* port of msnftp */
+    char fname[SML];        /* file name */
+    unsigned int size;      /* file size */
+    unsigned int sofar;     /* bytes transferred so far */
+    int port;               /* port of msnftp */
     unsigned int auth_cookie; /* authorization cookie */
-    char ipaddr[SML]; /* ip address */
+    char ipaddr[SML];       /* ip address */
 } xfer_file_t;
 
 typedef struct xfer_s {

@@ -1,5 +1,5 @@
 dnl    gtmess - MSN Messenger client
-dnl    Copyright (C) 2002-2003  George M. Tzoumas
+dnl    Copyright (C) 2002-2004  George M. Tzoumas
 dnl
 dnl    This program is free software; you can redistribute it and/or modify
 dnl    it under the terms of the GNU General Public License as published by
@@ -24,13 +24,12 @@ dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT
 PACKAGE="gtmess"
-VERSION="0.8.2"
-VDATE="15 Nov 2003"
+VERSION="0.9"
+VDATE="19 Dec 2004"
 AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
 AM_CONFIG_HEADER(src/config.h)
 AC_CONFIG_SRCDIR(src/client/gtmess.c)
 AC_DEFINE_UNQUOTED(VDATE, "$VDATE", [version date])
-
 
 dnl Checks for programs.
 AC_PROG_CC
@@ -45,7 +44,8 @@ dnl AM_C_PROTOTYPES
 
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS([arpa/inet.h errno.h fcntl.h netdb.h netinet/in.h stdlib.h string.h sys/socket.h sys/time.h unistd.h])
+AC_CHECK_HEADERS([arpa/inet.h errno.h fcntl.h netdb.h netinet/in.h \
+stdlib.h string.h sys/socket.h sys/time.h unistd.h iconv.h locale.h])
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -54,22 +54,6 @@ AC_TYPE_SIZE_T
 AC_HEADER_TIME
 AC_STRUCT_TM
 
-AC_ARG_ENABLE(home, 
-              [AC_HELP_STRING([--enable-home], [read run-time data from ~/.gtmess (no)])],
-              [if eval "test x$enable_home = xyes"; then
-                AC_DEFINE_UNQUOTED(HOME, [ ], [read run-time data from ~/.gtmess])
-                AC_MSG_NOTICE([runtime data will be read from ~/.gtmess])
-              fi],
-              [AC_MSG_NOTICE([runtime data will be read from ${datadir}/gtmess])])
-
-AC_ARG_ENABLE(msnp7, 
-              [AC_HELP_STRING([--enable-msnp7], [enable old MSNP7 protocol (no)])],
-              [if eval "test x$enable_msnp7 = xyes"; then
-                AC_DEFINE_UNQUOTED(MSNP7, [ ], [enable old MSNP7 protocol])
-                AC_MSG_NOTICE([old protocol MSNP7 enabled])
-              fi])
-
-
 AC_ARG_WITH(ssl,
             [AC_HELP_STRING([--with-ssl], [non-standard path for openssl (/usr/local/ssl)])],
             ac_cv_use_ssl=$withval, ac_cv_use_ssl=/usr/local/ssl)
@@ -77,35 +61,41 @@ if test x$ac_cv_use_ssl = xyes; then
     ac_cv_use_ssl=/usr/local/ssl
 fi
 
-
 dnl Checks for library functions.
 AC_FUNC_FORK
 dnl AC_FUNC_MALLOC
 AC_TYPE_SIGNAL
 dnl AC_FUNC_STAT
 dnl AC_FUNC_VPRINTF
-AC_CHECK_FUNCS([gettimeofday localtime_r memmove memset mkdir mkfifo select strchr strdup strerror strrchr strstr], ,
+AC_CHECK_FUNCS([gettimeofday localtime_r memmove memset mkdir mkfifo select strchr strdup strerror strrchr strstr setlocale], ,
                [AC_MSG_ERROR([required function is missing])])
 
-AC_CHECK_FUNCS([socket], ,
-               [AC_CHECK_LIB(socket, socket, ,
-                            [AC_MSG_ERROR([cannot find socket() function])])])
-AC_CHECK_FUNCS([gethostbyname], ,
-               [AC_CHECK_LIB(nsl, gethostbyname, ,
-                            [AC_MSG_ERROR([cannot find gethostbyname() function])])])
-                            
-AC_CHECK_LIB(pthread, pthread_create, ,
-             [AC_MSG_ERROR([cannot find posix threads library])])
-             
-AC_CHECK_LIB(ncurses, initscr, ,
-               [AC_CHECK_LIB(curses, initscr, ,
-                            [AC_MSG_ERROR([cannot find curses library])])])
+AC_SEARCH_LIBS([iconv], [iconv], ,
+               [AC_MSG_ERROR([cannot find iconv() function])])
 
-if eval "test x$enable_msnp7 = xyes"; then
-    :;
-else
-AC_CHECK_LIB(ssl, SSL_library_init, ,
-              [
+AC_CHECK_FUNCS([wcswidth mbsrtowcs])
+
+AC_SEARCH_LIBS([socket], [socket], ,
+               [AC_MSG_ERROR([cannot find socket() function])])
+
+AC_SEARCH_LIBS([gethostbyname], [nsl], ,
+               [AC_MSG_ERROR([cannot find gethostbyname() function])])
+
+
+AC_CHECK_LIB(pthread, pthread_create, ,
+             [AC_MSG_WARN([cannot find posix threads library, trying -pthread])
+              CFLAGS="-pthread $CFLAGS"
+             ])
+                            
+AC_SEARCH_LIBS([initscr], [ncursesw ncurses curses], ,
+               [AC_MSG_ERROR([cannot find curses library])])
+
+AC_CHECK_FUNCS([wresize])
+
+AC_CHECK_FUNCS([addwstr], ,
+               [AC_MSG_WARN([wchar_t unsupported by curses, UTF-8 might not display correctly])])
+
+AC_CHECK_LIB(ssl, SSL_library_init, [LIBS="-lssl -lcrypto $LIBS"], [
                 AC_MSG_CHECKING([if -lssl exists in alternate location]);
                 if test -f $ac_cv_use_ssl/lib/libssl.a; then
                     AC_MSG_RESULT(yes)
@@ -117,7 +107,6 @@ AC_CHECK_LIB(ssl, SSL_library_init, ,
                     AC_MSG_ERROR([cannot find ssl library])
                 fi
               ], [-lcrypto])
-fi
 
 AC_MSG_CHECKING([for Tcl/Tk interpreter])
 WISHPROG=`which wish 2>/dev/null`
@@ -147,6 +136,23 @@ fi
 AC_SUBST(TCLDATADIR)
 
 dnl AM_CONDITIONAL(OS_IRIX, test x`uname` = xIRIX64)
+
+CVR_SYSNAME=`uname -s`
+if test -z "$CVR_SYSNAME"; then
+    CVR_SYSNAME='Unix'
+fi
+CVR_SYSVER=`uname -r`
+if test -z "$CVR_SYSVER"; then
+    CVR_SYSVER='0.0'
+fi
+CVR_ARCH=`uname -m`
+if test -z "$CVR_ARCH"; then
+    CVR_ARCH='i386'
+fi
+    
+CVRSTRING="0x0409 $CVR_SYSNAME $CVR_SYSVER $CVR_ARCH GTMESS $VERSION MSMSGS"
+AC_MSG_NOTICE([CVR = ${CVRSTRING}])
+AC_DEFINE_UNQUOTED(CVRSTRING, "$CVRSTRING", [CVR string])
 
 AC_CONFIG_FILES(Makefile src/Makefile src/inty/Makefile src/client/Makefile data/Makefile)
 AC_CONFIG_FILES(src/gtmess-notify, chmod a+x src/gtmess-notify)

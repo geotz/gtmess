@@ -2,7 +2,7 @@
  *    xfer.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -37,7 +37,7 @@
 pthread_mutex_t XX = PTHREAD_MUTEX_INITIALIZER;
 xfer_l XL;
 
-extern char MyIP[SML];
+extern char MyIP[];
 
 char *xstat_str[] = { "???", "REQUEST", "ACCEPTED", 
         "CANCELLED", "REJECTED", "TIMEOUT", "FAILED",
@@ -138,7 +138,7 @@ void xf_print(xfer_t *x, char *dest)
     unsigned int kilo = 0; 
     
     if (x->xclass == XF_FILE) cc = 'F'; else cc = '?';
-    if (x->incoming) inc = "FROM"; else inc = "TO";
+    if (x->incoming) inc = "<<"; else inc = ">>";
     status = xstat_str[x->status];
     strcpy(remote, x->remote);
     if ((s = strstr(remote, "@hotmail.com")) != NULL) {
@@ -163,6 +163,7 @@ void xf_draw(TWindow *w)
 {
     xfer_t *x;
     char tmp[SML] = {0};
+    int attr;
             
     LOCK(&XX);
     LOCK(&w->lock);
@@ -174,7 +175,19 @@ void xf_draw(TWindow *w)
     wmove(w->wh, 0, 0);
     for (x = XL.head; x != NULL; x = x->next) {
         if (x->index < top) continue;
-        wattrset(w->wh, (x->incoming)? attrs[C_DBG]: attrs[C_MSG]); 
+        switch (x->status) {
+            case XS_CONNECT: 
+            case XS_UNKNOWN:
+            case XS_ACCEPT: 
+                attr = attrs[C_DBG]; break;
+            case XS_INVITE:
+                attr = attrs[C_NORMAL]; break;
+            case XS_COMPLETE:
+                attr = attrs[C_MSG]; break;
+            default:
+                attr = attrs[C_ERR]; break;
+        }
+        wattrset(w->wh, attr); 
         xf_print(x, tmp);
         if (XL.cur == x) {
             wbkgdset(w->wh, ' ' | attrs[C_MNU]);
@@ -205,7 +218,13 @@ void draw_xfer(int r)
     xf_draw(&w_xfer);
     time(&tm_last_draw);
     if (wvis != 1) return;
-    scr_event(SCR_XFER, NULL, 0, r);
+    LOCK(&w_xfer.lock);
+        copywin(w_xfer.wh, stdscr, 0, 0, w_xfer.y, w_xfer.x,
+                w_xfer.y + w_xfer.h - 1, w_xfer.x + w_xfer.w - 1, FALSE);
+    UNLOCK(&w_xfer.lock);
+    move(SLINES - 1, SCOLS - 1);
+    
+    if (r) refresh();
 }
 
 void tm_draw_xfer(int r)
@@ -226,7 +245,7 @@ void xf_keydown(int c)
             xfl_add_file(&XL, XS_INVITE, "me@hotmail.com", "sue@hotmail.com", 1, 1234, NULL, "readme.txt", 10240);
             break;
         case '2':    
-            xfl_add_file(&XL, XS_INVITE, "me@hotmail.com", SP, 0, 3433, NULL, "dd", 3576);
+            xfl_add_file(&XL, XS_INVITE, "me@hotmail.com", ZS, 0, 3433, NULL, "dd", 3576);
             break;
         case '3': 
             if (x != NULL) XL.cur->data.file.sofar++; 
@@ -658,8 +677,8 @@ char *msnftpd_err_str[] = {"internal error", "socket()", "bind()", "listen()"};
 
 void msnftp_init()
 {
-    if (Config.msnftpd == 1) {
-        msnftpd.port = MSNFTP_PORT;
+    if (Config.msnftpd > 0) {
+        msnftpd.port = Config.msnftpd;
         msnftpd.backlog = 10;
         msnftpd.server_thread = msnftp_server;
         pthread_cond_init(&msnftpd.cond, NULL);

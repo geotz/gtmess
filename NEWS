@@ -1,20 +1,21 @@
 For the latest version, visit the project's home page:
 
-    http://www.geocities.com/montajoe/gtmess
+    http://www.geocities.com/montajoe/gtmess/
 
 You can contact the developer at
 
     geotz@hotmail.com
 
 
-*** gtmess version 0.8.2 (15 Nov 2003) ***
+*** gtmess version 0.9 (19 Dec 2004) ***
 
-Since 14 November, 2003, the 0.8.1 client fails to log in
-with any account. The reason is the CVR string.
-The server decided to reject CVR strings that
-do not contain the account name as their last part. Version 0.8.1
-sents a simple `null' instead of the account name as the last part
-of the CVR string. So, I was forced to release version 0.8.2
-which fixes this problem and incorporates some minor changes
-that have been made up to now. 
-Look at the ChangeLog for more information.
+It's been more than one year since the previous version, and I've received
+numerous emails about gtmess.  I've tried to incorporate all suggestions for
+improvements. Thank you guys! Your feedback was precious.  Due to my
+lack-of-free-time perhaps I forgot to answer some emails -- don't shoot me! :-)
+This was also the reason it took me so long to release something new.  I have
+slightly more free time now, that's why project has become alive again.
+
+Enjoy the new version....
+
+    	    	    	    	    	    	---- George

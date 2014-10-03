@@ -1,4 +1,44 @@
 *******************************
+* Version 0.9 (19 Dec 2004)   * 
+*******************************
+* updated documentation
+* improved configure script
++ alternate key for @F7 and @F8 is ESC-& and ESC-*
+* SIGINT and SIGQUIT are now handled like SIGTERM (logout and exit)
+! fixed crashing upon signal when connections alive
+! the value of server-stored options (Reverse List Prompting & 
+  All Other Users) is correctly interpreted when modified under MSNP8
+  (formerly the correct value was displayed only after the login process)
+! msn.log is now correctly stored in `~/.gtmess' and not in `.'
+! initial status change is sent *after* SYN (the patch for 0.8.2)
+  (or everybuddy appear offline!)
++ MSNP9 support
+- no more MSNP7 support
++ content logging of server messages
++ contact aliases in `~/.gtmess/aliases'
+  can use always or instead of long nicks
+! do not complain any more for empty lines in config file
+* program architecture simplifications
++ ability to hide unrecognized messages
+! do not crash when terminal window resizes
++ adapt to terminal window resize
++ more precise CVR string calculation (at configure time)
++ full unicode (UTF-8) support
++ display local time and time of last event
+! do not send typing notifications on empty s/b (or you get disconnected)
++ automatic change to idle status after some time, back to online on keypress
++ auto-login on startup
++ ability to be un-invitable to a switchboard (only YOU can invite)
++ gtmess specific messages (BEEP, GTMESS, MSG, DLG)
++ configuration variables can be queried/modified/saved in runtime
++ more configuration variables
+* modified some semantics/defaults of existing cfg vars
+! if out-of-bounds value is given to a var, assume max value (instead of min)
+! if initial status is FLN then don't send it to server
+* improved & utf-8 compatible word wrap
++ user note facility
+
+*******************************
 * Version 0.8.2 (15 Nov 2003) * 
 *******************************
 ! when only online contacts are shown, contact list scroll limits

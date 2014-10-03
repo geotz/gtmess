@@ -3,22 +3,19 @@ INSTALLATION
 
 Contents
 
-1. SYSTEM SETUP
+1. SETUP
     1.1. From source distribution
     1.2. From binary .tar.gz package
     1.3. From binary RPM package
+    1.4. From binary DEB package
 
-2. USER SETUP
-
-3. GENERIC INSTRUCTIONS USING `configure'
+2. GENERIC INSTRUCTIONS USING `configure'
 
 -------------
 
-1. SYSTEM SETUP
+1. SETUP
 
-    This is how to install gtmess to your system. In order
-    to run it properly, each user should also set it up for his/her
-    account, according to the instructions in section 2.
+    This is how to install gtmess to your system.
 
     1.1. From source distribution
 
@@ -26,20 +23,21 @@ Contents
 
 	    1. Extract the contents of the package:
 
-		    tar zxf gtmess-X.Y.Z.tar.gz
-	    (or  gunzip < gtmess-X.Y.Z.tar.gz | tar xf - )
+		    tar zxf gtmess-X.Y.tar.gz
+	    (or  gunzip < gtmess-X.Y.tar.gz | tar xf - )
 
 	    2. Change to the package directory
 
-		    cd gtmess-X.Y.Z
+		    cd gtmess-X.Y
 
 	    3. Configure the package
 
 		    ./configure
 
 		you might want to use some extra options 
-		(such as --enable-home, read section 3 and 
-		the output of `configure --help' for details)
+		(such as 
+		CPPFLAGS=-I/usr/local/include LDFLAGS=-L/usr/local/lib 
+		see the output of `configure --help' for details)
 
 	    4. Compile the package
 
@@ -53,48 +51,39 @@ Contents
 		   make install-strip
 		(to strip debugging symbols)
 
-	    5. That's it. Don't forget the user setup!
+	    5. That's it.
 
     1.2. From binary .tar.gz package
 
-	    1. Simply extract the contents of the package, i.e.
+	Simply extract the contents of the package, i.e.
 
-		    tar zxf gtmess.X.Y.Z-Linux-i686.tar.gz
+		tar zxf gtmess.X.Y-Linux-i386.tar.gz
 
-	    The created directory contains the binaries.
+	The created directory contains the binaries and the data files
+        (documentation, icons, etc.).
+
+	The configuration directory ~/.gtmess/ will be created automatically 
+	when you run gtmess for the first time.
+	It's not a good idea to create that directory yourself, since
+	gtmess will create some extra files in it the first time.
+	
+	Perhaps you might want to copy `root.pem' into ~/.gtmess/ after
+	the directory has been created.
 	
     1.3. From binary RPM package
 
 	Install the rpm package in your system (as root), i.e.
 
-	    rpm -i gtmess-X.Y.Z.i686.rpm
+	    rpm -i gtmess-X.Y.i386.rpm
 
-2. USER SETUP
+    1.4. From binary DEB package
 
-    To be able to use gtmess, you should have
-    your configuration directory ~/.gtmess properly set up. 
-    This can be done automatically. When you run
-    gtmess for the first time, make sure to add the option
-    `-w' along with any settings you would like to be saved, e.g.:
+	Install the rpm package in your system (as root), i.e.
 
-	gtmess -w -Ologin=myaccount -Opassword=secret123
-
-    This will create the configuration directory ~/.gtmess along
-    with the appropriate files. Your default settings will be
-    saved in ~/.gtmess/config. The above example simply
-    stores the sign-in account `myaccount@hotmail.com' and the
-    password `secret123'.
-    
-    From now on, just run the client as `gtmess'. Your configuration
-    data will be loaded automatically.
-    
-    NOTE: If gtmess has been compiled with the `--enable-home' option,
-    then don't forget to copy the runtime data files to ~/.gtmess.
-    The only data file used for now is `root.pem' which contains trusted
-    root certificates.
+	    dkpg -i gtmess-X.Y.i386.deb
 
 
-3. GENERIC INSTRUCTIONS USING `configure'
+2. GENERIC INSTRUCTIONS USING `configure'
 
 Copyright 1994, 1995, 1996, 1999, 2000, 2001, 2002 Free Software
 Foundation, Inc.

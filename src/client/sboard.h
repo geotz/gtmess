@@ -2,7 +2,7 @@
  *    sboard.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -24,7 +24,9 @@
 
 #include<iconv.h>
 
+/*#include"nserver.h"*/
 #include"msn.h"
+#include"nserver.h"
 #include"screen.h"
 
 typedef struct msn_sboard_s {
@@ -47,9 +49,11 @@ typedef struct msn_sboard_s {
     pthread_t thrid;
     int sfd;
     char input[SXL];
+    wchar_t winput[SXL];
     time_t tm_last_char; /* when last char was typed */
     ebox_t EB; /* editbox */
     int plskip; /* PL list line skip (for display) */
+    time_t dlg_now; /* time of last screen output */
     
     struct msn_sboard_s *next, *prev;
 } msn_sboard_t;
@@ -67,18 +71,22 @@ extern pthread_mutex_t SX;
 extern msn_sblist_t SL; /* switchboard */
 extern pthread_key_t key_sboard;
 
-/* switchboard participants */
-void draw_plst(msn_sboard_t *sb, int r);
-
-void draw_sbebox(msn_sboard_t *sb, int r);
-void draw_sb(msn_sboard_t *sb, int r);
-void draw_dlg(msn_sboard_t *sb, int r);
-
-/* switchboard conversation window */
-void dlg(cattr_t attr, const char *fmt, ...);
-
+void *msn_sbdaemon(void *arg);
 msn_sboard_t *msn_sblist_add(msn_sblist_t *q, char *sbaddr, char *hash,
                              char *master, char *mnick, int called, char *sessid);
 int msn_sblist_rem(msn_sblist_t *q);
 
+void sb_blah();
+void sb_type(int c);
+void sboard_leave_all(int panic);
+int  sboard_leave();
+int  sboard_kill();
+void sboard_next();
+void sboard_prev();
+void sboard_next_pending();
+
+void draw_dlg(msn_sboard_t *sb, int r);
+void draw_plst(msn_sboard_t *sb, int r);
+void draw_sb(msn_sboard_t *sb, int r);
+void draw_sbebox(msn_sboard_t *sb, int r);
 #endif

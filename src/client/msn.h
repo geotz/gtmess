@@ -2,7 +2,7 @@
  *    msn.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -24,22 +24,26 @@
 
 #include<iconv.h>
 #include<stdio.h>
+#include<pthread.h>
 
 #define SXL 1024
 #define SML 512
 #define SNL 80
+
+#define MSNFTP_PORT 6891
 
 typedef enum {MS_FLN, MS_HDN, MS_NLN, MS_IDL,
                 MS_AWY, MS_BSY, MS_BRB, MS_PHN,
                 MS_LUN, MS_UNK} msn_stat_t;
 
 typedef struct msn_contact_s {
-    char login[SML]; /* FL, RL, AL, BL */
-    char nick[SML];  /* FL */
-    msn_stat_t status; /* FL */
-    int gid; /* FL only (and for RL represents
-                total number of groups user belongs to) */
-    int blocked; /* FL only */
+    char login[SML];    /* FL, RL, AL, BL */
+    char nick[SML];     /* FL */
+    int dirty;          /* update nickname on server */
+    msn_stat_t status;  /* FL */
+    int gid;            /* FL only (and for RL represents
+                           total number of groups user belongs to) */
+    int blocked;        /* FL only */
     time_t tm_last_char; /* FL only: time of last typing notification */
     struct msn_contact_s *next;
 } msn_contact_t;
@@ -63,7 +67,7 @@ typedef struct {
 extern char *msn_stat_name[];
 extern char *msn_stat_com[];
 extern char msn_stat_char[];
-extern iconv_t msn_ic;
+extern iconv_t msn_ic[2];
 
 /* contact list */
 msn_contact_t *msn_clist_find(msn_clist_t *q, char *login);
@@ -117,12 +121,9 @@ int msn_gtc(int fd, unsigned int tid, char c);
 int msn_blp(int fd, unsigned int tid, char c);
 int msn_cvr(int fd, unsigned int tid, char *cvr, char *login);
 int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest);
-#ifdef MSNP7
-int msn_login_md5(int fd, unsigned int tid, char *pass, char *md5hash, char *nick);
-#else
 int msn_login_twn(int fd, unsigned int tid, char *ticket, char *nick);
-#endif
 int msn_msg_typenotif(int fd, unsigned int tid, char *user);
+int msn_msg_gtmess(int fd, unsigned int tid, char *cmd, char *args);
 int msn_msg_text(int fd, unsigned int tid, char *text);
 int msn_msg_finvite(int fd, unsigned int tid, unsigned int cookie, 
                     char *fname, unsigned int size);

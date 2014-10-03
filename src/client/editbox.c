@@ -2,7 +2,7 @@
  *    editbox.c
  *
  *    editbox control for curses
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -21,57 +21,135 @@
 
 #include<stdlib.h>
 #include<string.h>
+#include<wchar.h>
 #include<curses.h>
+
 #include"editbox.h"
+#include"utf8.h"
 
 /* clipboard length */
-#define CBL 256
+#define CBL 1024
 
 /* history length */
 #define EBHLEN 128
 
-static char clipboard[CBL] = {0};
+static wchar_t clipboard[CBL] = {0};
 
-void eb_init(ebox_t *e, int nc, int width, char *s)
+void eb_mkwtext(ebox_t *e)
+{
+    mbstate_t mbs;
+    int i;
+    const char *s;
+    
+    if (e->utf8) {
+        memset(&mbs, 0, sizeof(mbs));
+        s = e->text;
+        mbsrtowcs(e->wtext, &s, e->nc+1, &mbs);
+    } else {
+        i = 0;
+        while (e->text[i]) e->wtext[i] = (wchar_t) e->text[i], i++;
+        e->wtext[i] = (wchar_t) e->text[i];
+    }
+}
+
+void eb_flush(ebox_t *e)
+{
+    mbstate_t mbs;
+    int i;
+    const wchar_t *s;
+    
+    if (e->utf8) {
+        memset(&mbs, 0, sizeof(mbs));
+        s = e->wtext;
+        wcsrtombs(e->text, &s, e->nb, &mbs);
+        e->text[e->nb+1] = 0;
+    } else {
+        for (i = 0; i < e->sl; i++) e->text[i] = (unsigned char) e->wtext[i];
+        e->text[i] = (unsigned char) 0;
+    }
+}
+
+/* does not store \0 ! */
+int eb_mblen(ebox_t *e, wchar_t w, char *dest)
+{
+    mbstate_t mbs;
+    char s[8];
+    
+    if (dest == NULL) dest = s;
+    if (!e->utf8) {
+        dest[0] = (unsigned char) w;
+        return 1;
+    }
+    memset(&mbs, 0, sizeof(mbs));
+    return wcrtomb(dest, w, &mbs);
+}
+
+void eb_init(ebox_t *e, int nc, int nb, int width, char *s, wchar_t *ws)
 {
     e->nc = nc;
+    e->nb = nb;
     e->insertmode = 1;
     e->text = s;
+    e->wtext = ws;
     e->width = width;
-    e->ii = e->sl = e->left = 0;
+    e->ii = e->sl = e->bl = 0;
+    e->left = 0;
     e->mask = 0;
     e->esc = 0;
     e->kb = 0;
     e->history = 0;
+    e->utf8 = 0;
+    e->multi = 0;
+    e->mbseq[0] = e->mbseq[1] = e->mbseq[2] = 
+    e->mbseq[3] = e->mbseq[4] = e->mbseq[5] = e->mbseq[6] = 0;
+    e->mbseqp = &e->mbseq[0];
     hlist_init(&e->HL, EBHLEN);
 }
 
 void eb_settext(ebox_t *e, char *s)
 {
-    e->ii = e->sl = strlen(s);
-    if (e->sl > e->nc) e->ii = e->sl = e->nc;
-    if (e->text != s) {
-        memset(e->text, 0, e->nc);
-        strncpy(e->text, s, e->nc);
+    if (e->text != (unsigned char *) s) {
+        memset(e->text, 0, e->nb+1);
+        strncpy(e->text, s, e->nb);
     }
-    e->text[e->nc] = 0;
-    e->left = (e->width > e->sl) ? 0: e->sl - e->width + 1;
+    eb_mkwtext(e);
+    e->sl = e->bl = 0;
+    while (e->wtext[e->sl]) e->sl++;
+    e->bl = strlen(e->text);
+    e->ii = e->sl;
+    if (e->sl > e->nc) e->ii = e->sl = e->nc;
+    e->wtext[e->nc] = 0;
+    e->left = 0;
+    if (e->utf8) {
+        e->multi = 0;
+        e->mbseq[0] = e->mbseq[1] = e->mbseq[2] = 
+        e->mbseq[3] = e->mbseq[4] = e->mbseq[5] = e->mbseq[6] = 0;
+        e->mbseqp = &e->mbseq[0];
+    }
+    eb_flush(e);
 }
 
-void eb_pastechar(ebox_t *e, int c)
+void eb_pastechar(ebox_t *e, wchar_t c)
 {
+    eb_mkwtext(e);
     if (e->insertmode) {
-        if (e->sl < e->nc) {
-            if (e->ii < e->sl) memmove(e->text+e->ii+1, e->text+e->ii, e->sl-e->ii);
-            e->text[e->ii++] = (char) c;
-            e->text[++e->sl] = 0;
-            if (e->ii-e->left >= e->width) e->left++;
+        if (e->sl < e->nc && e->bl+eb_mblen(e, c, NULL) <= e->nb) {
+            if (e->ii < e->sl) wmemmove(e->wtext+e->ii+1, e->wtext+e->ii, e->sl-e->ii);
+            e->wtext[e->ii++] = c;
+            e->wtext[++e->sl] = 0;
+            e->bl += eb_mblen(e, c, NULL);
         }
     } else if (e->ii < e->nc) {
-        e->text[e->ii++] = (char) c;
-        if (e->ii > e->sl) e->text[++e->sl] = 0;
-        if (e->ii-e->left >= e->width) e->left++;
+        int newbl;
+        if (e->ii < e->sl) newbl = e->bl - eb_mblen(e, e->wtext[e->ii], NULL) + eb_mblen(e, c, NULL);
+        else newbl = e->bl + eb_mblen(e, c, NULL);
+        if (newbl <= e->nb) {
+            e->wtext[e->ii++] = c;
+            e->bl = newbl;
+            if (e->ii > e->sl) e->wtext[++e->sl] = 0;
+        }
     }
+    eb_flush(e);
 }
 
 void eb_history_add(ebox_t *e, char *s, int len)
@@ -100,24 +178,21 @@ int eb_keydown(ebox_t *e, int key)
         case KEY_LEFT:
             if (e->ii > 0) {
                 e->ii--;
-                if (e->left > e->ii) e->left--;
             }
             break;
         case KEY_RIGHT:
             if (e->ii < e->sl) {
                 e->ii++;
-                if (e->ii-e->left >= e->width) e->left++;
             }
             break;
         case KEY_HOME:
             if (e->ii > 0) {
-                e->ii = e->left = 0;
+                e->ii = 0;
             }
             break;
         case KEY_END:
             if (e->ii < e->sl) {
                 e->ii = e->sl;
-                e->left = (e->width > e->sl) ? 0 : e->sl - e->width + 1;
             }
             break;
         case KEY_IC:
@@ -125,35 +200,36 @@ int eb_keydown(ebox_t *e, int key)
             break;
         case KEY_DC:
             if (e->ii < e->sl) {
-                memmove(e->text+e->ii, e->text+e->ii+1, e->sl-e->ii);
-                e->text[--e->sl] = 0;
-                if ((e->sl - e->left) < (e->width-1) && e->left > 0) e->left--;
+                eb_mkwtext(e);
+                e->bl -= eb_mblen(e, e->wtext[e->ii], NULL);
+                wmemmove(e->wtext+e->ii, e->wtext+e->ii+1, e->sl-e->ii);
+                e->wtext[--e->sl] = 0;
+                eb_flush(e);
             }
             break;
         case 20: /* ^T - delete word */
             if (e->ii < e->sl) {
                 while (e->ii < e->sl) {
-                    memmove(e->text+e->ii, e->text+e->ii+1, e->sl-e->ii);
-                    e->text[--e->sl] = 0;
-                    if ((e->sl - e->left) < (e->width-1) && e->left > 0) e->left--;
-                    if (e->text[e->ii] < 48) break;
+                    e->bl -= eb_mblen(e, e->wtext[e->ii], NULL);
+                    wmemmove(e->wtext+e->ii, e->wtext+e->ii+1, e->sl-e->ii);
+                    e->wtext[--e->sl] = 0;
+                    eb_flush(e);
+                    if (e->wtext[e->ii] < 48) break;
                 }
             }
             break;
         case 1: /* ^A - word left */
             if (e->ii > 0) {
-                while ((e->ii) && (e->text[--e->ii]<48));
-                while ((e->ii) && (e->text[--e->ii]>=48));
+                while ((e->ii) && (e->wtext[--e->ii]<48));
+                while ((e->ii) && (e->wtext[--e->ii]>=48));
                 if (e->ii) e->ii++;
-                if (e->left > e->ii) e->left = e->ii;
             }
             break;
         case 4: /* ^D - word right */
             if (e->ii < e->sl) {
-                while ((e->ii<e->sl) && (e->text[e->ii++]>=48));
-                while ((e->ii<e->sl) && (e->text[e->ii++]<48));
+                while ((e->ii<e->sl) && (e->wtext[e->ii++]>=48));
+                while ((e->ii<e->sl) && (e->wtext[e->ii++]<48));
                 if (e->ii<e->sl) e->ii--;
-                if (e->ii-e->left >= e->width) e->left = e->ii - e->width + 1;
             }
             break;
         case 11: /* ^K - clipboard escape */
@@ -163,12 +239,15 @@ int eb_keydown(ebox_t *e, int key)
         case KEY_BACKSPACE:
             if (e->ii > 0) {
                 if (e->ii == e->sl) {
-                    e->sl--; e->text[--e->ii] = 0;
+                    e->bl -= eb_mblen(e, e->wtext[--e->ii], NULL);
+                    e->sl--; e->wtext[e->ii] = 0;
                 } else {
-                    memmove(e->text+e->ii-1, e->text+e->ii, e->sl-e->ii);
-                    e->ii--; e->text[--e->sl] = 0;
+                    wmemmove(e->wtext+e->ii-1, e->wtext+e->ii, e->sl-e->ii);
+                    e->ii--; 
+                    e->bl -= eb_mblen(e, e->wtext[--e->sl], NULL);
+                    e->wtext[e->sl] = 0;
                 }
-                if (e->left > 0) e->left--;
+                eb_flush(e);
             }
             break;
         default:
@@ -186,7 +265,7 @@ int eb_keydown(ebox_t *e, int key)
                     if (e->ii > e->kb) {
                         int ncpy = e->ii - e->kb;
                         if (ncpy > CBL) ncpy = CBL - 1;
-                        strncpy(clipboard, e->text + e->kb, ncpy);
+                        wcsncpy(clipboard, e->wtext + e->kb, ncpy);
                         clipboard[ncpy] = 0;
                         clipboard[e->ii - e->kb] = 0;
                     } else clipboard[0] = 0;
@@ -195,27 +274,30 @@ int eb_keydown(ebox_t *e, int key)
                 case 'X': /* cut */
                     e->esc = 0;
                     if (e->mask) break;
-                    strncpy(clipboard, e->text, CBL);
+                    wcsncpy(clipboard, e->wtext, CBL);
                     clipboard[CBL-1] = 0;
-                    memset(e->text, 0, e->nc);
-                    e->sl = e->ii = e->left = 0;
+                    wmemset(e->wtext, 0, e->nc);
+                    e->sl = e->ii = 0;
+                    eb_flush(e);
+                    e->bl = strlen(e->text);
                     break;
                 case 'z':
                 case 'Z': /* zap */
                     e->esc = 0;
-                    memset(e->text, 0, e->nc);
-                    e->sl = e->ii = e->left = 0;
+                    wmemset(e->wtext, 0, e->nc);
+                    e->sl = e->ii = e->bl = 0;
+                    eb_flush(e);
                     break;
                 case 'c':
                 case 'C': /* copy */
                     e->esc = 0;
                     if (e->mask) break;
-                    strncpy(clipboard, e->text, CBL);
+                    wcsncpy(clipboard, e->wtext, CBL);
                     clipboard[CBL-1] = 0;
                     break;
                 case 'v':
                 case 'V': {/* paste */
-                    char *c;
+                    wchar_t *c;
                     
                     e->esc = 0;
                     for (c = clipboard; *c; c++) eb_pastechar(e, *c);
@@ -223,8 +305,31 @@ int eb_keydown(ebox_t *e, int key)
                 }
                 default:
                     e->esc = 0;
-            } else if ((key >= 32) && (key <= 255)) eb_pastechar(e, key);
-            else return 0;
+            } else if ((key >= 32) && (key <= 255)) {
+                if (!e->utf8) eb_pastechar(e, (wchar_t) key);
+                else { /* utf8 */
+                    int multi;
+                    mbstate_t mbs;
+                    wchar_t wc;
+                    
+                    multi = seqlen(key);
+                    if (multi > 0) { /* first char of mb seq */
+                        e->multi = multi - 1;
+                        e->mbseqp = &e->mbseq[0];
+                        e->mbseq[1] = e->mbseq[2] = e->mbseq[3] = 
+                        e->mbseq[4] = e->mbseq[5] = e->mbseq[6] = 0;
+                        *(e->mbseqp++) = (unsigned char) key;
+                    } else { /* intermediate char of mb seq */
+                        e->multi--;
+                        *(e->mbseqp++) = (unsigned char) key;
+                    }
+                    if (e->multi == 0) { /* end of mb seq */
+                        memset(&mbs, 0, sizeof(mbs));
+                        mbrtowc(&wc, e->mbseq, 7, &mbs);
+                        eb_pastechar(e, wc);
+                    }
+                }
+            } else return 0;
             break;
     }
     return 1;
@@ -232,22 +337,40 @@ int eb_keydown(ebox_t *e, int key)
 
 void eb_draw(ebox_t *e, WINDOW *w)
 {
-    int y, x, i, c;
+    int y, x, i, num_print, num_print_ii;
+    wchar_t ws;
 
     getyx(w, y, x);
     wprintw(w, "%*c", e->width, ' ');
     wmove(w, y, x);
-    for (i = 0; i < e->width; i++) {
-        c = e->text[e->left + i];
-        if (c == 0) break;
-        if (!e->mask) waddch(w, c); else waddch(w, '*');
+    eb_mkwtext(e);
+    num_print = num_print_ii = i = 0;
+    if (e->ii > e->left + 8)
+        if (e->utf8) 
+            while (wcswidth(&e->wtext[e->left], e->ii-e->left) > e->width-1) e->left++;
+        else while ((e->ii-e->left) > e->width-1) e->left++;
+    else {
+        e->left = e->ii - 8;
+        if (e->left < 0) e->left = 0;
     }
-    wmove(w, y, x + e->ii - e->left);
+    while (num_print < e->width - 1) {
+        ws = e->wtext[e->left + i];
+        if (ws == 0) break;
+        if (e->mask) waddch(w, '*');
+        else {
+            char s[8] = {0};
+            eb_mblen(e, ws, s);
+            waddstr(w, s);
+        }
+        if (e->utf8) num_print += wcwidth(ws);
+        else num_print++;
+        i++;
+        if (e->left + i == e->ii) num_print_ii = num_print;
+    }
+    wmove(w, y, x + num_print_ii);
 }
 
 void eb_resize(ebox_t *e, int nw)
 {
     e->width = nw;
-    if (e->ii-e->width >= e->left)
-        e->left = e->ii - e->width + 1;
 }

@@ -1,7 +1,7 @@
 /*
- *    unotif.h
+ *    utf8.h
  *
- *    gtmess - MSN Messenger client
+ *    utf8 support routines
  *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
@@ -19,14 +19,32 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _UNOTIF_H_
-#define _UNOTIF_H_
+#ifndef _UTF8_H_
+#define _UTF8_H_
 
-typedef enum {SND_NONE, SND_BEEP, SND_ONLINE, SND_OFFLINE, SND_NEWMAIL,
-        SND_PENDING, SND_RING, SND_LOGOUT } snd_t;
+#include "../config.h"
 
-void unotif_init(int asound, int apopup);
-void unotif_done();
-void unotify(char *msg, snd_t effect);
+int strlen_utf8(char *s, int *len);
+int strnlen_utf8(char *s, int n, int *len);
+int stroffset(char *s, int n, int len);
+int seqlen(int c);
+int strwidth(char *s);
+int widthoffset(char *s, int width);
+
+#ifndef HAVE_WCSWIDTH
+
+int wcswidth(const wchar_t *s, size_t n);
+#define wcwidth(c) 1
+
+#endif
+
+#ifndef HAVE_MBSRTOWCS
+
+#define mbsrtowcs(dest, src, len, ps) mbstowcs(dest, *(src), len)
+#define wcsrtombs(dest, src, len, ps) wcstombs(dest, *(src), len)
+#define wcrtomb(s, wc, ps) wctomb(s, wc)
+#define mbrtowc(pwc, s, n, ps) mbtowc(pwc, s, n)
+
+#endif
 
 #endif

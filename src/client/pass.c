@@ -2,7 +2,7 @@
  *    pass.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -39,12 +39,8 @@
 #include"gtmess.h"
 #include"msn.h"
 
-#ifndef MSNP7
-
 #include<openssl/ssl.h>
 #include<openssl/err.h>
-
-#endif
 
 #include"../inty/inty.h"
 #include"screen.h"
@@ -52,7 +48,6 @@
 
 #define SBL 5120
 
-#ifndef MSNP7
 SSL_CTX *ssl_ctx;
 
 SSL_CTX *initialize_ctx()
@@ -96,7 +91,7 @@ int check_cert(SSL *ssl, char *host)
                     return -1;
                 }
                 if (c == 'y' || c == 'a') break;
-                beep();
+                if (c == KEY_RESIZE) redraw_screen(1); else beep();
             }
             if (c == 'y') msg(C_ERR, "Yes\n");
             else Config.cert_prompt = 0, msg(C_ERR, "Always\n");
@@ -121,7 +116,7 @@ int check_cert(SSL *ssl, char *host)
                     return -1;
                 }
                 if (c == 'y' || c == 'a') break;
-                beep();
+                if (c == KEY_RESIZE) redraw_screen(1); else beep();
             }
             if (c == 'y') msg(C_ERR, "Yes\n");
             else Config.common_name_prompt = 0, msg(C_ERR, "Always\n");
@@ -175,16 +170,13 @@ int read_ssl(SSL *ssl, char *dest, int count)
     return 0;
     
 }
-#endif
 
 char *CRLF = "\r\n";
 
 int http_get(char *purl, char version, char*headers, char *response, int size, int *rcode)
 {
-#ifndef MSNP7
     SSL *ssl;
     BIO *sbio;
-#endif
     int fd;
     char *host, rsrc[SML], *s;
     int port;
@@ -222,7 +214,6 @@ int http_get(char *purl, char version, char*headers, char *response, int size, i
             return fd;
         }        
         
-#ifndef MSNP7
         if (port == 443) {
             ssl = SSL_new(ssl_ctx);
             sbio = BIO_new_socket(fd, BIO_NOCLOSE);
@@ -250,13 +241,10 @@ int http_get(char *purl, char version, char*headers, char *response, int size, i
             SSL_shutdown(ssl);
             SSL_free(ssl);
         } else {
-#endif
             write(fd, request, strlen(request));
             memset(response, 0, size);
             readx(fd, response, size-1);
-#ifndef MSNP7
         }
-#endif
         free(host);
         close(fd);
         
@@ -279,7 +267,6 @@ int http_get(char *purl, char version, char*headers, char *response, int size, i
     return 0;
 }
 
-#ifndef MSNP7
 char *get_login_server(char *dest)
 {
     char buf[SBL], *s, *s2;
@@ -328,18 +315,13 @@ int get_ticket(char *server, char *login, char *pass, char *param, char *dest)
     strcpy(dest, s);
     return 0;
 }
-#endif
 
 void pass_init()
 {
-#ifndef MSNP7
     ssl_ctx = initialize_ctx();
-#endif
 }
 
 void pass_done()
 {
-#ifndef MSNP7
     SSL_CTX_free(ssl_ctx);
-#endif
 }

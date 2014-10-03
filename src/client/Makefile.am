@@ -1,5 +1,5 @@
 #    gtmess - MSN Messenger client
-#    Copyright (C) 2002-2003  George M. Tzoumas
+#    Copyright (C) 2002-2004  George M. Tzoumas
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -22,15 +22,16 @@ bin_PROGRAMS = gtmess gtmess-gw
 AM_CFLAGS = -DDATADIR=\"${pkgdatadir}\"
 EXTRA_DIST = hash_cfg.inp
  
-gtmess_SOURCES = gtmess.c editbox.c hash_cfg.c hlist.c md5.c msn.c pass.c \
-                queue.c sboard.c screen.c unotif.c xfer.c \
-                editbox.h gtmess.h hash_cfg.h hlist.h md5.h msn.h pass.h \
-                queue.h sboard.h screen.h unotif.h xfer.h
+gtmess_SOURCES = gtmess.c editbox.c hash_cfg.c hash_tbl.c hlist.c md5.c msn.c nserver.c\
+                pass.c queue.c sboard.c screen.c unotif.c utf8.c xfer.c\
+                editbox.h gtmess.h hash_cfg.h hash_tbl.h hlist.h md5.h msn.h nserver.h\
+                pass.h queue.h sboard.h screen.h unotif.h utf8.h xfer.h
 
-gtmess_LDFLAGS = -L../inty
+#gtmess_LDFLAGS = -L../inty
 gtmess_LDADD = ../inty/libinty.a
 
 gtmess_gw_SOURCES = gtmess-gw.c
+#gtmess_gw_LDFLAGS = -L../inty
 gtmess_gw_LDADD = ../inty/libinty.a
 
 hash_cfg.c: hash_cfg.inp

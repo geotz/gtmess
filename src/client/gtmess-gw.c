@@ -2,7 +2,7 @@
  *    gtmess-gw.c
  *
  *    gtmess-gw - MSN Messenger HTTP Gateway
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -68,9 +68,11 @@ typedef struct sbentry_s {
 
 sbentry_t *sb_hlist;
 
+int verbose;
+
 void panic(char *s)
 {
-    fprintf(stderr, "FATAL ERROR: %s\n", s);
+    if (verbose) fprintf(stderr, "FATAL ERROR: %s\n", s);
     exit(1);
 }
 
@@ -102,36 +104,12 @@ sbentry_t *sbentry_find(char *hash, sbentry_t *head, sbentry_t **prev)
     return p;
 }
 
-/* connect a client socket to a server and return a socket descriptor */
-int Connect(char *hostname, int port)
-{
-    int sfd;
-    struct sockaddr_in servaddr;
-    struct hostent *host;
-    
-    if ((sfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-        return -1;
-    
-    memset(&servaddr, 0, sizeof(servaddr));
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(port);
-    host = gethostbyname(hostname);
-    if (host == NULL) return -2;
-    
-    servaddr.sin_addr.s_addr =  *((int *) host->h_addr_list[0]);
-    
-    if (connect(sfd, (struct sockaddr *) &servaddr, sizeof(servaddr)) < 0)
-        return -3;
-    
-    return sfd;
-}
-
 int Read(int fd, void *buf, size_t count)
 {
     int r;
     
     r = read(fd, buf, count);
-    if (r < 0) perror("read()");
+    if (r < 0 && verbose) perror("read()");
     return r;
 }
 
@@ -140,7 +118,7 @@ int Write(int fd, void *buf, size_t count)
     int r;
     
     r = write(fd, buf, count);
-    if (r < 0) perror("write()");
+    if (r < 0 && verbose) perror("write()");
     return r;
 }
 
@@ -166,9 +144,9 @@ int msn_gw_send(msn_gw_t *g, char *buf, int count)
     if (!g->opened) {
     /* need to open the server first */
         strcpy(g->gw_ip, msn_gateway_addr);
-        g->fd = Connect(msn_init_addr, 80);
+        g->fd = ConnectToServer(msn_init_addr, 80);
         if (g->fd < 0) {
-            perror("ms_gw_send(): Connect()");
+            if (verbose) perror("ms_gw_send(): Connect()");
             return g->fd;
         }
         sprintf(s, "POST http://%s/gateway/gateway.dll?Action=open&Server=%s&IP=%s HTTP/1.1\r\n"
@@ -189,9 +167,9 @@ int msn_gw_send(msn_gw_t *g, char *buf, int count)
     } else {
         if (g->redirect) {
             close(g->fd);
-            g->fd = Connect(g->gw_ip, 80);
+            g->fd = ConnectToServer(g->gw_ip, 80);
             if (g->fd < 0) {
-                perror("ms_gw_send(redirect): ConnectToServer()");
+                if (verbose) perror("ms_gw_send(redirect): ConnectToServer()");
                 return g->fd;
             }
             g->redirect = 0;
@@ -245,7 +223,7 @@ int msn_gw_recv(msn_gw_t *g, char *buf, int limit)
     int r, len, conlen, curlen, total;
     
     if (g->fd == -1) {
-        fprintf(stderr, "msn_gw_recv(): gateway not initialized\n");
+        if (verbose) fprintf(stderr, "msn_gw_recv(): gateway not initialized\n");
         return -1;
     }
     
@@ -257,7 +235,7 @@ int msn_gw_recv(msn_gw_t *g, char *buf, int limit)
     } while (r == 100);
     
     if (r != 200) {
-        fprintf(stderr, "msn_gw_recv(): unexpected gateway response: %d %s\n", r, tmp);
+        if (verbose) fprintf(stderr, "msn_gw_recv(): unexpected gateway response: %d %s\n", r, tmp);
         return -2;
     }
     
@@ -280,20 +258,20 @@ int msn_gw_recv(msn_gw_t *g, char *buf, int limit)
     if ((sp = strstr(s, "Content-Length:")) != NULL)
         sscanf(sp + 15, "%d", &conlen);
     else {
-        fprintf(stderr, "msn_gw_recv(): no content length\n");
+        if (verbose) fprintf(stderr, "msn_gw_recv(): no content length\n");
         return -3;
     }
     
     if ((sp = strstr(s, "\r\n\r\n")) != NULL) {
         curlen = (&s[len] - sp) - 4;
         if (curlen > limit) {
-            fprintf(stderr, "msn_gw_recv(): data will be truncated (needed %d/%d, avail. %d)\n",
+            if (verbose) fprintf(stderr, "msn_gw_recv(): data will be truncated (needed %d/%d, avail. %d)\n",
                     curlen, conlen, limit);
             memcpy(buf, sp + 4, limit);
             return -4;
         } else memcpy(buf, sp + 4, curlen);
     } else {
-        fprintf(stderr, "msn_gw_recv(): could not locate content\n");
+        if (verbose) fprintf(stderr, "msn_gw_recv(): could not locate content\n");
         return -5;
     }
     
@@ -301,15 +279,15 @@ int msn_gw_recv(msn_gw_t *g, char *buf, int limit)
     limit -= curlen;
     conlen -= curlen;
     if (conlen > limit) {
-        fprintf(stderr, "msn_gw_recv(): data will be truncated (needed %d, avail. %d)\n",
+        if (verbose) fprintf(stderr, "msn_gw_recv(): data will be truncated (needed %d, avail. %d)\n",
                 conlen, limit);
         r = readx(g->fd, buf + curlen, limit);
-        if (r != limit) perror("msn_gw_recv(): readx()");
+        if (r != limit && verbose) perror("msn_gw_recv(): readx()");
         return -6;
     } else {
         r = readx(g->fd, buf + curlen, conlen);
         if (r != conlen) {
-            perror("msn_gw_recv(): readx()");
+            if (verbose) perror("msn_gw_recv(): readx()");
             return -7;
         }
         total += r;
@@ -366,7 +344,7 @@ void NotifStrProcess(char *dest, char *src, int size, int *dsize)
                 t += tlen;
                 s = strchr(sp, '\r');
                 if (s == NULL) {
-                    fprintf(stderr, "NotifStrProcess(): could not find '\\r'\n");
+                    if (verbose) fprintf(stderr, "NotifStrProcess(): could not find '\\r'\n");
                     return;
                 }
                 size -= s - sp;
@@ -382,7 +360,7 @@ void NotifStrProcess(char *dest, char *src, int size, int *dsize)
                 t += tlen;
                 s = strchr(sp, '\r');
                 if (s == NULL) {
-                    fprintf(stderr, "NotifStrProcess(): could not find '\\r'");
+                    if (verbose) fprintf(stderr, "NotifStrProcess(): could not find '\\r'");
                     return;
                 }
                 size -= s - sp;
@@ -404,7 +382,7 @@ void NotifStrProcess(char *dest, char *src, int size, int *dsize)
             t += tlen;
             s = strchr(sp, '\r');
             if (s == NULL) {
-                fprintf(stderr, "NotifStrProcess(): could not find '\\r'");
+                if (verbose) fprintf(stderr, "NotifStrProcess(): could not find '\\r'");
                 return;
             }
             size -= s - sp;
@@ -448,7 +426,7 @@ void *SBServer(void *arg)
     UNLOCK(&sbhash_lock);
     
     if (p == NULL) {
-        fprintf(stderr, "SBServer(): could not find switchboard server for the hash\n");
+        if (verbose) fprintf(stderr, "SBServer(): could not find switchboard server for the hash\n");
         close(fd);
         return NULL;
     }
@@ -476,7 +454,7 @@ void *SBServer(void *arg)
         sel = select(max + 1, &rfds, NULL, NULL, &tv);
         
         if (sel == -1) {
-            perror("SBServer(): select()");
+            if (verbose) perror("SBServer(): select()");
             break;
         } else if (sel == 0) {
             if (!waitreply) {
@@ -528,7 +506,7 @@ void *NotifServer(void *arg)
         sel = select(max + 1, &rfds, NULL, NULL, &tv);
         
         if (sel == -1) {
-            perror("NotifServer(): select()");
+            if (verbose) perror("NotifServer(): select()");
             break;
         } else if (sel == 0) {
             if (!waitreply) {
@@ -557,52 +535,11 @@ void *NotifServer(void *arg)
     return NULL;
 }
 
-/*void *DispatchServer(void *arg)
+int main(int argc, char **argv)
 {
-    int fd = (int) arg;
-    int r;
-    unsigned int tid;
-    char s[SML], com[SML];
-    fd_set rfds;
-    struct timeval tv;
-
-
-    while (1) {
-        FD_ZERO(&rfds);
-        FD_SET(fd, &rfds);
-        tv.tv_sec = 180;
-        tv.tv_usec = 0;
-        
-        if (!select(fd+1, &rfds, NULL, NULL, &tv)) break;
-        if ((r = Read(fd, s, SML-1)) <= 0) break;
-        s[r] = 0;
-        if (sscanf(s, "%s %u", com, &tid) != 2) break;
-        if (is3(com, "VER")) {
-            if (Write(fd, s, strlen(s)) < 0) break;
-        } else if (is3(com, "INF")) {
-            sprintf(s, "INF %u MD5\r\n", tid);
-            if (Write(fd, s, strlen(s)) < 0) break;
-        } else if (is3(com, "USR")) {
-            sprintf(s, "XFR %u NS %s:%d 0 127.0.0.1:1863\r\n", tid, notif_addr, notif_port);
-            Write(fd, s, strlen(s));
-            break;
-        } else break;
-    }
-    close(fd);
-    return NULL;
-}    */
-
-int main()
-{
-/*    daemon_t disp;*/
     daemon_t notif, sb;
     
-/*    disp.port = disp_port;
-    disp.backlog = 10;
-    disp.server_thread = DispatchServer;
-    pthread_cond_init(&disp.cond, NULL);
-    pthread_mutex_init(&disp.lock, NULL);
-    disp.status = 0;*/
+    verbose = (argc == 2 && strcmp(argv[1], "-v") == 0);
     
     notif.port = notif_port;
     notif.backlog = 10;
@@ -619,11 +556,9 @@ int main()
     sb.status = 0;
     
     pthread_mutex_init(&sbhash_lock, NULL);
-/*    pthread_create(&disp.th_server, NULL, DaemonThread, (void *) &disp);*/
     pthread_create(&notif.th_server, NULL, DaemonThread, (void *) &notif);
     pthread_create(&sb.th_server, NULL, DaemonThread, (void *) &sb);
     
-/*    pthread_join(disp.th_server, NULL);*/
     pthread_join(notif.th_server, NULL);
     pthread_join(sb.th_server, NULL);
     

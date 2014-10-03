@@ -2,7 +2,7 @@
  *    screen.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    Copyright (C) 2002-2004  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -24,8 +24,15 @@
 
 #include<curses.h>
 #include<stdarg.h>
+
+#include"../config.h"
+
 #include"editbox.h"
 #include"msn.h"
+
+#ifndef HAVE_WRESIZE
+#define KEY_RESIZE (-2)
+#endif
 
 typedef struct {
     WINDOW *wh;
@@ -35,7 +42,7 @@ typedef struct {
 } TWindow;
 
 #define W_DLG_W (w_msg.w * 3 / 4)
-#define W_DLG_H (LINES - w_msg.h - 4)
+#define W_DLG_H (SLINES - w_msg.h - 4)
 #define W_DLG_X 0
 #define W_DLG_Y 1
 #define W_PRT_W (w_msg.w - W_DLG_W)
@@ -47,50 +54,29 @@ typedef struct {
 
 typedef enum {C_NORMAL, C_ERR, C_DBG, C_MSG, C_MNU, C_EBX, C_GRP} cattr_t;
 
-typedef struct {
-    int attr;
-    char txt[SML];
-} scrtxt_t;
-
-typedef struct {
-    int pl;
-    int attr;
-    ebox_t ebox;
-    char txt[SXL];
-    char prompt[SML];
-} screbx_t;
-
-typedef struct {
-    int null;
-    int attr;
-    ebox_t ebox;
-    char txt[SXL];
-} scrsbebx_t;
-
-typedef struct {
-    int skip;
-    msn_clist_t p;
-    msn_glist_t g;
-} scrlst_t;
-
-enum { SCR_DRAWREST, SCR_MSG, SCR_RMSG, SCR_TOPLINE, SCR_BOTLINE, 
-        SCR_EBINIT, SCR_EBDRAW, SCR_HOME, SCR_LST, SCR_RLST, SCR_RDLG,
-        SCR_RPLST, SCR_SBEBDRAW, SCR_SBBAR, SCR_XFER };
-
 extern int statattrs[], lstatattrs[], attrs[];
 
-extern TWindow w_msg, w_back, w_xfer;
+extern TWindow w_msg, w_lst, w_back, w_xfer;
 extern int w_msg_top;
-extern char copyright_str[80];
+extern char copyright_str[];
 
-void screen_init();
-void scr_event(int type, void *data, int size, int signal);
+int  get_string(cattr_t attr, int mask, const char *prompt, char *dest);
+void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, const char *fmt, va_list ap);
+
 void msg(cattr_t attr, const char *fmt, ...);
 void msg2(cattr_t attr, const char *fmt, ...);
-int  get_string(cattr_t attr, int mask, const char *prompt, char *dest);
-void vwmsg(TWindow *w, cattr_t attr, const char *fmt, va_list ap);
+void dlg(cattr_t attr, const char *fmt, ...);
+
+void draw_all();
+void draw_rest();
+void draw_status(int r);
+void draw_time(int r);
+void draw_lst(int r);
+void draw_msg(int r);
+
+void screen_resize();
+void screen_init();
 
 extern int wvis;
-extern pthread_mutex_t WL;
 
 #endif
