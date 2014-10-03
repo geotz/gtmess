@@ -15,11 +15,11 @@ Contents
 
 1. SETUP
 
-    This is how to install gtmess to your system.
+    This is how to install gtmess in your system.
 
     1.1. From source distribution
 
-	Follow the classic autotools procedure (more details in section 3):
+	Follow the classic autotools procedure (more details in section 2):
 
 	    1. Extract the contents of the package:
 
@@ -78,9 +78,9 @@ Contents
 
     1.4. From binary DEB package
 
-	Install the rpm package in your system (as root), i.e.
+	Install the deb package in your system (as root), i.e.
 
-	    dkpg -i gtmess-X.Y.i386.deb
+	    dpkg -i gtmess-X.Y.i386.deb
 
 
 2. GENERIC INSTRUCTIONS USING `configure'

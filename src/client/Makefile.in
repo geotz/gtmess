@@ -15,7 +15,7 @@
 @SET_MAKE@
 
 #    gtmess - MSN Messenger client
-#    Copyright (C) 2002-2004  George M. Tzoumas
+#    Copyright (C) 2002-2005  George M. Tzoumas
 #
 #    This program is free software; you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -71,8 +71,9 @@ PROGRAMS = $(bin_PROGRAMS)
 am_gtmess_OBJECTS = gtmess.$(OBJEXT) editbox.$(OBJEXT) \
 	hash_cfg.$(OBJEXT) hash_tbl.$(OBJEXT) hlist.$(OBJEXT) \
 	md5.$(OBJEXT) msn.$(OBJEXT) nserver.$(OBJEXT) pass.$(OBJEXT) \
-	queue.$(OBJEXT) sboard.$(OBJEXT) screen.$(OBJEXT) \
-	unotif.$(OBJEXT) utf8.$(OBJEXT) xfer.$(OBJEXT)
+	queue.$(OBJEXT) sound.$(OBJEXT) sboard.$(OBJEXT) \
+	screen.$(OBJEXT) unotif.$(OBJEXT) utf8.$(OBJEXT) \
+	xfer.$(OBJEXT)
 gtmess_OBJECTS = $(am_gtmess_OBJECTS)
 gtmess_DEPENDENCIES = ../inty/libinty.a
 am_gtmess_gw_OBJECTS = gtmess-gw.$(OBJEXT)
@@ -88,8 +89,8 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/msn.Po ./$(DEPDIR)/nserver.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/pass.Po ./$(DEPDIR)/queue.Po \
 @AMDEP_TRUE@	./$(DEPDIR)/sboard.Po ./$(DEPDIR)/screen.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/unotif.Po ./$(DEPDIR)/utf8.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/xfer.Po
+@AMDEP_TRUE@	./$(DEPDIR)/sound.Po ./$(DEPDIR)/unotif.Po \
+@AMDEP_TRUE@	./$(DEPDIR)/utf8.Po ./$(DEPDIR)/xfer.Po
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 CCLD = $(CC)
@@ -176,9 +177,9 @@ AUTOMAKE_OPTIONS = gnu
 AM_CFLAGS = -DDATADIR=\"${pkgdatadir}\"
 EXTRA_DIST = hash_cfg.inp
 gtmess_SOURCES = gtmess.c editbox.c hash_cfg.c hash_tbl.c hlist.c md5.c msn.c nserver.c\
-                pass.c queue.c sboard.c screen.c unotif.c utf8.c xfer.c\
+                pass.c queue.c sound.c sboard.c screen.c unotif.c utf8.c xfer.c\
                 editbox.h gtmess.h hash_cfg.h hash_tbl.h hlist.h md5.h msn.h nserver.h\
-                pass.h queue.h sboard.h screen.h unotif.h utf8.h xfer.h
+                pass.h queue.h sound.h sboard.h screen.h unotif.h utf8.h xfer.h
 
 
 #gtmess_LDFLAGS = -L../inty
@@ -268,6 +269,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/queue.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sboard.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/screen.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sound.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/unotif.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/utf8.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xfer.Po@am__quote@

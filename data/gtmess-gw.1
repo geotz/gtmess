@@ -1,4 +1,4 @@
-.TH gtmess-gw 1 "December 19, 2004" "" "gtmess messenger http gateway"
+.TH gtmess-gw 1 "March 15, 2005" "" "gtmess messenger http gateway"
 
 .SH NAME
 gtmess-gw - MSN messenger HTTP gateway
@@ -11,30 +11,58 @@ gtmess-gw [options]
 gtmess-gw is an HTTP gateway for the MSN messenger protocol. It effectively emulates
 an msn messenger server on the local machine and forwards all 
 packets through the HTTP msn gateway (port 80).
-This can be useful in cases there is a firewall that prevents access to ports other than 80.
+This can be useful in cases where a firewall is preventing access to ports other than 80.
 It was written as a companion to the
 .B gtmess
 messenger client, but can be used with any other client.
 
 .SH OPTIONS
 .TP
+.B -h
+Short help.
+
+.TP
+.BI "-g " gateway_server
+Set the gateway server. The default value is
+.BR gateway.messenger.hotmail.com .
+
+.TP
+.BI "-s " msn_server[:port]
+Set the messenger server. The default is
+.BR messenger.hotmail.com .
+
+.TP
+.BI "-n " notification_server
+Set the notification server. The default value
+.B 207.46.104.20
+has been chosen randomly.
+
+.TP
 .B -v
 Verbose mode; error messages are written to stderr.
 
+.SH EXAMPLE
+To use with gtmess, first start the gateway:
+
+$ gtmess-gw &
+
+Then tell gtmess to use the local server: 
+
+$ gtmess -Oserver=127.0.0.1
+
 .SH BUGS
 
-Some packets might be truncated. 
+Some packets might be truncated under some rare circumstances. 
 
 .SH SEE ALSO
 .BR gtmess "(1), "
 .BR gtmess-notify "(1)"
 
-
 .SH AUTHORS
 
 gtmess-gw - MSN messenger HTTP gateway
 .br
-Copyright (C) 2002-2004  George M. Tzoumas
+Copyright (C) 2002-2005  George M. Tzoumas
 
 .PP
 This program is free software; you can redistribute it and/or modify

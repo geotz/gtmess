@@ -2,7 +2,7 @@
  *    unotif.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -22,11 +22,11 @@
 #ifndef _UNOTIF_H_
 #define _UNOTIF_H_
 
-typedef enum {SND_NONE, SND_BEEP, SND_ONLINE, SND_OFFLINE, SND_NEWMAIL,
-        SND_PENDING, SND_RING, SND_LOGOUT } snd_t;
+#include "sound.h"
 
 void unotif_init(int asound, int apopup);
 void unotif_done();
+void playsound(snd_t snd);
 void unotify(char *msg, snd_t effect);
 
 #endif

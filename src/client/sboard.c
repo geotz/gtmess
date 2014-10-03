@@ -2,7 +2,7 @@
  *    sboard.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@
 #include<errno.h>
 #include<sys/stat.h>
 #include<string.h>
+#include<time.h>
 
 #include"sboard.h"
 #include"xfer.h"
@@ -36,6 +37,7 @@
 pthread_mutex_t SX; /* switchboard mutex */
 msn_sblist_t SL; /* switchboard */
 pthread_key_t key_sboard;
+xqueue_t q_sb_req; /* new-sb requests */
 
 time_t dlg_time = 0;
 
@@ -105,18 +107,22 @@ int sboard_kill()
 void sboard_next()
 {
     LOCK(&SX);
-    if (SL.head != NULL) SL.head = SL.head->next;
-    if (SL.head->pending) SL.head->pending = 0;
-    draw_sb(SL.head, 1);
+    if (SL.head != NULL) {
+        SL.head = SL.head->next;
+        if (SL.head->pending) SL.head->pending = 0;
+        draw_sb(SL.head, 1);
+    }
     UNLOCK(&SX);
 }
 
 void sboard_prev()
 {
     LOCK(&SX);
-    if (SL.head != NULL) SL.head = SL.head->prev;
-    if (SL.head->pending) SL.head->pending = 0;
-    draw_sb(SL.head, 1);
+    if (SL.head != NULL) {
+        SL.head = SL.head->prev;
+        if (SL.head->pending) SL.head->pending = 0;
+        draw_sb(SL.head, 1);
+    }
     UNLOCK(&SX);
 }
 
@@ -133,8 +139,8 @@ void sboard_next_pending()
             SL.head = s;
             draw_sb(SL.head, 1);
         }
+        s->pending = 0;
     }
-    s->pending = 0;
     UNLOCK(&SX);
 }
 
@@ -146,77 +152,94 @@ void sb_blah()
     LOCK(&msn.lock);
     LOCK(&SX);
     sb = SL.head;
-    if (sb != NULL && strlen(sb->input) > 0 && sb->cantype) {
-        strcpy(s, sb->input);
-        sp = s;
-        pthread_setspecific(key_sboard, (void *) sb);
-        if (sp[0] == '/') {
-            if (sp[1] == '/') sp++;
-            else if (sp[1] == ' ') sp += 2; /* secret typing */
-            else {
-                /* special command */
-                char cmd[SXL], args[SXL];
+    if (sb != NULL && strlen(sb->input) > 0) {
+        if (sb->sfd > -1) {
+            strcpy(s, sb->input);
+            sp = s;
+            pthread_setspecific(key_sboard, (void *) sb);
+            if (sp[0] == '/') {
+                if (sp[1] == '/') sp++;
+                else if (sp[1] == ' ') sp += 2; /* secret typing */
+                else {
+                    /* special command */
+                    char cmd[SXL], args[SXL];
 
-                eb_history_add(&SL.head->EB, SL.head->EB.text, strlen(SL.head->EB.text));
-                eb_settext(&SL.head->EB, ZS);
-                draw_sbebox(SL.head, 1);
+                    eb_history_add(&SL.head->EB, SL.head->EB.text, strlen(SL.head->EB.text));
+                    eb_settext(&SL.head->EB, ZS);
+                    draw_sbebox(SL.head, 1);
 
-                cmd[0] = args[0] = 0;
-                sscanf(sp, "%s %[^\n]", cmd, args);
-                if (strcmp(cmd, "/flash") == 0)
-                /* easter egg! */
-                    flash();
-                else if (strcmp(cmd, "/send") == 0) {
-                /* send raw command to server */
-                    sprintf(s, "%s\r\n", args);
-                    Write(sb->sfd, s, strlen(s));
-                } else if ((strcmp(cmd, "/invite") == 0) || (strcmp(cmd, "/i") == 0)) {
-                    msn_cal(sb->sfd, sb->tid++, args);
-                } else if (strcmp(cmd, "/spoof") == 0) {
-                /* make some clients think somebody else is typing! */
-                    msn_msg_typenotif(sb->sfd, sb->tid++, args);
-                } else if (strcmp(cmd, "/beep") == 0) {
-                    msn_msg_gtmess(sb->sfd, sb->tid++, "BEEP", ZS);
-                } else if (strcmp(cmd, "/gtmess") == 0) {
-                    msn_msg_gtmess(sb->sfd, sb->tid++, "GTMESS", ZS);
-                } else if (strcmp(cmd, "/msg") == 0) {
-                    msn_msg_gtmess(sb->sfd, sb->tid++, "MSG", args);
-                    msg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick));
-                    msg(C_MSG, "%s\n", args);
-                } else if (strcmp(cmd, "/dlg") == 0) {
-                    msn_msg_gtmess(sb->sfd, sb->tid++, "DLG", args);
-                    dlg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick));
-                    dlg(C_MSG, "%s\n", args);
-                } else if (strcmp(cmd, "/file") == 0) {
-                    struct stat st;
-                    unsigned int cookie;
-                    if (Config.msnftpd > 0) {
-                        if (stat(args, &st) == 0) {
-                            cookie = lrand48();
-                            xfl_add_file(&XL, XS_INVITE, msn.login, ZS, 0, cookie, sb, args, st.st_size);
-                            msn_msg_finvite(sb->sfd, sb->tid++, cookie, args, st.st_size);
-                        } else msg(C_ERR, "Could not stat file '%s'\n", args);
-                    } else msg(C_ERR, "Cannot send file: MSNFTP server is not running\n");
-                } else msg(C_ERR, "Invalid command\n");
-                UNLOCK(&SX);
-                UNLOCK(&msn.lock);
-                return;
+                    cmd[0] = args[0] = 0;
+                    sscanf(sp, "%s %[^\n]", cmd, args);
+                    if (strcmp(cmd, "/flash") == 0)
+                    /* easter egg! */
+                        flash();
+                    else if (strcmp(cmd, "/send") == 0) {
+                    /* send raw command to server */
+                        sprintf(s, "%s\r\n", args);
+                        Write(sb->sfd, s, strlen(s));
+                    } else if ((strcmp(cmd, "/invite") == 0) || (strcmp(cmd, "/i") == 0)) {
+                        msn_cal(sb->sfd, sb->tid++, args);
+                    } else if (strcmp(cmd, "/spoof") == 0) {
+                    /* make some clients think somebody else is typing! */
+                        msn_msg_typenotif(sb->sfd, sb->tid++, args);
+                    } else if (strcmp(cmd, "/beep") == 0) {
+                        msn_msg_gtmess(sb->sfd, sb->tid++, "BEEP", ZS);
+                    } else if (strcmp(cmd, "/gtmess") == 0) {
+                        msn_msg_gtmess(sb->sfd, sb->tid++, "GTMESS", ZS);
+                    } else if (strcmp(cmd, "/msg") == 0) {
+                        msn_msg_gtmess(sb->sfd, sb->tid++, "MSG", args);
+                        msg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick, Config.aliases));
+                        msg(C_MSG, "%s\n", args);
+                    } else if (strcmp(cmd, "/dlg") == 0) {
+                        msn_msg_gtmess(sb->sfd, sb->tid++, "DLG", args);
+                        dlg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick, Config.aliases));
+                        dlg(C_MSG, "%s\n", args);
+                    } else if (strcmp(cmd, "/file") == 0) {
+                        struct stat st;
+                        unsigned int cookie;
+                        if (Config.msnftpd > 0) {
+                            if (stat(args, &st) == 0) {
+                                cookie = lrand48();
+                                xfl_add_file(&XL, XS_INVITE, msn.login, ZS, 0, cookie, sb, args, st.st_size);
+                                msn_msg_finvite(sb->sfd, sb->tid++, cookie, args, st.st_size);
+                            } else msg(C_ERR, "Could not stat file '%s'\n", args);
+                        } else msg(C_ERR, "Cannot send file: MSNFTP server is not running\n");
+                    } else msg(C_ERR, "Invalid command\n");
+                    UNLOCK(&SX);
+                    UNLOCK(&msn.lock);
+                    return;
+                }
             }
+            if (sb->PL.count == 0) {
+                if (sb->master[0]) { /* call other party again */
+                    msn_cal(sb->sfd, sb->tid++, sb->master);
+                    sb->called = 0;
+                    dlg(C_NORMAL, "Calling other party again, please wait...\n");
+                    UNLOCK(&SX);
+                    UNLOCK(&msn.lock);
+                    return;
+                } else {
+                    msg(C_ERR, "No switchboard participants\n");
+                    UNLOCK(&SX);
+                    UNLOCK(&msn.lock);
+                    return;
+                }
+            }
+            msn_msg_text(sb->sfd, sb->tid++, sp);
+            dlg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick, Config.aliases));
+            dlg(C_MSG, "%s\n", sp);
+            eb_history_add(&SL.head->EB, SL.head->EB.text, strlen(SL.head->EB.text));
+            eb_settext(&SL.head->EB, ZS);
+            draw_sbebox(SL.head, 1);
+        } else  if (sb->multi == 0) { /* reconnect only if not multiuser */
+            char s[SML];
+
+            sprintf(s, "XFR %u SB\r\n", nftid());
+            /* enqueue the request; normally the server will respond in
+               the same order so we do not have to do any request tracking */
+            queue_put(&q_sb_req, 0, sb, 0);
+            Write(msn.nfd, s, strlen(s));
         }
-        if (sb->PL.count == 0 && sb->master[0]) { /* call other party again */
-            msn_cal(sb->sfd, sb->tid++, sb->master);
-            sb->called = 0;
-            dlg(C_NORMAL, "Calling other party again, please wait...\n");
-            UNLOCK(&SX);
-            UNLOCK(&msn.lock);
-            return;
-        }
-        msn_msg_text(sb->sfd, sb->tid++, sp);
-        dlg(C_DBG, "%s says:\n", getnick(msn.login, msn.nick));
-        dlg(C_MSG, "%s\n", sp);
-        eb_history_add(&SL.head->EB, SL.head->EB.text, strlen(SL.head->EB.text));
-        eb_settext(&SL.head->EB, ZS);
-        draw_sbebox(SL.head, 1);
     }
     UNLOCK(&SX);
     UNLOCK(&msn.lock);
@@ -231,25 +254,43 @@ void sb_type(int c)
     LOCK(&msn.lock);
     LOCK(&SX);
     sb = SL.head;
-    if (sb != NULL && sb->cantype) {
-        time(&now);
-        command = (sb->input[0] == '/' &&
-                    ((sb->input[1] && sb->input[1] != '/') || (!sb->input[1] && c != '/'))) ||
-                  (!sb->input[0] && c == '/');
-        if (!command && now - sb->tm_last_char > Config.time_user_types) {
-            sb->tm_last_char = now;
-            if (sb->thrid != -1 && sb->PL.count > 0)
-                msn_msg_typenotif(sb->sfd, sb->tid++, msn.login);
-            if (sb->PL.count == 0 && sb->master[0]) { /* call other party again */
-                msn_cal(sb->sfd, sb->tid++, sb->master);
-                sb->called = 0;
+    if (sb != NULL) {
+            time(&now);
+            command = (sb->input[0] == '/' &&
+                        ((sb->input[1] && sb->input[1] != '/') || (!sb->input[1] && c != '/'))) ||
+                      (!sb->input[0] && c == '/');
+            if (!command && now - sb->tm_last_char > Config.time_user_types) {
+                sb->tm_last_char = now;
+                if (sb->thrid != -1 && sb->PL.count > 0)
+                    msn_msg_typenotif(sb->sfd, sb->tid++, msn.login);
+                if (sb->sfd > -1) {
+                    if (sb->PL.count == 0 && sb->master[0]) { /* call other party again */
+                        msn_cal(sb->sfd, sb->tid++, sb->master);
+                        sb->called = 0;
+                    }
+                } else if (sb->multi == 0) { /* reconnect only if not multiuser */
+                    char s[SML];
+
+                    sprintf(s, "XFR %u SB\r\n", nftid());
+                    /* enqueue the request; normally the server will respond in
+                       the same order so we do not have to do any request tracking */
+                    queue_put(&q_sb_req, 0, sb, 0);
+                    Write(msn.nfd, s, strlen(s));
+                }
             }
-        }
-        eb_keydown(&sb->EB, c);
-        draw_sbebox(sb, 1);
-    } 
+            eb_keydown(&sb->EB, c);
+            draw_sbebox(sb, 1);
+    }
     UNLOCK(&SX);
     UNLOCK(&msn.lock);
+}
+
+void fcopy(FILE *s, FILE *d)
+{
+    size_t k;
+    char buf[4096];
+
+    while ((k = fread(buf, 1, sizeof(buf), s)) > 0) fwrite(buf, 1, k, d);
 }
 
 void sb_cleanup(void *arg)
@@ -261,6 +302,22 @@ void sb_cleanup(void *arg)
     msn_clist_free(&sb->PL);
     sb->thrid = -1;
     sb->tid = 0;
+    if (sb->fp_log != NULL) { /* copy temp log file */
+        if (sb->master[0]) {
+            char tmp[SML];
+            FILE *f;
+            sprintf(tmp, "%s/%s/log/%s", Config.cfgdir, msn.login, sb->master);
+            if ((f = fopen(tmp, "a")) != NULL) {
+                rewind(sb->fp_log);
+                fcopy(sb->fp_log, f);
+                fprintf(f, "\n----------------------------------------\n\n");
+                fclose(f);
+            }
+        }
+        fclose(sb->fp_log);
+        sb->fp_log = NULL;
+        remove(sb->fn_log);
+    }
 }
 
 int scan_error_sb(char *s)
@@ -292,7 +349,7 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
 
     sb->pending = 0;
     if (strchr(arg1, '@') != NULL) url2str(arg2, nick);
-    else sprintf(nick, "<%s>", getnick(arg1, arg1));
+    else sprintf(nick, "<%s>", getnick(arg1, arg1, Config.aliases));
     contype[0] = 0;
     s = strafter(msgdata, "Content-Type: ");
     if (s == NULL) {
@@ -311,7 +368,7 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
         sb->pending = 1;
         
         utf8decode(sb->ic, s, text);
-        dlg(C_DBG, "%s says:\n", getnick(arg1, nick));
+        dlg(C_DBG, "%s says:\n", getnick(arg1, nick, Config.aliases));
         dlg(C_MSG, "%s\n", text);
         free(text);
         
@@ -353,14 +410,14 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
             else if (strcmp(cmd, "MSG") == 0) {
                 char *text = strdup(args);
                 utf8decode(msn_ic[0], args, text);
-                msg(C_DBG, "%s says:\n", getnick(arg1, nick));
+                msg(C_DBG, "%s says:\n", getnick(arg1, nick, Config.aliases));
                 msg(C_MSG, "%s\n", text);
                 free(text);
             } else if (strcmp(cmd, "DLG") == 0) {
                 char *text = strdup(args);
                 utf8decode(sb->ic, args, text);
                 sb->pending = 1;
-                dlg(C_DBG, "%s says:\n", getnick(arg1, nick));
+                dlg(C_DBG, "%s says:\n", getnick(arg1, nick, Config.aliases));
                 dlg(C_MSG, "%s\n", text);
                 free(text);
             }
@@ -404,7 +461,7 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
                     xfl_add_file(&XL, XS_INVITE, msn.login, arg1, 1, cookie, sb, bfname, size);
                     UNLOCK(&XX);
                     sb->pending = 1;
-                    dlg(C_DBG, "%s wants to send you the file '%s', %u bytes long\n", getnick(arg1, nick), fname, size);
+                    dlg(C_DBG, "%s wants to send you the file '%s', %u bytes long\n", getnick(arg1, nick, Config.aliases), fname, size);
                 } else {
                 /* reject all other types of invitations */
                     dlg(C_DBG, msgdata);
@@ -466,9 +523,9 @@ void msn_sb_handle_msgbody(char *arg1, char *arg2, char *msgdata, int len)
 
                 if (x->xclass == XF_FILE) {
                     if (x->incoming)
-                        dlg(C_DBG, "%s is not sending you '%s' any more\n", getnick(arg1, nick), x->data.file.fname);
+                        dlg(C_DBG, "%s is not sending you '%s' any more\n", getnick(arg1, nick, Config.aliases), x->data.file.fname);
                     else
-                        dlg(C_DBG, "%s is not receiving '%s'\n", getnick(arg1, nick), x->data.file.fname);
+                        dlg(C_DBG, "%s is not receiving '%s'\n", getnick(arg1, nick, Config.aliases), x->data.file.fname);
                 }
                 x->status = xs;
             } else {
@@ -498,9 +555,13 @@ void *msn_sbdaemon(void *arg)
     int msglen;
     char *msgdata;
     int r;
+    time_t tm;
 
     pthread_setspecific(key_sboard, arg);
     LOCK(&SX);
+    tm = time(NULL);
+    ctime_r(&tm, s);
+    dlg(C_NORMAL, "Switchboard session begin on %s", s);
     if (sb->called) dlg(C_DBG, "Invitation from <%s>\n", sb->master);
     dlg(C_NORMAL, "Connecting to switchboard %s ...\n", sb->sbaddr);
     sb->sfd = do_connect_sb(sb->sbaddr);
@@ -556,7 +617,7 @@ void *msn_sbdaemon(void *arg)
                                 time(&dlg_time);
                                 unotify("New message\n" , SND_PENDING);
                         }
-                    } else if (SL.head != sb) unotify(ZS, SND_PENDING);
+                    } else if (SL.head != sb) playsound(SND_PENDING);
                     if (SL.head == sb) sb->pending = 0;
                 }
                 
@@ -577,13 +638,12 @@ void *msn_sbdaemon(void *arg)
             LOCK(&SX);
             msn_clist_add(&sb->PL, -1, arg1, nick);
             if (sb->PL.count > 1) sb->multi = 1;
-            if (sb->PL.count >= 0) sb->cantype = 1;
             if (sb->PL.count == 1) {
                 strcpy(sb->master, arg1);
                 strcpy(sb->mnick, nick);
             }
             draw_plst(sb, 0);
-            dlg(C_DBG, "%s <%s> has joined the conversation\n", getnick(arg1, nick), arg1);
+            dlg(C_DBG, "%s <%s> has joined the conversation\n", getnick(arg1, nick, Config.aliases), arg1);
             UNLOCK(&SX);
         } else if (is3(com, "IRO")) {
 
@@ -597,19 +657,19 @@ void *msn_sbdaemon(void *arg)
             msn_clist_add(&sb->PL, -1, arg1, nick);
             draw_plst(sb, 0);
             if (sb->PL.count > 1) sb->multi = 1;
-            dlg(C_DBG, "%d. %s <%s>\n", index, getnick(arg1, nick), arg1);
+            dlg(C_DBG, "%d. %s <%s>\n", index, getnick(arg1, nick, Config.aliases), arg1);
             UNLOCK(&SX);
         } else if (is3(com, "USR")) {
             LOCK(&SX);
-            sb->cantype = 1;
             dlg(C_DBG, "Ready to invite other users\n");
+            if (sb->master[0]) /* auto invite previous user */
+                msn_cal(sb->sfd, sb->tid++, sb->master);
             UNLOCK(&SX);
         } else if (is3(com, "ANS")) {
 
         /* end of initial negotiation */
 
             LOCK(&SX);
-            sb->cantype = 1;
             dlg(C_DBG, "total participants: %d\n", sb->PL.count);
             UNLOCK(&SX);
         } else if (is3(com, "CAL")) {
@@ -660,19 +720,27 @@ void *msn_sbdaemon(void *arg)
             UNLOCK(&SX);
         }
     }
+    tm = time(NULL);
+    ctime_r(&tm, s);
+    dlg(C_ERR, "Disconnected from switchboard on %s", s);
+/*    sb->pending = 1;*/
+/*    snd_play(SND_PENDING);*/
     pthread_cleanup_pop(0);
     LOCK(&SX);
     sb_cleanup(arg);
-/*    sb->pending = 1;*/
-    sb->cantype = 0;
-/*    snd_play(SND_PENDING);*/
     draw_plst(sb, 0);
-    dlg(C_ERR, "Disconnected from switchboard\n");
     if (SL.out_count > 0) SL.out_count--;
     if (SL.out_count == 0) pthread_cond_signal(&SL.out_cond);
     UNLOCK(&SX);
     pthread_detach(pthread_self());
     return NULL;
+}
+
+void sboard_openlog(msn_sboard_t *p)
+{
+    sprintf(p->fn_log, "%s/%s/log/%s", Config.cfgdir, msn.login, p->hash);
+    if ((Config.log_console & 1) == 1) p->fp_log = fopen(p->fn_log, "w+");
+    else p->fp_log = NULL;
 }
 
 msn_sboard_t *msn_sblist_add(msn_sblist_t *q, char *sbaddr, char *hash,
@@ -684,6 +752,7 @@ msn_sboard_t *msn_sblist_add(msn_sblist_t *q, char *sbaddr, char *hash,
     strcpy(p->sbaddr, sbaddr);
     strcpy(p->hash, hash);
     p->called = called;
+    sboard_openlog(p);
 
     p->sessid[0] = 0;
     if (sessid != NULL) strcpy(p->sessid, sessid);
@@ -691,7 +760,6 @@ msn_sboard_t *msn_sblist_add(msn_sblist_t *q, char *sbaddr, char *hash,
     strcpy(p->master, master);
     strcpy(p->mnick, mnick);
     p->multi = 0;
-    p->cantype = 0;
 
     p->w_dlg.w = W_DLG_W;
     p->w_dlg.h = W_DLG_H;

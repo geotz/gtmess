@@ -1,8 +1,8 @@
 /*
- *    queue.h
+ *    sound.h
  *
- *    queue data structure
- *    Copyright (C) 2002-2003  George M. Tzoumas
+ *    gtmess - MSN Messenger client
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -19,28 +19,19 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#ifndef _QUEUE_H_
-#define _QUEUE_H_
+#ifndef __SOUND_H__
+#define __SOUND_H__
 
-typedef struct qelem_s {
-    void *data;
-    int size;
-    int type;
-    
-    struct qelem_s *next;
-} qelem_t;
+#include<pthread.h>
 
-typedef struct {
-    qelem_t *head;
-    qelem_t *tail;
-    int count;
-} xqueue_t; /* those guys at SUN came up first with the name 'queue_t' :-( */
+typedef enum {SND_NONE, SND_BEEP, SND_ONLINE, SND_OFFLINE, SND_NEWMAIL,
+        SND_PENDING, SND_RING, SND_LOGOUT } snd_t;
 
-void queue_init(xqueue_t *q);
-void queue_free(xqueue_t *q);
-void qelem_free(qelem_t *e);
+extern pthread_cond_t cond_snd;
+extern pthread_mutex_t lock_snd;
 
-int queue_put(xqueue_t *q, int type, void *data, int size);
-qelem_t *queue_get(xqueue_t *q);
+extern snd_t sound_effect;
+
+void sound_init();
 
 #endif

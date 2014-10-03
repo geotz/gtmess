@@ -2,7 +2,7 @@
  *    gtmess.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -24,22 +24,20 @@
 TODO LIST
 =========
 
-DELETE EVERYTHING AND WRITE THE CLIENT FROM SCRATCH USING C++ :-)
+DELETE EVERYTHING AND WRITE THE CLIENT FROM SCRATCH IN C++ :-)
 
-
-planned for next version 0.91 or 0.92
--------------------------------------
-FLN: contact_rename = 0: never, 1: when nick < email, 2:always
-allow mult-line input or \xx sequences
+[TEST/WIP]
+update manpage of gtmess
 full console (sb & notification) logging
-advertise (don't freak, it's not adware, you'll just be able
-to tell your friends where to get this cool client from! :-))
-gtmess-notify: write manpage
 gtmess-gw command-line args to change default net addresses
-reconnect to sb even if connection has been closed
+FLN: update_nicks = 0: never, 1: when nick < email, 2:always
+SOUND
 
 MAYBE in SOME future version
 ----------------------------
+allow multi-line input or \xx sequences
+ignore list (uninvitable)
+auto file accept
 use MSNP9 ClientIP info
 runtime CVR
 use wcsrtombs to determine max buf size
@@ -59,6 +57,8 @@ auto PNG QNG (keep connection alive!)
 use iconv() at invitation messages, too!
 phone numbers
 add global ui command line
+application/x-msmsgp2p ??
+advertise
 
 if I ever have TOO MUCH FREE TIME 
 and there are no other features to add :-)
@@ -144,7 +144,13 @@ static struct cfg_entry ConfigTbl[] =
     {"auto_login", "", 1, 1, 0, 1},
     {"invitable", "", 1, 1, 0, 1},
     {"gtmesscontrol_ignore", "", 0, 0, 0, 0},
-    {"max_nick_len", "", 0, 1, 0, 1024}
+    {"max_nick_len", "", 0, 1, 0, 1024},
+    {"log_console", "", 0, 1, 0, 3},
+    {"notif_aliases", "", 0, 1, 0, 1},
+    {"update_nicks", "", 0, 1, 0, 2},
+    {"snd_dir", "*data*", 0, 0, 0, 0},
+    {"snd_exec", "/usr/bin/aplay -Nq %", 0, 0, 0, 0},
+    {"snd_redirect", "", 3, 1, 0, 3}
   };
 
 struct cfg_entry *OConfigTbl;
@@ -258,14 +264,14 @@ void sched_draw_lst(time_t after)
 {
     time_t newt;
     
-    pthread_mutex_lock(&i_draw_lst_lock);
+    LOCK(&i_draw_lst_lock);
     newt = time(NULL) + after;
     if (i_draw_lst_handled) {
         i_draw_lst_handled = 0;
         i_draw_lst_time_start = newt;
         i_draw_lst_time_end = newt;
     } else if (newt > i_draw_lst_time_end) i_draw_lst_time_end = newt;
-    pthread_mutex_unlock(&i_draw_lst_lock);
+    UNLOCK(&i_draw_lst_lock);
 }
 
 void *interval_daemon(void *dummy)
@@ -278,13 +284,13 @@ void *interval_daemon(void *dummy)
         
         calc_time();
         
-        pthread_mutex_lock(&i_draw_lst_lock);
+        LOCK(&i_draw_lst_lock);
         time(&now);
         if (!i_draw_lst_handled) {
             if (now >= i_draw_lst_time_start) draw_lst(1);
             if (now >= i_draw_lst_time_end) i_draw_lst_handled = 1;
         }
-        pthread_mutex_unlock(&i_draw_lst_lock);
+        UNLOCK(&i_draw_lst_lock);
         
         draw_time(1);
         
@@ -311,16 +317,25 @@ void panic(char *s)
     _exit(128);
 }
 
-char *getnick(char *login, char *nick)
+char *getalias(char *login)
+{
+    char *alias;
+    
+    alias = hash_tbl_find(&Aliases, login);
+    if (alias == NULL) return "<none>";
+    else return alias;
+}
+
+char *getnick(char *login, char *nick, int flag)
 {
     char *alias;
     int maxlen;
     
-    if (login == NULL || Config.aliases == 0) return nick;
+    if (login == NULL || flag == 0) return nick;
     if ((alias = hash_tbl_find(&Aliases, login)) != NULL) {
         maxlen = Config.max_nick_len;
-        if (maxlen == 0) maxlen = w_lst.w-1;
-        if (Config.aliases == 2 || 
+        if (maxlen == 0) maxlen = w_lst.w-3;
+        if (flag == 2 || 
             strstr(nick, login) != NULL || strlen(nick) > maxlen) return alias;
         else return nick;
     } else {
@@ -430,7 +445,7 @@ int do_login()
     int r;
     char hash[SXL];
     char dalogin[SXL], ticket[SXL];
-/*    char udir[SML];*/
+    char udir[SML];
 
     msg(C_NORMAL, "Connecting to server %s ...\n", msn.notaddr);
     msn.nfd = do_connect(msn.notaddr);
@@ -467,8 +482,10 @@ int do_login()
     msg(C_MSG, "Login successful\n");
     
     /* create user data dir */
-/*    sprintf(udir, "%s/%s", Config.cfgdir, msn.login);
-    mkdir(udir, 0700);*/
+    sprintf(udir, "%s/%s", Config.cfgdir, msn.login);
+    mkdir(udir, 0700);
+    sprintf(udir, "%s/%s/log", Config.cfgdir, msn.login);
+    mkdir(udir, 0700);
     
     pthread_create(&msn.thrid, NULL, msn_ndaemon, (void *) NULL);
 /*    pthread_detach(msn.thrid);*/
@@ -513,7 +530,7 @@ void print_usage(char *argv0)
                     "\n"
                     "config vars, <n>=int, <s>=str, <b>=bool(1/0), []=default\n"
                     "--------------------------------------------------------\n"
-                    "aliases=<n>\t\tuse contact aliases [1], 0=disabled, 1=smart, 2=always\n"
+                    "aliases=<n>\t\tuse contact aliases [1], 0=never, 1=smart, 2=always\n"
                     "auto_login=<b>\t\tauto-login on startup [1]\n"
                     "cert_prompt=<b>\t\tprompt on unverified certificates (SSL) [1]\n"
                     "colors=<n>\t\tcolor mode [0]\n\t\t\t0=auto, 1=color, 2=mono\n"
@@ -529,24 +546,33 @@ void print_usage(char *argv0)
                     "invitable=<b>\t\tallow others to invite you to conversations [1]\n"
                     "login=<s>\t\tdefault login account\n"
                     "log_traffic=<b>\t\tlog network traffic [0]\n"
+                    "log_console=<n>\t\tlog console messages [0], 0=none, 1=sb, 2=ns, 3=both\n"
                     "max_nick_len=<n>\tmax nickname length before use of alias [0], 0=fit\n"
                     "msg_debug=<n>\t\thandle unknown msgs [0], 0 = ignore,\n"
                     "\t\t\t1 = show type, 2 = show whole msg\n"
                     "msg_notify=<n>\t\textra notification on received messages [1],\n"
                     "\t\t\t0=never, 1=when idle, or when <n> seconds have passed\n"
                     "msnftpd=<n>\t\tport of msnftp server [6891], 0=disable\n"
+                    "notif_aliases=<n>\taliases in notif win [0], 0=never, 1=smart, 2=always\n"
                     "online_only=<b>\t\tshow only online contacts [0]\n"
                     "password=<s>\t\tdefault password\n"
                     "popup=<b>\t\tenable/disable popup notification window [1]\n"
                     "server=<s>[:<n>]\tdispatch/notification server (optional port)\n"
-                    "syn_cache=<b>\t\tcache contact/group lists [0]\n"
+                    "snd_dir=<s>\t\tdirectory for sound effects [*data*]\n"
+                    "snd_exec=<s>\t\tcommand line for sound player\n"
+                    "\t\t\t[%s]\n"
+                    "snd_redirect=<s>\t\tredirect stdout/err of player to /dev/null [3]\n"
+                    "\t\t\t0=none, 1=stdout, 2=stderr, 3=both\n"
                     "sound=<n>\t\tsound mode [1]\n"
                     "\t\t\t<n> = 0 for no sound, 1 for beep, 2 for sound effects\n"
+                    "syn_cache=<b>\t\tcache contact/group lists [0]\n"
                     "time_user_types=<n>\tinterval of typing notifications [%d]\n"
+                    "update_nicks=<n>\tupdate nicknames on server [0]\n"
+                    "\t\t\t0=never, 1=smart, 2=always\n"
                     "\n"
                     "EXAMPLE:\n"
                     "\t%s -Ologin=george -Opassword=secret123 -Oinitial_status=1\n",
-             argv0, ConfigTbl[4].ival, argv0);
+             argv0, ConfigTbl[28].sval, ConfigTbl[4].ival, argv0);
 }
 
 int export_nicks()
@@ -736,9 +762,19 @@ void config_init()
     Config.invitable = ConfigTbl[c++].ival;
     strcpy(Config.gtmesscontrol_ignore, ConfigTbl[c++].sval);
     Config.max_nick_len = ConfigTbl[c++].ival;
+    Config.log_console = ConfigTbl[c++].ival;
+    Config.notif_aliases = ConfigTbl[c++].ival;
+    Config.update_nicks = ConfigTbl[c++].ival;
+    strcpy(Config.snd_dir, ConfigTbl[c++].sval);
+    strcpy(Config.snd_exec, ConfigTbl[c++].sval);
+    Config.snd_redirect = ConfigTbl[c++].ival;
     NumConfigVars = c;
     
     sprintf(Config.datadir, "%s", DATADIR);
+    
+    if (strcmp(Config.snd_dir, "*data*") == 0) 
+        sprintf(Config.snd_dir, "%s/snd", Config.datadir);
+    
     strcpy(Config.ca_list, "./root.pem");
     if (!file_exists(Config.ca_list)) {
         sprintf(Config.ca_list, "%s/root.pem", Config.cfgdir);
@@ -827,9 +863,9 @@ int menu_clist(pthread_mutex_t *lock, msn_clist_t *q, msn_contact_t *con, int sh
     while (1) {
         if (showgrp)
             msg2(C_MNU, "[%d] (%d/%d) %s <%s>",
-                    a[i]->gid, i+1, count, getnick(a[i]->login, a[i]->nick), a[i]->login);
+                    a[i]->gid, i+1, count, getnick(a[i]->login, a[i]->nick, Config.aliases), a[i]->login);
         else
-            msg2(C_MNU, "(%d/%d) %s <%s>", i+1, count, getnick(a[i]->login, a[i]->nick), a[i]->login);
+            msg2(C_MNU, "(%d/%d) %s <%s>", i+1, count, getnick(a[i]->login, a[i]->nick, Config.aliases), a[i]->login);
         if (c == ' ' || c == '\r') break;
         switch (c = getch()) {
             case KEY_RESIZE: redraw_screen(1); break;
@@ -845,13 +881,13 @@ int menu_clist(pthread_mutex_t *lock, msn_clist_t *q, msn_contact_t *con, int sh
             case KEY_END: i = count - 1; break;
             case 'l':
                 if (showgrp) for (j = 0; j < count; j++)
-                    msg(C_NORMAL, "%2d. [%d] %s <%s>\n", j + 1, a[j]->gid, getnick(a[j]->login, a[j]->nick), a[j]->login);
+                    msg(C_NORMAL, "%2d. [%d] %s <%s>\n", j + 1, a[j]->gid, getnick(a[j]->login, a[j]->nick, Config.aliases), a[j]->login);
                 else for (j = 0; j < count; j++)
-                    msg(C_NORMAL, "%2d. %s <%s>\n", j + 1, getnick(a[j]->login, a[j]->nick), a[j]->login);
+                    msg(C_NORMAL, "%2d. %s <%s>\n", j + 1, getnick(a[j]->login, a[j]->nick, Config.aliases), a[j]->login);
                 break;
             case 'q':
                 msg(C_NORMAL, "NICK: %s\n", a[i]->nick);
-                msg(C_NORMAL, "ALIAS: %s\n", getnick(a[i]->login, a[i]->nick));
+                msg(C_NORMAL, "ALIAS: %s\n", getalias(a[i]->login));
                 msg(C_NORMAL, "LOGIN: %s\n", a[i]->login);
                 if (q == &msn.FL) {
                     msg(C_NORMAL, "STATUS: %s\n", msn_stat_name[a[i]->status]);
@@ -939,19 +975,23 @@ void menu_change_name(char *login, char *old)
         msn_rea(msn.nfd, nftid(), login, newn);
 }
 
+void do_invite(msn_contact_t *p)
+{
+    LOCK(&SX);
+    if (SL.head == NULL || SL.head->sfd == -1) {
+        UNLOCK(&SX);
+        msg(C_ERR, "Not in a switchboard session\n");
+    } else {
+        msn_cal(SL.head->sfd, SL.head->tid++, p->login);
+        UNLOCK(&SX);
+    }
+}
+
 void menu_invite()
 {
     msn_contact_t p;
-    if (menu_clist(&msn.lock, &msn.FL, &p, 1, cfilt_online) >= 0) {
-        LOCK(&SX);
-        if (SL.head == NULL || !SL.head->cantype) {
-            UNLOCK(&SX);
-            msg(C_ERR, "Not in a switchboard session\n");
-        } else {
-            msn_cal(SL.head->sfd, SL.head->tid++, p.login);
-            UNLOCK(&SX);
-        }
-    }
+    if (menu_clist(&msn.lock, &msn.FL, &p, 1, cfilt_online) >= 0) 
+        do_invite(&p);
 }
 
 void menu_lists()
@@ -979,7 +1019,7 @@ void menu_lists()
                         break;
                     case 'b':
                         if (inBL)
-                            msg(C_ERR, "%s <%s> is already blocked\n", getnick(p.login, p.nick), p.login);
+                            msg(C_ERR, "%s <%s> is already blocked\n", getnick(p.login, p.nick, Config.aliases), p.login);
                         else {
                             if (inAL) msn_rem(msn.nfd, nftid(), 'A', p.login, -1);
                             msn_add(msn.nfd, nftid(), 'B', p.login, -1);
@@ -987,7 +1027,7 @@ void menu_lists()
                         break;
                     case 'u':
                         if (!inBL)
-                            msg(C_ERR, "%s <%s> is not blocked\n", getnick(p.login, p.nick), p.login);
+                            msg(C_ERR, "%s <%s> is not blocked\n", getnick(p.login, p.nick, Config.aliases), p.login);
                         else {
                             msn_rem(msn.nfd, nftid(), 'B', p.login, -1);
                             msn_add(msn.nfd, nftid(), 'A', p.login, -1);
@@ -1012,14 +1052,7 @@ void menu_lists()
                         }
                         break;
                     case 'i':
-                        LOCK(&SX);
-                        if (SL.head == NULL || !SL.head->cantype) {
-                            UNLOCK(&SX);
-                            msg(C_ERR, "Not in a switchboard session\n");
-                        } else {
-                            msn_cal(SL.head->sfd, SL.head->tid++, p.login);
-                            UNLOCK(&SX);
-                        }
+                        do_invite(&p);
                         break;
                 }
             }
@@ -1104,12 +1137,12 @@ void menu_lists()
 
 void menu_msn_options()
 {
-    int c, i;
+    int c, key, i;
     char optline[SML], tmp[SML];
     FILE *cfg_fp;
 
-    msg2(C_MNU, "(R)L prompt  (A)ll others  (V)ar  (Q)uery  (W)rite");
-    switch (tolower(getch())) {
+    msg2(C_MNU, "(R)L prompt  (A)ll others  (V)ar  (Q)uery  (W)rite  (1)-(6) Sound test");
+    switch (key = tolower(getch())) {
         case KEY_RESIZE: redraw_screen(1); break;
         case 'r':
             if (msn.nfd == -1) {
@@ -1181,6 +1214,14 @@ void menu_msn_options()
                 fclose(cfg_fp);
                 msg(C_DBG, "-- end cfg (written) --\n");
             }
+            break;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+            playsound(key-'1' + 2);
             break;
     }
 }
@@ -1271,6 +1312,22 @@ int log_in(int startup)
     return -1;
 }
 
+int do_update_nicks()
+{
+    int c = 0;
+    if (Config.update_nicks) {
+        msn_contact_t *p;
+        for (p = msn.FL.head; p != NULL; p = p->next)
+        if (p->dirty && (Config.update_nicks == 2 || Config.update_nicks == 1 && 
+            strstr(p->nick, p->login) == NULL)) {
+                msg(C_DBG, "Renaming <%s> to %s\n", p->login, p->nick);
+                msn_rea(msn.nfd, nftid(), p->login, p->nick);
+                c++;
+        }
+    }
+    return c;
+}
+
 void log_out(int panic)
 {
     int retcode = 0;
@@ -1280,7 +1337,8 @@ void log_out(int panic)
     sboard_leave_all(panic);
     if (msn.nfd == -1) return;
     if (panic == 0) {
-        timeout = nowplus(5);
+        retcode = do_update_nicks();
+        timeout = nowplus(5+retcode/2);
         msg(C_NORMAL, "Logging out...\n");
         LOCK(&msn.lock);
     }
@@ -1369,6 +1427,9 @@ void sboard_new()
     char s[SML];
 
     sprintf(s, "XFR %u SB\r\n", nftid());
+    /* enqueue the request; normally the server will respond in
+       the same order so we do not have to do any request tracking */
+    queue_put(&q_sb_req, 0, NULL, 0);
     Write(msn.nfd, s, strlen(s));
 }
 
@@ -1418,6 +1479,7 @@ void load_aliases()
             } /* not comment */
         } /* not eof */
         msg(C_DBG, "Loaded %d alias%s\n", c, (c>1)?"es": "");
+        fclose(f);
     } /* file exists */
 }
 
@@ -1441,7 +1503,7 @@ int main(int argc, char **argv)
 {
     int c, paste;
     
-    sprintf(copyright_str, "gtmess, version %s (%s), (c) 2002-2004 by George M. Tzoumas", VERSION, VDATE);
+    sprintf(copyright_str, "gtmess, version %s (%s), (c) 2002-2005 by George M. Tzoumas", VERSION, VDATE);
     printf("%s\n", copyright_str);
     
     setup_cfg_dir();
@@ -1481,6 +1543,9 @@ int main(int argc, char **argv)
     pthread_key_create(&key_sboard, NULL);
     pthread_setspecific(key_sboard, NULL);
     
+    q_sb_req.head = q_sb_req.tail = NULL;
+    q_sb_req.count = 0;
+    
     pass_init();
     unotif_init(Config.sound, Config.popup);
     
@@ -1496,7 +1561,7 @@ int main(int argc, char **argv)
     msg(C_DBG, 
         "gtmess version %s (%s)\n"
         "MSN Messenger Client for UNIX Console\n"
-        "(c) 2002-2004 by George M. Tzoumas\n"
+        "(c) 2002-2005 by George M. Tzoumas\n"
         "gtmess is free software, covered by the\nGNU General Public License.\n"
         "There is absolutely no warranty for gtmess.\n\n", VERSION, VDATE);
 

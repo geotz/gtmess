@@ -1,0 +1,67 @@
+.TH gtmess-notify 1 "March 15, 2005" "" "gtmess messenger notification popups"
+
+.SH NAME
+gtmess-notify - popup notification windows
+
+.SH SYNOPSIS
+gtmess-notify
+
+.SH DESCRIPTION
+.PP
+gtmess-notify is a simple Tcl/Tk script that pops up notification
+windows starting from the lower right corner of the screen. 
+The script watches a named pipe for new lines and displays the contents of
+each line in a separate popup window.
+It was written as a companion to the
+.B gtmess
+messenger client, but could be of general use.
+
+.SH EXAMPLE
+
+First we start our daemon:
+
+$ gtmess-notify &
+
+Then we can popup anything, like:
+
+$ echo "hello world" > ~/.gtmess/notify.pip
+
+However, the script terminates when the last client closes
+the pipe. So we 'd better keep it open.
+Or we can just run gtmess :-)
+
+$ gtmess-notify &
+.br
+some_other_terminal> gtmess
+.br
+$ echo "now" > ~/.gtmess/notify.pip
+.br
+$ echo "it works!" > ~/.gtmess/notify.pip
+
+.SH FILES
+.TP
+.B ~/.gtmess/notify.pip
+The named pipe where the text to be displayed is read from.
+
+.SH SEE ALSO
+.BR gtmess "(1), "
+.BR gtmess-gw "(1)"
+
+.SH CREDITS
+
+Inspired from the aMSN messenger client.
+
+.SH AUTHORS
+
+gtmess-notify - popup notification windows
+.br
+Copyright (C) 2002-2004  George M. Tzoumas
+
+.PP
+This script is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+.PP
+The source code of this script is ABSOLUTELY FREE.
+You can do whatever you want with it ;-)

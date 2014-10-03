@@ -2,7 +2,7 @@
  *    nserver.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -45,6 +45,10 @@ typedef struct {
     
     int flskip; /* FL list line skip (for display) */
     pthread_mutex_t lock;
+    
+    FILE *fp_log; /* log file pointer */
+    char fn_log[SML]; /* log file name */
+    
 
     /* session */
     unsigned int tid;

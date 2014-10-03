@@ -1,4 +1,18 @@
 *******************************
+* Version 0.91 (18 Mar 2005)  * 
+*******************************
+! fixed contact list alias display (fit width)
+! fixed segfault on F1/F2/F3 when no sb window open
++ reconnect and reinvite on existing sb windows
++ new window bar
++ full console (switchboard & notification) logging [log_console]
+* enable/disable aliases in notification window [notif_aliases]
++ gtmess-gw command-line args to change default net addresses
++ automatic update of contact nicknames on server (upon logout) [update_nicks]
++ sound support (external player) [snd_dir, snd_exec, snd_redirect]
++ new icons
+
+*******************************
 * Version 0.9 (19 Dec 2004)   * 
 *******************************
 * updated documentation
@@ -30,10 +44,10 @@
 + auto-login on startup
 + ability to be un-invitable to a switchboard (only YOU can invite)
 + gtmess specific messages (BEEP, GTMESS, MSG, DLG)
-+ configuration variables can be queried/modified/saved in runtime
++ configuration variables can be queried/modified/saved at runtime
 + more configuration variables
 * modified some semantics/defaults of existing cfg vars
-! if out-of-bounds value is given to a var, assume max value (instead of min)
+! if out-of-upper-bound value is given to a var, assume max value (not min)
 ! if initial status is FLN then don't send it to server
 * improved & utf-8 compatible word wrap
 + user note facility
@@ -92,6 +106,6 @@
 
 Legend:
 ! bugfix
-* change/update
-+ add
-- remove
+* change/modification/update
++ addition
+- removal

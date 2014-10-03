@@ -2,7 +2,7 @@
  *    gtmess-gw.c
  *
  *    gtmess-gw - MSN Messenger HTTP Gateway
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -68,7 +68,7 @@ typedef struct sbentry_s {
 
 sbentry_t *sb_hlist;
 
-int verbose;
+int verbose = 0;
 
 void panic(char *s)
 {
@@ -535,11 +535,52 @@ void *NotifServer(void *arg)
     return NULL;
 }
 
+void print_usage(int code)
+{
+    fprintf(stderr, 
+            "gtmess-gw - MSN messenger HTTP gateway\n"
+            "usage:\n"
+            "\tgtmess-gw [options]\n"
+            "options:\n"
+            "-h:\tthis help\n"
+            "-v:\tverbose mode, write error messages to stderr\n"
+            "-s <msn_server>[:<port>]:\n\tdefault is %s\n"
+            "-g <gateway_server>:\n\tdefault is %s\n" 
+            "-n <notification_server>:\n\tdefault is %s\n", 
+            msn_init_addr, msn_gateway_addr, msn_notif_addr);
+    _exit(code);
+}
+
 int main(int argc, char **argv)
 {
     daemon_t notif, sb;
+    int c;
     
-    verbose = (argc == 2 && strcmp(argv[1], "-v") == 0);
+    while ((c = getopt(argc, argv, "hvs:g:n:")) != -1) {
+        switch (c) {
+            case 'v': 
+                verbose = 1; 
+                break;
+            case 'h':
+                print_usage(0);
+                break;
+            case '?':
+                print_usage(1);
+                break;
+            case 's': 
+                strncpy(msn_init_addr, optarg, SML-1);
+                msn_init_addr[SML-1] = 0;
+                break;
+            case 'g':
+                strncpy(msn_gateway_addr, optarg, SML-1);
+                msn_gateway_addr[SML-1] = 0;
+                break;
+            case 'n':
+                strncpy(msn_notif_addr, optarg, SML-1);
+                msn_notif_addr[SML-1] = 0;
+                break;
+        }
+    }
     
     notif.port = notif_port;
     notif.backlog = 10;

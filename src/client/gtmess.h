@@ -2,7 +2,7 @@
  *    gtmess.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -65,6 +65,12 @@ typedef struct {
     int invitable;
     char gtmesscontrol_ignore[SCL];
     int max_nick_len;
+    int log_console;
+    int notif_aliases;
+    int update_nicks;
+    char snd_dir[SCL];
+    char snd_exec[SCL];
+    int snd_redirect;
     
     char cfgdir[SCL];
     char datadir[SCL];
@@ -82,7 +88,7 @@ void *Malloc(size_t size);
 int Write(int fd, void *buf, size_t count);
 
 unsigned int nftid();
-char *getnick(char *login, char *nick);
+char *getnick(char *login, char *nick, int flag);
 struct timespec nowplus(int seconds);
 
 void read_syn_cache_data();

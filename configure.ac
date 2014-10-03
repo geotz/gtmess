@@ -1,5 +1,5 @@
 dnl    gtmess - MSN Messenger client
-dnl    Copyright (C) 2002-2004  George M. Tzoumas
+dnl    Copyright (C) 2002-2005  George M. Tzoumas
 dnl
 dnl    This program is free software; you can redistribute it and/or modify
 dnl    it under the terms of the GNU General Public License as published by
@@ -24,8 +24,8 @@ dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT
 PACKAGE="gtmess"
-VERSION="0.9"
-VDATE="19 Dec 2004"
+VERSION="0.91"
+VDATE="18 Mar 2005"
 AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
 AM_CONFIG_HEADER(src/config.h)
 AC_CONFIG_SRCDIR(src/client/gtmess.c)

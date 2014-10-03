@@ -2,7 +2,7 @@
  *    editbox.c
  *
  *    editbox control for curses
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -158,6 +158,26 @@ void eb_history_add(ebox_t *e, char *s, int len)
     hlist_add(&e->HL, s, len, -1);
 }
 
+void eb_zap(ebox_t *e)
+{
+    e->esc = 0;
+    wmemset(e->wtext, 0, e->nc);
+    e->sl = e->ii = e->bl = 0;
+    eb_flush(e);
+}
+
+void eb_cut(ebox_t *e)
+{
+    e->esc = 0;
+    if (e->mask) return;
+    wcsncpy(clipboard, e->wtext, CBL);
+    clipboard[CBL-1] = 0;
+    wmemset(e->wtext, 0, e->nc);
+    e->sl = e->ii = 0;
+    eb_flush(e);
+    e->bl = strlen(e->text);
+}
+
 int eb_keydown(ebox_t *e, int key)
 {
     switch (key) {
@@ -218,6 +238,9 @@ int eb_keydown(ebox_t *e, int key)
                 }
             }
             break;
+        case 25: /* ^Y - cut */
+            eb_cut(e);
+            break;
         case 1: /* ^A - word left */
             if (e->ii > 0) {
                 while ((e->ii) && (e->wtext[--e->ii]<48));
@@ -272,21 +295,11 @@ int eb_keydown(ebox_t *e, int key)
                     break;
                 case 'x':
                 case 'X': /* cut */
-                    e->esc = 0;
-                    if (e->mask) break;
-                    wcsncpy(clipboard, e->wtext, CBL);
-                    clipboard[CBL-1] = 0;
-                    wmemset(e->wtext, 0, e->nc);
-                    e->sl = e->ii = 0;
-                    eb_flush(e);
-                    e->bl = strlen(e->text);
+                    eb_cut(e);
                     break;
                 case 'z':
                 case 'Z': /* zap */
-                    e->esc = 0;
-                    wmemset(e->wtext, 0, e->nc);
-                    e->sl = e->ii = e->bl = 0;
-                    eb_flush(e);
+                    eb_zap(e);
                     break;
                 case 'c':
                 case 'C': /* copy */

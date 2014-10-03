@@ -98,17 +98,18 @@ arrow left/right	navigation left/right
 home/end		navigation home/end
 insert			toggle insert mode
 delete			delete character at cursor (and move rest to the left)
-^T			delete word
 ^A			word left
 ^D			word right
+^T			delete word
+^Y			cut line to clipboard (same as ^K-X)
 backspace/^H		delete character at the left
 ESC			cancel
 ENTER			exit edit mode and save string
 arrow up/down           recall previous/next line from history
 ^K			enter clipboard mode (escape mode)
 * clipboard mode
-	C		copy whole line to clipboard
 	B		set block begin
+	C		copy whole line to clipboard
 	K		copy from block begin to current pos
 	V		paste clipboard contents
 	X		cut line to clipboard
@@ -158,6 +159,7 @@ gtmess-gw - HTTP gateway for MSN Messenger Clients
 	gtmess-gw (better in another terminal or in the background)
     2) start gtmess
 	gtmess -Oserver=127.0.0.1
+* -h option shows mini help
 
 ******************************************
 gtmess-notify - popup notification windows

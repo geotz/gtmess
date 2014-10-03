@@ -1,4 +1,4 @@
-.TH gtmess 1 "December 19, 2004" "" "gtmess messenger"
+.TH gtmess 1 "March 18, 2005" "" "gtmess messenger"
 
 .SH NAME
 gtmess - MSN messenger client
@@ -11,7 +11,7 @@ gtmess [options]
 gtmess is an MSN messenger client, which allows you to use
 the MSN messenger service. It is a console application that
 uses the curses library to present a friendly user interface.
-This manpage corresponds to version 0.9.
+This manpage corresponds to version 0.91.
 
 .SH OPTIONS
 .TP
@@ -55,8 +55,11 @@ displayed. User-defined contact aliases are stored into
 .B ~/.gtmess/aliases 
 (see the
 .B FILES
-section). The default value is
-.BR 1.
+section). This variable affects the use of aliases everywhere but the notification
+window. See also the
+.B notif_aliases
+variable. The default value is
+.BR 1 .
 
 .TP
 .BI auto_login "" = B
@@ -67,7 +70,7 @@ and
 .B password
 variables are nonempty.
 The default value is
-.BR 1.
+.BR 1 .
 
 .TP
 .BI cert_prompt "" = B
@@ -107,7 +110,7 @@ the user is asked if the login process should continue,
 when the common name does not match the host name upon
 the initialization of an SSL connection.
 The default value is
-.BR 1.
+.BR 1 .
 
 .TP
 .BI console_encoding "" = S
@@ -215,6 +218,16 @@ The default value is
 .BR 0 .
 
 .TP
+.BI log_console "" = N
+Sets console logging level. 0 disables logging, 1 enables switchboard window logging,
+2 enables notification window logging, and 3 enables both. Log files are stored into
+.BI ~/.gtmess/ account /log/
+in a per-contact scheme. The notification window messages are stored in the special
+file
+.BR _nserver.log .
+This option is disabled by default.
+
+.TP
 .BI max_nick_len "" = N
 Specifies the maximum allowed nickname length before displaying the alias.
 If
@@ -222,7 +235,7 @@ If
 is 0, then aliases are displayed only if the nickname does not fit on a single
 line of the contact list window.
 The default value is
-.BR 0.
+.BR 0 .
 
 .TP
 .BI msg_debug "" = N
@@ -236,7 +249,7 @@ is 1, then the type of the message is displayed, and if
 is 2, the whole message is displayed. This option
 is useful for development purposes.
 The default value is
-.BR 0.
+.BR 0 .
 
 .TP
 .BI msg_notify "" = N
@@ -266,10 +279,19 @@ The default value is
 .BR 6891 .
 
 .TP
+.BI notif_aliases "" = N
+This variable has exactly the same meaning as the
+.B aliases
+variable. It affects the use of aliases in the notification window.
+The default value is
+.BR 0 .
+
+
+.TP
 .BI online_only "" = B
 If enabled, only contacts with online status are shown on the screen.
 The default value is
-.BR 0.
+.BR 0 .
 
 .TP 
 .BI password "" = S
@@ -280,7 +302,7 @@ Sets the default password.
 Enables/disables the popup notification window at the lower right corner of
 the screen. This is an external Tcl/Tk script.
 The default value is
-.BR 1.
+.BR 1 .
 
 .TP
 .BI server "" = S
@@ -294,14 +316,50 @@ The default value is
 .BR messenger.hotmail.com .
 
 .TP
+.BI snd_dir "" = S
+Sets the location of the sound effect (.wav) files. The default
+value is
+.B *data*
+which corresponds to the
+.B snd/
+directory in the data prefix, usually
+.BR /usr/local/share/gtmess .
+
+.TP
+.BI snd_exec "" = S
+Sets the playback program for the sound effects. The default
+value is
+.B /usr/bin/aplay -Nq %
+which corresponds to the playback utility of the ALSA system.
+Note that this string is parsed in a naive way. Therefore, each
+argument should be separated by exactly one space character and there is no 
+form of escape sequence for space characters. The percent character
+substitutes to the full path of the audio file in the sound effects directory.
+
+.TP
+.BI snd_redirect "" = N
+Redirects standard output and standard error streams of the sound player into 
+.BR /dev/null .
+A value of 0 performs no redirection, 1 redirects stdout, 2 redirects stderr and
+3 redirects both. The default value is
+.BR 3 .
+
+.TP
 .BI sound "" = N
 Sets sound mode.
 .I N
 can be 0, 1 or 2. 0 disables all sound, 1 produces always a (console) beep,
-while 2 plays sound effects (through a sound device).
+while 2 plays sound effects (through a sound device using an external utility).
 The default value is
 .B 1
 (beep).
+There are 6 sound effects that correspond to various events (guess from the name):
+.BR online.wav ,
+.BR offline.wav ,
+.BR newemail.wav ,
+.BR type.wav ,
+.BR ring.wav ,
+.BR meout.wav .
 
 .TP
 .BI syn_cache "" = B
@@ -310,33 +368,72 @@ seems to have no meaning nowadays, as the msn server always rejects the cached v
 of the list. It has been disabled in this version of the client and will be removed
 completely in the future.
 The default value is
-.BR 0.
+.BR 0 .
 
 .TP
 .BI time_user_types "" = N
 Sets how often typing notifications are sent. It is the time interval in seconds.
 The default value is
-.BR 5.
+.BR 5 .
+
+.TP
+.BI update_nicks "" = N
+Sets how the nicknames are updated on the msn server. 
+When a contact is initially online or changes his/her nickname while online, the server
+lets you know about his/her nickname. Gtmess uses the new nickname when provided,
+otherwise it uses the last nickname stored on the server (on your forward list). 
+A value of 0 never updates
+nicknames, and a value of 2 always updates modified nicknames upon logout.
+A value of 1 updates nicknames only if they do not contain the email address.
+Note that you can always update the nickname of a specific contact manually (rename function).
+The default value is
+.BR 0 .
 
 .SH USER INTERFACE
 .PP
 The screen is divided in 7 parts. Four lines and three windows.
+
 The first line of the screen displays your nickname, your account and
 your status. The right-hand corner shows the system's clock (local time).
+
 The bottom line displays the copyright string and the menus 
 or the input boxes.
+
 On the right is the contact list window. On the left of the contact list
 window is the switchboard (chat) window. Right below the switchboard window
-is the messages window. This window displays various messages and errors
-from the operating system, as well as the notification server. The switchboard
+is the messages or notification window. 
+This window displays various messages and errors
+from the operating system, as well as the notification server. 
+
+The switchboard
 window is separated from the messages window by two lines. The first line
-is the edibox where you type your text when you chat. The second line
-is a kind of window-bar that displays a character for each open switchboard
-window. The selected switchboard window (which is displayed) is represented
+is the edibox where you type your text when you chat. 
+The second line is a kind of window-bar that displays a character for each open 
+switchboard window. The window bar is displayed in three different modes, depending
+on the number of open switchboard windows:
+
+.TP
+.B Text
+In this mode, each window is represented by the name of the first contact
+that joined it. The name of the selected sb window (which is displayed on top)
+is enclosed in square brackets. Braces instead of square brackets
+denote that the window has unread messages (something got typed in the window while
+it was in the background and the user has not seen it yet).
+
+.TP
+.B Icons
+The selected switchboard window is represented
 with an `O'. A `-' represents a switchboard window that is open but not
 on the foreground, while a `+' means additionally that the designated
-window has unread messages (something got typed in the window while
-it was in the background and the user has not seen it yet).
+window has unread messages .
+
+.TP
+.B Stats
+If there are too many open windows, then the window bar displays
+the only the number of the current window. It also displays how many
+windows exist on the left and right of the current one and how many
+of them have unread messages. The 5 numbers displayed correspond to these
+quantities respectively: left_unread, left, current, right_unread, right.
 
 .PP
 In the following description of the keyboard controls, `^' denotes holding CTRL, while
@@ -464,7 +561,9 @@ the contact from the list
 the selected contact (by adding him/her to the allow list)
 .IP N 16
 .B Rename
-- change the name of the contact
+- change the name of the contact (see also the
+.B update_nicks
+variable)
 .IP C 16
 .B Copy
 the contact to another group
@@ -548,6 +647,10 @@ all configuration variables
 configuration variables into 
 .BR ~/.gtmess/config ; 
 in fact, only those variables with values other than the default are written
+
+.IP 1-6 8
+.B Playback
+respective sound effect (for testing)
 
 .IP M 4
 .B Mail
@@ -940,7 +1043,7 @@ The aliases file. It contains lines of the form
 .IR email " " alias .
 Lines beginning with `#' are considered to be comments, and therefore ignored.
 The alias export feature provides a convenient way to create an initial version
-of this file and then edit it by hand.
+of this file and then edit it manually.
 
 .TP
 .B ~/.gtmess/config
@@ -965,6 +1068,10 @@ This file is a named pipe that is used by the gtmess-notify script to pop up not
 windows. The client writes data in this file.
 
 .TP
+.BI ~/.gtmess/ account /log/
+The directory where console logs are stored.
+
+.TP
 .B ./root.pem
 Trusted root certificates, verified upon the initialization 
 of an SSL connection. Gtmess first looks into the current directory
@@ -972,6 +1079,12 @@ for this file, then into
 .B ~/.gtmess/ 
 and then into the default data prefix, usually
 .BR /usr/local/share/gtmess .
+
+.TP
+.B /usr/local/share/gtmess/snd/
+This is the location of the sound effect files. Note that the prefix
+.B /usr/local/share/gtmess
+might be different in your system.
 
 .SH BUGS
 
@@ -989,8 +1102,6 @@ There is no option to keep an idle connection alive.
 There may occur conflicts in the authorization cookies of file transfers (though rare).
 
 Messages are always assumed to be UTF-8 encoded.
-
-No automatic offline user rename.
 
 
 .SH SEE ALSO
@@ -1020,11 +1131,34 @@ for some useful patches they sent me.
 for kindly providing his FreeBSD box for testing.
 
 
+.SH MAKING OF
+.TP
+.B Operating System
+Debian Linux Sarge (2.6.10)
+.TP
+.B Desktop Environment
+WindowMaker 0.91.0
+.TP
+.B Code Editor
+NEdit 5.5
+.TP
+.B Sound Effects
+ZynAddSubFX 1.4.3
+.TP
+.B Audio Editor
+Audacity 1.2.1
+.TP
+.B Graphics Editor
+The GIMP 1.2.3
+.TP
+.B File Manager
+Midnight Commander 4.6.1-pre1
+
 .SH AUTHORS
 
 gtmess - MSN Messenger client
 .br
-Copyright (C) 2002-2004  George M. Tzoumas
+Copyright (C) 2002-2005  George M. Tzoumas
 
 .PP
 This program is free software; you can redistribute it and/or modify

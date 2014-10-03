@@ -25,7 +25,7 @@
 
 #include"queue.h"
 
-void queue_init(queue_t *q)
+void queue_init(xqueue_t *q)
 {
     q->head = q->tail = NULL;
     q->count = 0;
@@ -38,23 +38,7 @@ void qelem_free(qelem_t *e)
     e = NULL;
 }
 
-/*void queue_free(ev_queue_t *q)
-{
-    qelem_t *cur, *next;
-    
-    if (q->count == 0) return;
-    cur = q->head;
-    next = q->head->next;
-    while (cur != NULL) {
-        qlem_free(&cur);
-        cur = next;
-        if (next != NULL) next = next->next;
-    }
-    q->head = q->tail = NULL;
-    q->count = 0;
-}*/
-
-int queue_put(queue_t *q, int type, void *data, int size)
+int queue_put(xqueue_t *q, int type, void *data, int size)
 {
     qelem_t *e;
     
@@ -83,7 +67,7 @@ int queue_put(queue_t *q, int type, void *data, int size)
     return 0;
 }
 
-qelem_t *queue_get(queue_t *q)
+qelem_t *queue_get(xqueue_t *q)
 {
     qelem_t *e;
     

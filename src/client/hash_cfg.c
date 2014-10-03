@@ -1,6 +1,6 @@
 /* ANSI-C code produced by gperf version 3.0.1 */
 /* Command-line: gperf -t -LANSI-C hash_cfg.inp  */
-/* Computed positions: -k'1' */
+/* Computed positions: -k'5' */
 
 #if !((' ' == 32) && ('!' == 33) && ('"' == 34) && ('#' == 35) \
       && ('%' == 37) && ('&' == 38) && ('\'' == 39) && ('(' == 40) \
@@ -35,7 +35,7 @@
  *    hash_cfg.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -57,12 +57,12 @@ struct hct_entry {
     int id; 
 };
 
-#define TOTAL_KEYWORDS 24
+#define TOTAL_KEYWORDS 30
 #define MIN_WORD_LENGTH 3
 #define MAX_WORD_LENGTH 20
 #define MIN_HASH_VALUE 3
-#define MAX_HASH_VALUE 35
-/* maximum key range = 33, duplicates = 0 */
+#define MAX_HASH_VALUE 41
+/* maximum key range = 39, duplicates = 0 */
 
 #ifdef __GNUC__
 __inline
@@ -76,34 +76,45 @@ hash (register const char *str, register unsigned int len)
 {
   static unsigned char asso_values[] =
     {
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 20, 36,  0,
-      36, 36, 36, 15, 36,  5, 36, 36, 20,  0,
-      36, 15,  0, 36, 36, 15,  0, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36, 36, 36, 36, 36,
-      36, 36, 36, 36, 36, 36
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 10, 42, 42, 42, 30,
+      25,  0, 10, 42, 42,  0, 42, 42, 42, 42,
+       5, 10,  0, 42, 25, 15,  0, 42, 42,  5,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42, 42, 42, 42, 42,
+      42, 42, 42, 42, 42, 42
     };
-  return len + asso_values[(unsigned char)str[0]];
+  register int hval = len;
+
+  switch (hval)
+    {
+      default:
+        hval += asso_values[(unsigned char)str[4]];
+      /*FALLTHROUGH*/
+      case 4:
+      case 3:
+        break;
+    }
+  return hval;
 }
 
 #ifdef __GNUC__
@@ -120,24 +131,42 @@ in_word_set (register const char *str, register unsigned int len)
       {""},
 #line 31 "hash_cfg.inp"
       {"popup", 3},
-#line 29 "hash_cfg.inp"
-      {"colors", 1},
+#line 37 "hash_cfg.inp"
+      {"server", 9},
 #line 43 "hash_cfg.inp"
       {"msnftpd", 15},
+#line 56 "hash_cfg.inp"
+      {"snd_exec", 28},
+#line 49 "hash_cfg.inp"
+      {"invitable", 21},
+#line 38 "hash_cfg.inp"
+      {"login", 10},
+#line 28 "hash_cfg.inp"
+      {"log_traffic", 0},
+#line 54 "hash_cfg.inp"
+      {"update_nicks", 26},
 #line 39 "hash_cfg.inp"
       {"password", 11},
-#line 45 "hash_cfg.inp"
-      {"msg_debug", 17},
+#line 40 "hash_cfg.inp"
+      {"initial_status", 12},
 #line 46 "hash_cfg.inp"
       {"msg_notify", 18},
-#line 34 "hash_cfg.inp"
-      {"cert_prompt", 6},
+#line 41 "hash_cfg.inp"
+      {"online_only", 13},
 #line 51 "hash_cfg.inp"
       {"max_nick_len", 23},
 #line 47 "hash_cfg.inp"
       {"idle_sec", 19},
-#line 49 "hash_cfg.inp"
-      {"invitable", 21},
+      {""},
+#line 48 "hash_cfg.inp"
+      {"auto_login", 20},
+#line 34 "hash_cfg.inp"
+      {"cert_prompt", 6},
+#line 44 "hash_cfg.inp"
+      {"aliases", 16},
+#line 53 "hash_cfg.inp"
+      {"notif_aliases", 25},
+      {""},
 #line 32 "hash_cfg.inp"
       {"time_user_types", 4},
 #line 36 "hash_cfg.inp"
@@ -145,29 +174,27 @@ in_word_set (register const char *str, register unsigned int len)
       {""},
 #line 35 "hash_cfg.inp"
       {"common_name_prompt", 7},
-#line 40 "hash_cfg.inp"
-      {"initial_status", 12},
+      {""},
 #line 30 "hash_cfg.inp"
       {"sound", 2},
-#line 37 "hash_cfg.inp"
-      {"server", 9},
-      {""}, {""},
+#line 29 "hash_cfg.inp"
+      {"colors", 1},
+#line 55 "hash_cfg.inp"
+      {"snd_dir", 27},
+      {""},
+#line 45 "hash_cfg.inp"
+      {"msg_debug", 17},
+#line 50 "hash_cfg.inp"
+      {"gtmesscontrol_ignore", 22},
+      {""},
+#line 57 "hash_cfg.inp"
+      {"snd_redirect", 29},
+      {""},
 #line 42 "hash_cfg.inp"
       {"syn_cache", 14},
-#line 38 "hash_cfg.inp"
-      {"login", 10},
-#line 41 "hash_cfg.inp"
-      {"online_only", 13},
-#line 44 "hash_cfg.inp"
-      {"aliases", 16},
-      {""}, {""},
-#line 48 "hash_cfg.inp"
-      {"auto_login", 20},
-#line 28 "hash_cfg.inp"
-      {"log_traffic", 0},
-      {""}, {""}, {""},
-#line 50 "hash_cfg.inp"
-      {"gtmesscontrol_ignore", 22}
+      {""},
+#line 52 "hash_cfg.inp"
+      {"log_console", 24}
     };
 
   if (len <= MAX_WORD_LENGTH && len >= MIN_WORD_LENGTH)

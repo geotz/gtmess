@@ -2,7 +2,7 @@
  *    screen.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -28,7 +28,6 @@
 #include"screen.h"
 #include"sboard.h"
 #include"unotif.h"
-#include"queue.h"
 #include"xfer.h"
 #include"utf8.h"
 #include"gtmess.h"
@@ -162,7 +161,7 @@ int get_string(cattr_t attr, int mask, const char *prompt, char *dest)
 }
 
 /* print a message */
-void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, const char *fmt, va_list ap)
+void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, FILE *fp_log, const char *fmt, va_list ap)
 {
     char tmp[SXL], *s;
     time_t now2;
@@ -174,6 +173,17 @@ void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, const char *fmt, va_list ap
 
     LOCK(&w->lock);
     wattrset(w->wh, attrs[attr]);
+    if (fp_log != NULL) {
+        switch (attr) {
+            case C_DBG: 
+                fprintf(fp_log, "(--) "); break;
+            case C_ERR: 
+                fprintf(fp_log, "(!!) "); break;
+            default:
+                fprintf(fp_log, "     "); break;
+        }
+        fflush(fp_log);
+    }
 /*    waddstr(w->wh, tmp);*/
     time(&now2);
     LOCK(&time_lock);
@@ -181,12 +191,20 @@ void vwmsg(TWindow *w, time_t *sbtime, cattr_t attr, const char *fmt, va_list ap
         *sbtime = now2;
         sbtime -= now2 % 60;
         wprintw(w->wh, "[%02d:%02d] ", now_tm.tm_hour, now_tm.tm_min);
+        if (fp_log != NULL) {
+            fprintf(fp_log, "[%02d:%02d] ", now_tm.tm_hour, now_tm.tm_min);
+            fflush(fp_log);
+        }
         indent = 8;
     } else indent = 0;
     UNLOCK(&time_lock);
     wprintx(w->wh, tmp, indent);
     wattrset(w->wh, attrs[C_NORMAL]);
     UNLOCK(&w->lock);
+    if (fp_log != NULL) {
+        fputs(tmp, fp_log);
+        fflush(fp_log);
+    }
 }
 
 /* message window */
@@ -211,16 +229,35 @@ void msg(cattr_t attr, const char *fmt, ...)
     
     LOCK(&w_msg.lock);
     wattrset(w_msg.wh, attrs[attr]);
+    if (msn.fp_log != NULL) {
+        switch (attr) {
+            case C_DBG: 
+                fprintf(msn.fp_log, "(--) "); break;
+            case C_ERR: 
+                fprintf(msn.fp_log, "(!!) "); break;
+            default:
+                fprintf(msn.fp_log, "     "); break;
+        }
+        fflush(msn.fp_log);
+    }
     time(&now2);
     LOCK(&time_lock);
     if (difftime(now2, msg_now) > 60) {
         msg_now = now2;
         msg_now -= now2 % 60;
         wprintw(w_msg.wh, "[%02d:%02d] ", now_tm.tm_hour, now_tm.tm_min);
+        if (msn.fp_log != NULL) {
+            fprintf(msn.fp_log, "[%02d:%02d] ", now_tm.tm_hour, now_tm.tm_min);
+            fflush(msn.fp_log);
+        }
         indent = 8;
     } else indent = 0;
     UNLOCK(&time_lock);
     wprintx(w_msg.wh, txt, indent);
+    if (msn.fp_log != NULL) {
+        fputs(txt, msn.fp_log);
+        fflush(msn.fp_log);
+    }
     wattrset(w_msg.wh, attrs[C_NORMAL]);
     getyx(w_msg.wh, y, x);
     newtop = y - w_msg.h + 1;
@@ -275,7 +312,7 @@ void draw_status(int r)
     int y, x;
     char txt[SML];
     
-    sprintf(txt, "%s (%s)", getnick(msn.login, msn.nick), msn_stat_name[msn.status]);
+    sprintf(txt, "%s (%s)", getnick(msn.login, msn.nick, Config.aliases), msn_stat_name[msn.status]);
     if (utf8_mode) txt[widthoffset(txt, SCOLS-6)] = 0;
     else txt[SCOLS-6] = 0;
     getyx(stdscr, y, x);
@@ -348,7 +385,7 @@ void draw_lst(int r)
                     else if (p->blocked) ch = '+';
                     else ch = ' ';
                     wprintw(w_lst.wh, "%c%c %s\n", ch, msn_stat_char[p->status], 
-                            getnick(p->login,p->nick));
+                            getnick(p->login,p->nick, Config.aliases));
                 }
                 lines++;
             }
@@ -418,13 +455,13 @@ void draw_plst(msn_sboard_t *sb, int r)
         total = sb->PL.count + 1;
         if (lines >= sb->plskip && lines < total + sb->plskip) {
             wattrset(w->wh, attrs[C_GRP]);
-            wprintw(w->wh, "[%s]\n\n", getnick(sb->master, sb->mnick));
+            wprintw(w->wh, "[%s]\n\n", getnick(sb->master, sb->mnick, Config.aliases));
         }
         lines++;
         for (p = sb->PL.head; p != NULL; p = p->next) {
             if (lines >= sb->plskip && lines < total + sb->plskip) {
                 wattrset(w->wh, lstatattrs[MS_UNK]);
-                wprintw(w->wh, "  %s\n", getnick(p->login, p->nick));
+                wprintw(w->wh, "  %s\n", getnick(p->login, p->nick, Config.aliases));
             }
             lines++;
         }
@@ -449,20 +486,36 @@ void draw_sbbar(int r)
     int attr;
     char txt[SML];
     char *ch;
-    int y, x;
+    int y, x, w;
     
-    attr = attrs[C_NORMAL];
     ch = &txt[0];
+    attr = attrs[C_NORMAL];
     
     s = SL.start;
     c = SL.count;
+    if (c > 0) {
+        w = w_msg.w / SL.count;
+        if (w < 9) w = 9;
+    } else w = 1;
     if (c < w_msg.w) {
+        txt[0] = 0;
         for (i = 0; i < c; i++, s = s->next) {
-            if (s == SL.head) *ch++ = 'O';
-            else if (s->pending) *ch++ = '+';
-            else *ch++ = '-';
+            if (s == SL.head) strcat(txt, "[");
+            else if (s->pending) strcat(txt, "{");
+            else strcat(txt, " ");
+            strncat(txt, s->mnick, w-3);
+            if (s == SL.head) strcat(txt, "]-");
+            else if (s->pending) strcat(txt, "}-");
+            else strcat(txt, " -");
         }
-        *ch = 0;
+        if (strlen(txt) > w_msg.w) {
+            for (i = 0; i < c; i++, s = s->next) {
+               if (s == SL.head) *ch++ = 'O';
+               else if (s->pending) *ch++ = '+';
+               else *ch++ = '-';
+            }
+            *ch = 0;
+        }
     } else {
         left = leftp = right = rightp = 0;
         for (left = 0; s != SL.head; s = s->next, left++) if (s->pending) leftp++;
@@ -491,7 +544,7 @@ void dlg(cattr_t attr, const char *fmt, ...)
 
     if (sb == NULL) return;
     va_start(ap, fmt);
-    vwmsg(&sb->w_dlg, &sb->dlg_now, attr, fmt, ap);
+    vwmsg(&sb->w_dlg, &sb->dlg_now, attr, sb->fp_log, fmt, ap);
     va_end(ap);
     
     getyx(sb->w_dlg.wh, y, x);

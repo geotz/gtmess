@@ -2,7 +2,7 @@
  *    unotif.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2004  George M. Tzoumas
+ *    Copyright (C) 2002-2005  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -28,14 +28,12 @@
 #include<curses.h>
 
 #include"unotif.h"
+#include"sound.h"
 #include"gtmess.h"
 
 int sound;  /* 0 = silence, 1 = beep, 2 = sound effects */
 int popup;  /* popup window enabled/disabled */
 int pfd;    /* pipe file descriptor */
-
-char *snd_files[] = { NULL, NULL, "online.wav", "offline.wav", "newemail.wav",
-        "type.wav", "ring.wav", "meout.wav" };
 
 void unotif_init(int asound, int apopup)
 {
@@ -43,6 +41,7 @@ void unotif_init(int asound, int apopup)
     
     sound = asound;
     popup = apopup;
+    if (sound == 2) sound_init();
     sprintf(tmp, "%s/notify.pip", Config.cfgdir);
     pfd = open(tmp, O_WRONLY | O_NONBLOCK);
 }
@@ -52,9 +51,24 @@ void unotif_done()
     if (pfd >= 0) close(pfd);
 }
 
+
+void playsound(snd_t snd)
+{
+    if (sound == 0) return;
+    if (snd < SND_BEEP || snd > SND_LOGOUT) return;
+    if (sound == 1 || snd == SND_BEEP) {
+        beep();
+        return;
+    }
+    LOCK(&lock_snd);
+    sound_effect = snd;
+    pthread_cond_signal(&cond_snd);
+    UNLOCK(&lock_snd);
+}
+
 void unotify(char *msg, snd_t effect)
 {
-    if (sound == 1) beep();
+    playsound(effect);
     if (pfd == -1) return;
     write(pfd, msg, strlen(msg));
 }

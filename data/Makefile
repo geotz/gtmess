@@ -55,7 +55,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 subdir = data
 DIST_COMMON = $(dist_man1_MANS) $(dist_pixmap_DATA) \
-	$(dist_pkgdata_DATA) $(srcdir)/Makefile.am \
+	$(nobase_dist_pkgdata_DATA) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/configure.ac
@@ -71,8 +71,8 @@ am__installdirs = "$(DESTDIR)$(man1dir)" "$(DESTDIR)$(pixmapdir)" "$(DESTDIR)$(p
 NROFF = nroff
 MANS = $(dist_man1_MANS)
 dist_pixmapDATA_INSTALL = $(INSTALL_DATA)
-dist_pkgdataDATA_INSTALL = $(INSTALL_DATA)
-DATA = $(dist_pixmap_DATA) $(dist_pkgdata_DATA)
+nobase_dist_pkgdataDATA_INSTALL = $(install_sh_DATA)
+DATA = $(dist_pixmap_DATA) $(nobase_dist_pkgdata_DATA)
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = ${SHELL} /home/george/progs/gtmess/missing --run aclocal-1.8
 AMDEP_FALSE = #
@@ -117,7 +117,7 @@ SET_MAKE =
 SHELL = /bin/sh
 STRIP = 
 TCLDATADIR = NONE/share/gtmess
-VERSION = 0.9
+VERSION = 0.91
 WISHPROG = /usr/bin/wish
 ac_ct_CC = gcc
 ac_ct_RANLIB = ranlib
@@ -147,10 +147,10 @@ sbindir = ${exec_prefix}/sbin
 sharedstatedir = ${prefix}/com
 sysconfdir = ${prefix}/etc
 target_alias = 
-dist_man1_MANS = gtmess.1 gtmess-gw.1
-dist_pkgdata_DATA = root.pem 
+dist_man1_MANS = gtmess.1 gtmess-gw.1 gtmess-notify.1
+nobase_dist_pkgdata_DATA = root.pem snd/meout.wav snd/newemail.wav snd/offline.wav snd/online.wav snd/ring.wav snd/type.wav
 pixmapdir = $(datadir)/pixmaps
-dist_pixmap_DATA = gtmess_icon.png gtmess_icon-48.png gtmess_icon2-64.png gtmess_icon2-48.png
+dist_pixmap_DATA = gtmess_icon-64.png gtmess_icon-48.png gtmess_icon2-64.png gtmess_icon2-48.png gtmess_icon2-32.png gtmess_icon2-16.png
 all: all-am
 
 .SUFFIXES:
@@ -246,20 +246,28 @@ uninstall-dist_pixmapDATA:
 	  echo " rm -f '$(DESTDIR)$(pixmapdir)/$$f'"; \
 	  rm -f "$(DESTDIR)$(pixmapdir)/$$f"; \
 	done
-install-dist_pkgdataDATA: $(dist_pkgdata_DATA)
+install-nobase_dist_pkgdataDATA: $(nobase_dist_pkgdata_DATA)
 	@$(NORMAL_INSTALL)
 	test -z "$(pkgdatadir)" || $(mkdir_p) "$(DESTDIR)$(pkgdatadir)"
-	@list='$(dist_pkgdata_DATA)'; for p in $$list; do \
+	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
+	list='$(nobase_dist_pkgdata_DATA)'; for p in $$list; do \
 	  if test -f "$$p"; then d=; else d="$(srcdir)/"; fi; \
-	  f="`echo $$p | sed -e 's|^.*/||'`"; \
-	  echo " $(dist_pkgdataDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(pkgdatadir)/$$f'"; \
-	  $(dist_pkgdataDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(pkgdatadir)/$$f"; \
+	  case $$p in \
+	    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+	    *) f=$$p;; \
+	  esac; \
+	  echo " $(nobase_dist_pkgdataDATA_INSTALL) '$$d$$p' '$(DESTDIR)$(pkgdatadir)/$$f'"; \
+	  $(nobase_dist_pkgdataDATA_INSTALL) "$$d$$p" "$(DESTDIR)$(pkgdatadir)/$$f"; \
 	done
 
-uninstall-dist_pkgdataDATA:
+uninstall-nobase_dist_pkgdataDATA:
 	@$(NORMAL_UNINSTALL)
-	@list='$(dist_pkgdata_DATA)'; for p in $$list; do \
-	  f="`echo $$p | sed -e 's|^.*/||'`"; \
+	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
+	list='$(nobase_dist_pkgdata_DATA)'; for p in $$list; do \
+	  case $$p in \
+	    $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
+	    *) f=$$p;; \
+	  esac; \
 	  echo " rm -f '$(DESTDIR)$(pkgdatadir)/$$f'"; \
 	  rm -f "$(DESTDIR)$(pkgdatadir)/$$f"; \
 	done
@@ -271,6 +279,7 @@ CTAGS:
 
 
 distdir: $(DISTFILES)
+	$(mkdir_p) $(distdir)/snd
 	@srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`; \
 	topsrcdirstrip=`echo "$(top_srcdir)" | sed 's|.|.|g'`; \
 	list='$(DISTFILES)'; for file in $$list; do \
@@ -346,8 +355,8 @@ info: info-am
 
 info-am:
 
-install-data-am: install-dist_pixmapDATA install-dist_pkgdataDATA \
-	install-man
+install-data-am: install-dist_pixmapDATA install-man \
+	install-nobase_dist_pkgdataDATA
 
 install-exec-am:
 
@@ -373,22 +382,22 @@ ps: ps-am
 
 ps-am:
 
-uninstall-am: uninstall-dist_pixmapDATA uninstall-dist_pkgdataDATA \
-	uninstall-info-am uninstall-man
+uninstall-am: uninstall-dist_pixmapDATA uninstall-info-am \
+	uninstall-man uninstall-nobase_dist_pkgdataDATA
 
 uninstall-man: uninstall-man1
 
 .PHONY: all all-am check check-am clean clean-generic distclean \
 	distclean-generic distdir dvi dvi-am html html-am info info-am \
 	install install-am install-data install-data-am \
-	install-dist_pixmapDATA install-dist_pkgdataDATA install-exec \
-	install-exec-am install-info install-info-am install-man \
-	install-man1 install-strip installcheck installcheck-am \
-	installdirs maintainer-clean maintainer-clean-generic \
-	mostlyclean mostlyclean-generic pdf pdf-am ps ps-am uninstall \
-	uninstall-am uninstall-dist_pixmapDATA \
-	uninstall-dist_pkgdataDATA uninstall-info-am uninstall-man \
-	uninstall-man1
+	install-dist_pixmapDATA install-exec install-exec-am \
+	install-info install-info-am install-man install-man1 \
+	install-nobase_dist_pkgdataDATA install-strip installcheck \
+	installcheck-am installdirs maintainer-clean \
+	maintainer-clean-generic mostlyclean mostlyclean-generic pdf \
+	pdf-am ps ps-am uninstall uninstall-am \
+	uninstall-dist_pixmapDATA uninstall-info-am uninstall-man \
+	uninstall-man1 uninstall-nobase_dist_pkgdataDATA
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
