@@ -2,7 +2,7 @@
  *    screen.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2009  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -399,7 +399,7 @@ void draw_status(int r)
     int y, x;
     char txt[SML];
     
-    sprintf(txt, "%s (%s)", getnick(msn.login, msn.nick, Config.aliases), msn_stat_name[msn.status]);
+    sprintf(txt, "%s (%s)", msn.nick, msn_stat_name[msn.status]);
     if (utf8_mode) txt[widthoffset(txt, SCOLS-6)] = 0;
     else txt[SCOLS-6] = 0;
     getyx(stdscr, y, x);
@@ -448,21 +448,28 @@ void draw_lst(int r)
     int lines, total;
     int y, x, i, j, ingroup;
     int cur_grp, cur_con;
-    msn_group_t *b[msn.GL.count];
-    msn_contact_t **a[msn.GL.count];
-    int gsize[msn.GL.count];
+    int gcount = msn.GL.count + 1;
+    msn_group_t *b[gcount];
+    msn_contact_t **a[gcount];
+    int gsize[gcount];
     int found;
     
-    total = msn.GL.count;
+    total = gcount;
     cur_grp = 0;
     cur_con = 0;
     found = 0;
     if (Config.online_only == 0) {
         for (p = msn.CL.head; p != NULL; p = p->next)
-            if ((p->lflags & msn_FL) == msn_FL) total += p->groups;
+            if (p->lflags & msn_FL) {
+                if (p->groups > 0) total += p->groups;
+                else total++;
+            }
     } else {
         for (p = msn.CL.head; p != NULL; p = p->next)
-            if ((p->lflags & msn_FL) == msn_FL && p->status >= MS_NLN) total += p->groups;
+            if ((p->lflags & msn_FL) && p->status >= MS_NLN) {
+                if (p->groups > 0) total += p->groups;
+                else total++;
+            }
     }
     
     /* create arrays for random access */
@@ -471,7 +478,9 @@ void draw_lst(int r)
         gsize[i] = 0;
         for (p = msn.CL.head; p != NULL; p = p->next) { /* first pass to compute size :-/ */
             if ((p->lflags & msn_FL) == 0 || (Config.online_only && p->status < MS_NLN)) continue;
-            for (j = 0; j < p->groups; j++) gsize[i] += (p->gid[j] == g->gid);
+            for (j = 0; j < p->groups; j++) {
+                gsize[i] += strcmp(p->gid[j], g->gid) == 0;
+            }
         }
         if (gsize[i]) {
             /* is there an easy way to avoid malloc() all the time? perhaps a custom malloc :-) */
@@ -479,15 +488,34 @@ void draw_lst(int r)
             ingroup = 0;
             for (p = msn.CL.head; p != NULL; p = p->next) {
                 if ((p->lflags & msn_FL) == 0 || (Config.online_only && p->status < MS_NLN)) continue;
-                for (j = 0; j < p->groups; j++) if (p->gid[j] == g->gid) {
+                for (j = 0; j < p->groups; j++) if (strcmp(p->gid[j], g->gid) == 0) {
                     a[i][ingroup] = p;
-                    if (msn.hgid == g->gid && strcmp(p->login, msn.hlogin) == 0)
+                    if (strcmp(msn.hgid, g->gid) == 0 && strcmp(p->login, msn.hlogin) == 0)
                         cur_grp = i, cur_con = ingroup, found = 1;
                     ingroup++;
                 }
             }
         }
     }
+    /* groupless contacts */
+    b[gcount-1] = &msn_group_0;
+    gsize[gcount-1] = 0;
+    for (p = msn.CL.head; p != NULL; p = p->next)
+        if ((p->lflags & msn_FL) && (!Config.online_only || p->status >= MS_NLN) && p->groups == 0)
+            gsize[gcount-1]++;
+    if (gsize[gcount-1]) {
+        a[gcount-1] = (msn_contact_t **) malloc(gsize[gcount-1] * sizeof(msn_contact_t *));
+        ingroup = 0;
+        for (p = msn.CL.head; p != NULL; p = p->next)
+            if ((p->lflags & msn_FL)
+                && (!Config.online_only || p->status >= MS_NLN) && p->groups == 0) {
+                a[gcount-1][ingroup] = p;
+                if (msn.hgid[0] == 0 && strcmp(p->login, msn.hlogin) == 0)
+                    cur_grp = gcount-1, cur_con = ingroup, found = 1;
+                ingroup++;
+            }
+    }
+
     lines = 0;
     
     /* handle selection */
@@ -497,7 +525,7 @@ void draw_lst(int r)
             while (1) {
                 if (cur_con >= gsize[cur_grp]) {
                     cur_grp++;
-                    if (cur_grp >= msn.GL.count) cur_grp = 0;
+                    if (cur_grp >= gcount) cur_grp = 0;
                     cur_con = 0; 
                 } else break;
             }
@@ -507,23 +535,24 @@ void draw_lst(int r)
             while (1) {
                 if (cur_con < 0) {
                     cur_grp--; 
-                    if (cur_grp < 0) cur_grp = msn.GL.count - 1;
+                    if (cur_grp < 0) cur_grp = gcount - 1;
                     cur_con = gsize[cur_grp] - 1;
                 } else break;
             }
             msn.dhid = 0;
         }
-    } else while (cur_grp < msn.GL.count) {
+    } else while (cur_grp < gcount) {
         if (cur_con < gsize[cur_grp]) break;
         else cur_grp++, cur_con = 0;
     }
 
-    if (cur_grp >= msn.GL.count) {
+    if (cur_grp >= gcount) {
         clmenu = 0;
     }
     
     if (clmenu) {
-        msn.hgid = b[cur_grp]->gid;
+        if (b[cur_grp]->gid[0]) strcpy(msn.hgid, b[cur_grp]->gid);
+        else msn.hgid[0] = 0;
         strcpy(msn.hlogin, a[cur_grp][cur_con]->login);
     }
 
@@ -532,7 +561,7 @@ void draw_lst(int r)
     wclear(w_lst.wh);
     
     time(&now);
-    for (i = 0; i < msn.GL.count; i++) {
+    for (i = 0; i < gcount; i++) {
         if (lines >= msn.flskip && lines < total + msn.flskip) {
             wattrset(w_lst.wh, C_GRP);
             wprintw(w_lst.wh, "%s\n", b[i]->name);
@@ -548,14 +577,13 @@ void draw_lst(int r)
                 else if ((p->lflags & msn_BL) == msn_BL) ch = '+'; /* blocked */
                 else if (p->ignored) ch = ':';
                 else ch = ' ';
-                wprintw(w_lst.wh, "%c%c %s\n", ch, msn_stat_char[p->status], 
-                        getnick(p->login, p->nick, Config.aliases));
+                wprintw(w_lst.wh, "%c%c %s\n", ch, msn_stat_char[p->status], getnick1c(p));
             }
             lines++;
         }
     }
 
-    for (i = 0; i < msn.GL.count; i++) if (gsize[i]) free(a[i]);
+    for (i = 0; i < gcount; i++) if (gsize[i]) free(a[i]);
 
     getyx(stdscr, y, x);
     copywin(w_lst.wh, stdscr, 0, 0, w_lst.y, w_lst.x,
@@ -622,13 +650,13 @@ void draw_plst(msn_sboard_t *sb, int r)
         total = sb->PL.count + 1;
         if (lines >= sb->plskip && lines < total + sb->plskip) {
             wattrset(w->wh, C_GRP);
-            wprintw(w->wh, "[%s]\n\n", getnick(sb->master, sb->mnick, Config.aliases));
+            wprintw(w->wh, "[%s]\n\n", getnick2(sb->master, sb->mnick));
         }
         lines++;
         for (p = sb->PL.head; p != NULL; p = p->next) {
             if (lines >= sb->plskip && lines < total + sb->plskip) {
                 wattrset(w->wh, lstatattrs[MS_UNK]);
-                wprintw(w->wh, "  %s\n", getnick(p->login, p->nick, Config.aliases));
+                wprintw(w->wh, "  %s\n", getnick1c(p));
             }
             lines++;
         }

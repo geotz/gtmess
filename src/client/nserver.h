@@ -2,7 +2,7 @@
  *    nserver.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2009  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -24,6 +24,8 @@
 
 #include"msn.h"
 
+#define MSN_MAX_GROUP 64
+
 typedef struct {
     /* must be set by user */
     char login[SML], pass[SML];
@@ -41,14 +43,14 @@ typedef struct {
     msn_clist_t CL; /* contact list (forward, reverse, allow, block) */
 
     char hlogin[SML]; /* highlighted contact in CL */
-    int hgid;         /* highlighted group in CL */
+    char hgid[SNL];         /* highlighted group in CL */
     int dhid;          /* delta pos. of highlighted contact */
     
-    msn_clist_t IL; /* initial status list */
-    unsigned int SYN; /* syn list version */
+    /*msn_clist_t IL; /* initial status list */
+    /* unsigned int SYN; /* syn list version */
     int list_count; /* number of LST responses */
-    
-    int flskip; /* FL list line skip (for display) */
+
+	int flskip; /* FL list line skip (for display) */
     pthread_mutex_t lock;
     
     FILE *fp_log; /* log file pointer */

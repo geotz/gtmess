@@ -2,7 +2,7 @@
  *    gtmess.h
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2009  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -31,6 +31,7 @@
 #define DBG() fprintf(stderr, "DEBUG: %s: %d\n", __FILE__, __LINE__)
 
 #include "util.h"
+#include "msn.h"
 
 struct cfg_entry {
     char var[SCL];  /* variable name */
@@ -77,6 +78,7 @@ typedef struct {
     int safe_msg;
     int err_connreset;
     int auto_cl;
+	char force_nick[SCL];
     
     char cfgdir[SCL];
     char datadir[SCL];
@@ -93,7 +95,11 @@ extern pthread_mutex_t time_lock;
 extern char MyIP[];
 
 unsigned int nftid();
-char *getnick(char *login, char *nick, int flag);
+
+char *getnick2(char *login, char *nick);
+char *getnick1(char *login);
+char *getnick1c(msn_contact_t *p);
+
 struct timespec nowplus(int seconds);
 
 void read_syn_cache_data();

@@ -2,7 +2,7 @@
  *    nserver.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2009  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -68,7 +68,7 @@ void logout_cleanup(void *r)
     msn.nfd = -1;
     msn_glist_free(&msn.GL);
     msn_clist_free(&msn.CL);
-    msn_clist_free(&msn.IL);
+    /*msn_clist_free(&msn.IL);*/
     if (msn.fp_log != NULL) {
         time_t tm = time(NULL);
         char s[SNL];
@@ -89,7 +89,8 @@ void logout_cleanup(void *r)
     pthread_cond_signal(&cond_out);
     UNLOCK(&msn.lock);
     
-    if (((int) r) == 0 || ((int) r) == -2) msg(C_ERR, "msn_ndaemon(): disconnected from server\n");
+    if (r == (void *) 0 || r == (void *) -2)
+        msg(C_ERR, "msn_ndaemon(): disconnected from server\n");
     unotify("You have been signed out\n", SND_LOGOUT);
 /*    msg(C_DBG, "msn_ndaemon(): flushed %d bytes\n", buf.len);*/
 }
@@ -111,9 +112,9 @@ int msn_list_cleanup(msn_clist_t *q, unsigned char lf)
     int count = 0;
 
     for (p = q->head; p != NULL; p = p->next)
-        if ((p->lflags & lf) == lf && (p->lflags & msn_RL) == 0) {
+        if ((p->lflags & lf) == lf && (p->lflags & (msn_RL | msn_PL)) == 0) {
             msg(C_MSG, "%s <%s> has removed you from his/her contact list\n",
-                getnick(p->login, p->nick, Config.notif_aliases), p->login);
+                getnick1c(p), p->login);
             count++;
         }
     return count;
@@ -128,11 +129,11 @@ void msn_handle_msgbody(char *msgdata, int len)
     s = strafter(msgdata, "Content-Type: ");
     sscanf(s, "%s", contype);
 
-    if (strstr(contype, "text/x-msmsgsinitialemailnotification") != NULL) {
-    /* initial email notification */
-        s = strafter(msgdata, "\nInbox-Unread: ");
+    if (strstr(contype, "text/x-msmsgsinitialmdatanotification") != NULL) {
+    /* initial email data notification */
+        s = strafter(msgdata, "<IU>");
         sscanf(s, "%d", &msn.inbox);
-        s = strafter(msgdata, "\nFolders-Unread: ");
+        s = strafter(msgdata, "<OU>");
         sscanf(s, "%d", &msn.folders);
 
         msg(C_MSG, "MBOX STATUS: Inbox: %d, Folders: %d\n", msn.inbox, msn.folders);
@@ -205,6 +206,17 @@ void msn_handle_msgbody(char *msgdata, int len)
     }
 }
 
+char *msn_get_payload(buffer_t *buf, int size)
+{
+    char *msgdata;
+    int r;
+    msgdata = (char *) Malloc(size+1);
+    r = bfFlushN(buf, msgdata, size);
+    bfReadX(buf, msgdata + r, size - r);
+    msgdata[size] = 0;
+    return msgdata;
+}
+
 void *msn_ndaemon(void *dummy)
 {
     buffer_t buf;
@@ -221,7 +233,7 @@ void *msn_ndaemon(void *dummy)
     pthread_cleanup_push(logout_cleanup, (void *) 0);
     while (1) {
         r = bfParseLine(&buf, s, SXL);
-	rerrno = errno;
+		rerrno = errno;
         if (r == -2) msg(C_ERR, "bfParseLine(): buffer overrun\n");
         else if (r < 0) msg(C_ERR, "bfParseLine(): %s\n", strerror(errno));
         pthread_testcancel();
@@ -233,13 +245,13 @@ void *msn_ndaemon(void *dummy)
             localtime_r(&t1, &t);
             fprintf(flog, "%d-%02d-%02d %02d:%02d:%02d< %s", 1900+t.tm_year, 1+t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec, s);
         }
-	if (r < 0 && rerrno == EINTR) continue;
+		if (r < 0 && rerrno == EINTR) continue;
         if (r <= 0) break;
 
         com[0] = 0; arg1[0] = 0; arg2[0] = 0;
         msglen = 0; msgdata = NULL;
 
-/*        msgn(C_DBG, strlen(s)+6, "<<< %s\n", s);*/
+        /* msgn(C_DBG, strlen(s)+6, ">>> %s\n", s); */
 
         sscanf(s, "%s", com);
         if (is3(com, "MSG")) {
@@ -247,10 +259,7 @@ void *msn_ndaemon(void *dummy)
         /* message */
 
             if (sscanf(s + 4, "%s %s %d", arg1, arg2, &msglen) == 3) {
-                msgdata = (char *) Malloc(msglen+1);
-                r = bfFlushN(&buf, msgdata, msglen);
-                bfReadX(&buf, msgdata + r, msglen - r);
-                msgdata[msglen] = 0;
+                msgdata = msn_get_payload(&buf, msglen);
                 if (Config.log_traffic && msglen > 0) fprintf(flog, "%s", msgdata);
                 msn_handle_msgbody(msgdata, msglen);
                 free(msgdata);
@@ -261,6 +270,7 @@ void *msn_ndaemon(void *dummy)
 
             sscanf(s + 4, "%*s %s", arg2);
             msn_qry(msn.nfd, nftid(), arg2);
+
         } else if (is3(com, "CHG")) {
 
         /* status change */
@@ -299,54 +309,52 @@ void *msn_ndaemon(void *dummy)
 
         /* group rename */
 
-            int gid;
             msn_group_t *pg;
 
-            sscanf(s + 4, "%*s %*s %d %s", &gid, arg2);
+            sscanf(s + 4, "%*s %s %s", arg1, arg2);
             LOCK(&msn.lock);
             url2str(arg2, nick);
-            if ((pg = msn_glist_find(&msn.GL, gid)) != NULL) {
+            if ((pg = msn_glist_find(&msn.GL, arg1)) != NULL) {
+                msg(C_MSG, "Group %d renamed to %s\n", pg->name, nick);
                 Strcpy(pg->name, nick, SML);
                 draw_lst(1);
-                msg(C_MSG, "Group %d renamed to %s\n", gid, nick);
             }
             UNLOCK(&msn.lock);
         } else if (is3(com, "ADG")) {
 
         /* group add */
 
-            int gid;
-
-            sscanf(s + 4, "%*s %*s %s %d", arg2, &gid);
-            url2str(arg2, nick);
+            sscanf(s + 4, "%*d %s %s", arg1, arg2);
+            url2str(arg1, nick);
             LOCK(&msn.lock);
-            msn_glist_add(&msn.GL, gid, nick);
+            msn_glist_add(&msn.GL, arg2, nick);
             draw_lst(1);
-            msg(C_MSG, "Added group %s with id %d\n", nick, gid);
+            msg(C_MSG, "Added group %s with uuid %d\n", nick, arg2);
             UNLOCK(&msn.lock);
         } else if (is3(com, "RMG")) {
 
         /* group remove*/
 
-            int gid, nr;
+            int nr;
 
-            sscanf(s + 4, "%*s %*s %d", &gid);
+            sscanf(s + 4, "%*d %s", arg1);
             LOCK(&msn.lock);
-            msn_glist_rem(&msn.GL, gid);
-            nr = msn_clist_rem_grp(&msn.CL, gid);
+            msn_glist_rem(&msn.GL, arg1);
+            nr = msn_clist_rem_grp(&msn.CL, arg1);
             draw_lst(1);
-            msg(C_MSG, "Group [%d] removed with %d contacts\n", gid, nr);
+            msg(C_MSG, "Removed group with %d contacts\n", nr);
             UNLOCK(&msn.lock);
+
         } else if (is3(com, "LSG")) {
 
         /* group list */
+            msn_group_t *pg;
 
-            int gid;
-
-            sscanf(s + 4, "%d %s", &gid, arg2);
-            url2str(arg2, nick);
+            sscanf(s + 4, "%s %s", arg1, arg2);
+            url2str(arg1, nick);
             LOCK(&msn.lock);
-            msn_glist_add(&msn.GL, gid, nick);
+            pg = msn_glist_add(&msn.GL, arg2, nick);
+            /*msg(C_DBG, "added group %s %s\n", pg->name, pg->gid);*/
             UNLOCK(&msn.lock);
         } else if (is3(com, "ILN")) {
 
@@ -357,14 +365,14 @@ void *msn_ndaemon(void *dummy)
             LOCK(&msn.lock);
             sscanf(s + 4, "%*u %s %s %s", stat, arg1, arg2);
             url2str(arg2, nick);
-            if (msn_clist_update(&msn.CL, msn_FL, arg1, nick, msn_stat_id(stat), -1) > 0) {
+            if (msn_clist_update(&msn.CL, msn_FL, arg1, nick, msn_stat_id(stat), -1, 0) > 0) {
                 draw_lst(1);
-            } else {
-                p = msn_clist_add(&msn.IL, 0, arg1, nick, -1);
+            } /* else {
+                p = msn_clist_add(&msn.IL, 0, arg1, nick, -1, NULL);
                 p->status = msn_stat_id(stat);
-            }
+            }*/
             UNLOCK(&msn.lock);
-            msg(C_MSG, "%s <%s> is %s\n", getnick(arg1, nick, Config.notif_aliases), arg1, msn_stat_name[msn_stat_id(stat)]);
+            msg(C_MSG, "%s <%s> is %s\n", getnick2(arg1, nick), arg1, msn_stat_name[msn_stat_id(stat)]);
         } else if (is3(com, "NLN")) {
 
         /* contact changes to online status */
@@ -377,12 +385,12 @@ void *msn_ndaemon(void *dummy)
             url2str(arg2, nick);
             if ((p = msn_clist_find(&msn.CL, msn_FL, arg1)) != NULL) old = p->status;
             if (old < MS_NLN) {
-                sprintf(nf, "%s is %s\n", getnick(arg1, nick, Config.aliases), msn_stat_name[msn_stat_id(stat)]);
+                sprintf(nf, "%s is %s\n", getnick2(arg1, nick), msn_stat_name[msn_stat_id(stat)]);
                 if (can_notif(arg1)) unotify(nf, SND_ONLINE);
             }
-            if (msn_clist_update(&msn.CL, msn_FL, arg1, nick, msn_stat_id(stat), -1) > 0) {
+            if (msn_clist_update(&msn.CL, msn_FL, arg1, nick, msn_stat_id(stat), -1, 0) > 0) {
                 draw_lst(1);
-                msg(C_MSG, "%s <%s> is %s\n", getnick(arg1, nick, Config.notif_aliases), arg1, msn_stat_name[msn_stat_id(stat)]);
+                msg(C_MSG, "%s <%s> is %s\n", getnick2(arg1, nick), arg1, msn_stat_name[msn_stat_id(stat)]);
             }
             UNLOCK(&msn.lock);
         } else if (is3(com, "FLN")) {
@@ -394,11 +402,11 @@ void *msn_ndaemon(void *dummy)
             sscanf(s + 4, "%s", arg1);
             p = msn_clist_find(&msn.CL, msn_FL, arg1);
             if (p != NULL && p->status == MS_FLN)
-                msg(C_ERR, "%s <%s> possibly appears offline\n", getnick(arg1, p->nick, Config.notif_aliases), arg1);
-            else if (msn_clist_update(&msn.CL, msn_FL, arg1, NULL, MS_FLN, -1) > 0) {
+                msg(C_ERR, "%s <%s> possibly appears offline\n", getnick1c(p), arg1);
+            else if (msn_clist_update(&msn.CL, msn_FL, arg1, NULL, MS_FLN, -1, 0) > 0) {
                 draw_lst(1);
-                msg(C_MSG, "%s <%s> is %s\n", getnick(arg1, p->nick, Config.notif_aliases), arg1, msn_stat_name[MS_FLN]);
-                sprintf(nf, "%s is Offline\n", getnick(arg1, p->nick, Config.aliases));
+                msg(C_MSG, "%s <%s> is %s\n", getnick1c(p), arg1, msn_stat_name[MS_FLN]);
+                sprintf(nf, "%s is Offline\n", getnick1c(p));
                 if (can_notif(arg1)) unotify(nf, SND_OFFLINE);
             }
             UNLOCK(&msn.lock);
@@ -407,79 +415,105 @@ void *msn_ndaemon(void *dummy)
         /* list remove */
 
             char lst[SML];
-            int grp = -1;
+            int nf;
 
             lst[0] = 0;
-            sscanf(s + 4, "%*u %s %*d %s %d", lst, arg1, &grp);
+            nf = sscanf(s + 4, "%*u %s %s %s", lst, arg1, arg2);
             switch (lst[0]) {
                 case 'F':
                     LOCK(&msn.lock);
-                    msn_clist_rem(&msn.CL, msn_FL, arg1, grp);
+                    if (nf == 3) msn_clist_rem(&msn.CL, msn_FL, arg1, arg2);
+                    else msn_clist_rem(&msn.CL, msn_FL, arg1, NULL);
                     draw_lst(1);
-                    if (grp == -1) grp = 0;
-                    msg(C_MSG, "<%s> has been removed from group %s\n",
-                        arg1, msn_glist_findn(&msn.GL, grp));
+                    p = msn_clist_findu(&msn.CL, 0, arg1);
+                    if (p) {
+                        if (nf == 3)
+                            msg(C_MSG, "%s <%s> has been removed from group %s\n",
+                                getnick1c(p), p->login, msn_glist_findn(&msn.GL, arg2));
+                        else msg(C_MSG, "%s <%s> has been removed from your forward list\n",
+                                 getnick1c(p), p->login);
+                    }
                     UNLOCK(&msn.lock);
                     break;
                 case 'A':
                     LOCK(&msn.lock);
-                    msn_clist_rem(&msn.CL, msn_AL, arg1, -1);
+                    msn_clist_rem(&msn.CL, msn_AL, arg1, NULL);
                     UNLOCK(&msn.lock);
                     msg(C_MSG, "<%s> has been removed from your allow list\n", arg1);
                     break;
                 case 'B':
                     LOCK(&msn.lock);
-                    msn_clist_rem(&msn.CL, msn_BL, arg1, -1);
+                    msn_clist_rem(&msn.CL, msn_BL, arg1, NULL);
                     draw_lst(1);
                     UNLOCK(&msn.lock);
                     msg(C_MSG, "<%s> has been unblocked\n", arg1);
                     break;
                 case 'R':
                     LOCK(&msn.lock);
-                    msn_clist_rem(&msn.CL, msn_RL, arg1, -1);
+                    msn_clist_rem(&msn.CL, msn_RL, arg1, NULL);
                     UNLOCK(&msn.lock);
                     break;
                     msg(C_MSG, "<%s> has removed you from his/her contact list\n", arg1);
             }
-        } else if (is3(com, "ADD")) {
+        } else if (is3(com, "ADC")) {
 
-        /* list add */
+        /* list add contact */
 
-            int gid;
-            char lst[SML];
+            char uuid[SNL];
+            char lst = 0;
             msn_contact_t *q;
 
-            lst[0] = 0;
-            sscanf(s + 4, "%*u %s %*d %s %s %d", lst, arg1, arg2, &gid);
-            url2str(arg2, nick);
-            switch (lst[0]) {
+            uuid[0] = uuid[1] = uuid[2] = 0;
+            arg1[1] = arg1[2] = arg2[1] = arg2[2] = 0;
+            /* quick'n'dirty way instread of calling msn_parse_contact_data() */
+            sscanf(s + 4, "%*u %c%*s %s %s %s", &lst, arg1, arg2, uuid);
+            if (arg2[0] == 'F' && arg2[1] == '=') url2str(&arg2[2], nick);
+
+            switch (lst) {
                 case 'F':
                     LOCK(&msn.lock);
-                    q = msn_clist_add(&msn.CL, msn_FL, arg1, nick, gid);
-                    draw_lst(1);
-                    msg(C_MSG, "%s <%s> has been added to group %s\n",
-                            getnick(arg1, nick, Config.notif_aliases), arg1, msn_glist_findn(&msn.GL, gid));
+                    if (arg1[0] == 'N') {
+                        q = msn_clist_add(&msn.CL, msn_FL, &arg1[2], nick, NULL, &uuid[2]);
+                        draw_lst(1);
+                        msg(C_MSG, "%s <%s> has been added to your forward list\n",
+                                getnick2(&arg1[2], nick));
+                    } else if (arg1[0] == 'C') {
+                        if (p = msn_clist_findu(&msn.CL, msn_FL, &arg1[2])) {
+                            q = msn_clist_add(&msn.CL, msn_FL, p->login, p->nick, arg2, p->uuid);
+                            draw_lst(1);
+                            msg(C_MSG, "%s <%s> has been added to group %s\n",
+                                    getnick1c(p), msn_glist_findn(&msn.GL, arg2));
+                        }
+                    }
                     UNLOCK(&msn.lock);
                     break;
                 case 'A':
+                    /* let's hope it's not referenced by uuid */
                     LOCK(&msn.lock);
-                    msn_clist_add(&msn.CL, msn_AL, arg1, nick, 0);
+                    msn_clist_add(&msn.CL, msn_AL, &arg1[2], NULL, NULL, NULL);
                     UNLOCK(&msn.lock);
-                    msg(C_MSG, "%s <%s> has been added to your allow list\n", getnick(arg1, nick, Config.notif_aliases), arg1);
+                    msg(C_MSG, "%s <%s> has been added to your allow list\n", getnick1(&arg1[2]), &arg1[2]);
                     break;
                 case 'B':
                     LOCK(&msn.lock);
-                    msn_clist_add(&msn.CL, msn_BL, arg1, nick, 0);
+                    msn_clist_add(&msn.CL, msn_BL, &arg1[2], NULL, NULL, NULL);
                     draw_lst(1);
                     UNLOCK(&msn.lock);
-                    msg(C_MSG, "%s <%s> has been blocked\n", getnick(arg1, nick, Config.notif_aliases), arg1);
+                    msg(C_MSG, "%s <%s> has been blocked\n", getnick1(&arg1[2]), &arg1[2]);
                     break;
                 case 'R':
                     LOCK(&msn.lock);
-                    q = msn_clist_add(&msn.CL, msn_RL, arg1, nick, 0);
-                    if (msn.GTC == 'A') 
-                        msg(C_MSG, "%s <%s> has added you to his/her contact list\n", 
-                                getnick(arg1, nick, Config.notif_aliases), arg1);
+                    q = msn_clist_add(&msn.CL, msn_RL, &arg1[2], NULL, NULL, NULL);
+                    UNLOCK(&msn.lock);
+                    break;
+                case 'P':
+                    LOCK(&msn.lock);
+                    q = msn_clist_add(&msn.CL, msn_PL, &arg1[2], NULL, NULL, NULL);
+                    if (msn.GTC == 'A')
+                        msg(C_MSG, "%s <%s> has added you to his/her contact list\n",
+                                getnick1(&arg1[2]), &arg1[2]);
+                    /*msn_adc(msn.nfd, nftid(), 'R', &arg1[2], NULL);
+                    msn_rem(msn.nfd, nftid(), 'P', &arg1[2], NULL); */
                     UNLOCK(&msn.lock);
                     break;
             }
@@ -487,30 +521,42 @@ void *msn_ndaemon(void *dummy)
 
         /* contact lists */
 
-            int gid;
-            unsigned char lflags;
-            char gids[SML], *tmp;
+            unsigned int lflags;
+            char uuid[SNL], *rest, *tmp;
             
-            sscanf(s + 4, "%s %s %d %s", arg1, arg2, &lflags, gids);
-            url2str(arg2, nick);
+            /*sscanf(s + 4, "%s %s %u %s", arg1, arg2, &lflags, gids);*/
+            rest = msn_parse_contact_data(s+4, arg1, nick, uuid);
+            /*msg(C_DBG, "PARSED login = %s, nick = %s, uuid = %s\nrest = %s\n", arg1, nick, gid, rest);*/
+            sscanf(rest, "%d", &lflags);
+			
             LOCK(&msn.lock);
-            q = msn_clist_add(&msn.CL, lflags, arg1, nick, 0);
+            q = msn_clist_add(&msn.CL, lflags, arg1, nick, NULL, uuid);
             if (lflags & msn_FL) {
+                tmp = strchr(rest, ' '); /* before list flags */
+                if (tmp != NULL) tmp = strchr(tmp+1, ' '); /* before contact type */
+                if (tmp != NULL) tmp = strchr(tmp+1, ' '); /* before groups */
                 /* FL */
-                tmp = gids;
-                while (1) {
-                    if (sscanf(tmp, "%d", &gid) == 1)
-                        q = msn_clist_add(&msn.CL, msn_FL, arg1, nick, gid);
-                    else break;
-                    tmp = strchr(tmp, ',');
-                    if (tmp == NULL) break; else tmp++;
+                if (tmp != NULL) {
+                    int i;
+                    tmp++;
+                    for (i = 0; tmp[i]; i++) if (tmp[i] == ',') tmp[i] = ' ';
+                    while (1) {
+                        char gid[SNL];
+                        if (sscanf(tmp, "%s", gid) == 1) {
+                            /* msg(C_DBG, "parsed group %s for contact %s %s\n", gid, arg1, uuid); */
+                            q = msn_clist_add(&msn.CL, msn_FL, arg1, nick, gid, uuid);
+                        }
+                        else break;
+                        tmp = strchr(tmp, ' ');
+                        if (tmp == NULL) break; else tmp++;
+                    }
                 }
             }
-            if (lflags & 8) {
-                /* RL */
-                if (q->lflags == msn_RL && msn.GTC == 'A')
-                    msg(C_MSG, "%s <%s> has added you to his/her contact list\n", 
-                            getnick(arg1, nick, Config.notif_aliases), arg1);
+            /* if (q->groups) msg(C_DBG, "added contact: %s, groups = %d\n", q->login, q->groups); */
+            if (lflags & (msn_PL | msn_RL)) {
+                /* RL, PL */
+                if ((q->lflags & (msn_FL | msn_AL | msn_BL)) == 0 && msn.GTC == 'A')
+                    msg(C_MSG, "%s <%s> has added you to his/her contact list\n", getnick2(arg1, nick), arg1);
             }
             if (--msn.list_count == 0) {
             /* end of sync -- last LST rmember */
@@ -518,7 +564,7 @@ void *msn_ndaemon(void *dummy)
                 int ignored, notify, count = 0;
                 char name[SML], fn[SML];
                 FILE *f; 
-                int cF = 0, cA = 0, cB = 0, cR = 0; /* counters */
+                int cF = 0, cA = 0, cB = 0, cR = 0, cP = 0; /* counters */
                 
                 /* loading per-contact settings */                
                 sprintf(fn, "%s/%s/per_contact", Config.cfgdir, msn.login);
@@ -526,7 +572,7 @@ void *msn_ndaemon(void *dummy)
                 if (f != NULL) {
                     char ver[SNL] = {0};
                     fscanf(f, "#GTMESS:%[^:]s:PCS\n", ver);
-                    if (strcmp(ver, VERSION) != 0) {
+                    if (strcmp(ver, "0.94") < 0) {
                         msg(C_ERR, "%s: version mismatch -- delete to recreate with defaults\n", fn);
                         skip_pcs = 1;
                     } else {                    
@@ -549,18 +595,19 @@ void *msn_ndaemon(void *dummy)
                     cA += (p->lflags & msn_AL) == msn_AL;
                     cB += (p->lflags & msn_BL) == msn_BL;
                     cR += (p->lflags & msn_RL) == msn_RL;
+                    cP += (p->lflags & msn_PL) == msn_PL;
                 }
                 
-                if (cA + cB > cR) match_color = C_ERR; else if (cA + cB < cR) match_color = C_DBG;
+                if (cP > 0 || cA + cB < cR) match_color = C_DBG;
                 
-                msg(match_color, "FL/AL/BL/RL contacts: %d/%d/%d/%d\n", cF, cA, cB, cR);
+                msg(match_color, "FL/AL/BL/RL/PL contacts: %d/%d/%d/%d/%d\n", cF, cA, cB, cR, cP);
                     
                 msn_list_cleanup(&msn.CL, msn_FL);
 
-                /* update FL with IL */
-                for (p = msn.IL.head; p != NULL; p = p->next)
+                /* update FL with IL -- do we still need this?  */
+                /*for (p = msn.IL.head; p != NULL; p = p->next)
                     msn_clist_update(&msn.CL, msn_FL, p->login, p->nick, p->status, -1);
-                msn_clist_free(&msn.IL);
+                msn_clist_free(&msn.IL);*/
 
                 /* activate contact list if no SB windows? */
 /*                LOCK(&SX);
@@ -569,6 +616,7 @@ void *msn_ndaemon(void *dummy)
                 draw_lst(1);
 /*                write_syn_cache();*/
                 /* initial status to log in */
+                if (Config.force_nick[0]) msn_prp(msn.nfd, nftid(), Config.force_nick);
                 if (Config.initial_status) msn_chg(msn.nfd, nftid(), Config.initial_status);
                 
             }
@@ -576,7 +624,7 @@ void *msn_ndaemon(void *dummy)
         } else if (is3(com, "SYN")) {
 
         /* sync begin */
-            sscanf(s + 4, "%*u %u %d", &msn.SYN, &msn.list_count);
+            sscanf(s + 4, "%*u %*s %*s %d", &msn.list_count);
             msn.in_syn = 1;
 /*            if (msn.SYN == syn_cache.ver) {
                 LOCK(&msn.lock);
@@ -595,8 +643,33 @@ void *msn_ndaemon(void *dummy)
             
             /* msg(C_MSG, "Challenge accepted\n"); */
             
-        } else if (is3(com, "PRP") /* personal phone numbers (ignore) */
-                    || is3(com, "BPR")) { /* user phone numbers */
+        } else if (is3(com, "PRP")) {
+			
+            /* personal data (nick, phone numbers etc.) */
+
+            if (msn.in_syn) sscanf(s + 4, "%s %s", arg1, arg2);
+            else sscanf(s + 4, "%*u %s %s", arg1, arg2);
+
+            if (is3(arg1, "MFN")) {
+
+                /* my friendly name */
+                /* screen name change */
+
+                url2str(arg2, nick);
+                LOCK(&msn.lock);
+                Strcpy(msn.nick, nick, SML);
+                draw_status(1);
+                UNLOCK(&msn.lock);
+            }
+
+        } else if (is3(com, "SBS")) {
+
+            /* mobile credits */
+            /* ignore */
+
+        } else if (is3(com, "BPR")) {
+			
+            /* user phone numbers, blogs, etc. */
             
             /* ignore */
             
@@ -615,19 +688,22 @@ void *msn_ndaemon(void *dummy)
                 sec = ((double) isec + ((double) (tv.tv_usec - tv_ping.tv_usec)) / 1000000);
                 msg(C_MSG, "RTT = %g sec, NEXT = %d\n", sec, next);
             }
-        } else if (is3(com, "REA")) {
+        } else if (is3(com, "SBP")) {
 
         /* screen name change */
 
-            sscanf(s + 4, "%*u %*d %s %s", arg1, arg2);
-            url2str(arg2, nick);
-            LOCK(&msn.lock);
-            if (strcmp(arg1, msn.login) == 0) {
-                Strcpy(msn.nick, nick, SML);
-                draw_status(1);
-            } else if (msn_clist_update(&msn.CL, msn_FL, arg1, nick, -1, -1) > 0)
-                draw_lst(1);
-            UNLOCK(&msn.lock);
+            char sett[SNL];
+
+            sscanf(s + 4, "%*u %s %s %s", arg1, sett, arg2);
+
+            if (is3(sett, "MFN")) {
+                url2str(arg2, nick);
+                LOCK(&msn.lock);
+                if (msn_clist_update(&msn.CL, msn_FL, arg1, nick, -1, -1, 1) > 0)
+                    draw_lst(1);
+                UNLOCK(&msn.lock);
+            }
+
         } else if (is3(com, "XFR")) {
 
         /* referral */
@@ -681,7 +757,7 @@ void *msn_ndaemon(void *dummy)
                     UNLOCK(&SX);
                     pthread_create(&sb->thrid, NULL, msn_sbdaemon, (void *) sb);
                 }
-            } else msgn(C_DBG, strlen(s)+6, "<<< %s\n", s);
+            } else msgn(C_DBG, strlen(s)+6, ">>> %s\n", s);
         } else if (is3(com, "RNG")) {
 
         /* invitation to switchboard */
@@ -693,13 +769,13 @@ void *msn_ndaemon(void *dummy)
             sscanf(s + 4, "%s %s %*s %s %s %s", sessid, sbaddr, hash, arg1, arg2);
             url2str(arg2, nick);
             LOCK(&msn.lock);
-            found = msn_clist_update(&msn.CL, msn_FL, arg1, nick, -1, -1);
+            found = msn_clist_update(&msn.CL, msn_FL, arg1, nick, -1, -1, 0);
             if (found > 0) draw_lst(1);
             if (found == -1 && msn.BLP == 'B') {
                 UNLOCK(&msn.lock);
             } else {
-                msg(C_MSG, "%s <%s> rings\n", getnick(arg1, nick, Config.notif_aliases), arg1);
-                sprintf(nf, "%s rings\n", getnick(arg1, nick, Config.aliases));
+                msg(C_MSG, "%s <%s> rings\n", getnick2(arg1, nick), arg1);
+                sprintf(nf, "%s rings\n", getnick2(arg1, nick));
                 if (can_notif(arg1)) unotify(nf, SND_RING);
                 p = msn_clist_find(&msn.CL, 0, arg1);
                 if (p != NULL) ignore = p->ignored; else ignore = 0;
@@ -724,7 +800,7 @@ void *msn_ndaemon(void *dummy)
                 if (!found) sb = msn_sblist_add(&SL, sbaddr, hash, arg1, nick, 1, sessid);
                 else {
                     /* reuse inactive switchboard */
-                    if (sb->thrid != -1) {
+                    if (sb->thrid != (pthread_t) -1) {
                         pthread_t tmp = sb->thrid;
                         pthread_cancel(tmp);
                         pthread_join(tmp, NULL);
@@ -761,21 +837,59 @@ void *msn_ndaemon(void *dummy)
             break;
         } else if (is3(com, "NOT")) {
             
-        /* sever notification -- just ignore */
-            
+            /* sever notification -- just ignore */
+
             if (sscanf(s + 4, "%d", &msglen) == 1) {
-                msgdata = (char *) Malloc(msglen+1);
-                r = bfFlushN(&buf, msgdata, msglen);
-                bfReadX(&buf, msgdata + r, msglen - r);
-                msgdata[msglen] = 0;
+                msgdata = msn_get_payload(&buf, msglen);
                 if (Config.log_traffic && msglen > 0) fprintf(flog, "%s", msgdata);
                 free(msgdata);
             }
+
+        } else if (is3(com, "LKP")) {
+
+            /* lookup phone numbers */
+            /* ignore */
+
+        } else if (is3(com, "UUX")) {
+
+            /* personal message, etc. -- ignore */
+
+        } else if (is3(com, "UBX")) {
+
+            /* buddy personal message */
+            if (sscanf(s + 4, "%s %d", arg1, &msglen) == 2) {
+                char *psm1, *psm2;
+                msgdata = msn_get_payload(&buf, msglen);
+                if (Config.log_traffic && msglen > 0) fprintf(flog, "%s", msgdata);
+                if (Config.msg_debug == 2) {
+                    msg(C_DBG, "Personal data for <%s>:\n", arg1);
+                    msgn(C_DBG, strlen(msgdata)+2, "%s\n", msgdata);
+                }
+                psm1 = strafter(msgdata, "<PSM>");
+                if (psm1) psm2 = strstr(psm1, "</PSM>");
+                if (psm2) *psm2 = 0;
+                if (psm1 && psm2) msg(C_MSG, "%s <%s> - %s\n", getnick1(arg1), arg1, psm1);
+                free(msgdata);
+            }
+
+        } else if (is3(com, "GCF")) {
+
+            /* global configuration file */
+            if (sscanf(s + 4, "%*d %s %d", arg1, &msglen) == 2) {
+                msgdata = msn_get_payload(&buf, msglen);
+                if (Config.log_traffic && msglen > 0) fprintf(flog, "%s", msgdata);
+                if (Config.msg_debug >= 1) {
+                    msg(C_DBG, "Received Global Configuration File '%s':\n", arg1);
+                    msgn(C_DBG, strlen(msgdata)+2, "%s\n", msgdata);
+                }
+                free(msgdata);
+            }
+
         } else
 
         /* error code or unhandled command */
 
-            if (!scan_error(com)) msgn(C_DBG, strlen(s)+6, "<<< %s", s);
+            if (!scan_error(com)) msgn(C_DBG, strlen(s)+6, ">>> %s", s);
     }
     pthread_cleanup_pop(0);
     logout_cleanup((void *) r);
@@ -785,6 +899,8 @@ void *msn_ndaemon(void *dummy)
 
 void msn_init(msn_t *msn)
 {
+	int i;
+	
     Strcpy(msn->nick, msn->login, SML);
     msn->status = MS_FLN;
     msn->inbox = 0;
@@ -795,17 +911,18 @@ void msn_init(msn_t *msn)
     msn->GL.head = NULL; msn->GL.count = 0;
     msn->CL.head = NULL; msn->CL.count = 0;
     msn->hlogin[0] = 0;
-    msn->hgid = 0;
+    msn->hgid[0] = 0;
     msn->dhid = 0;
 
-    msn->IL.head = NULL; msn->IL.count = 0;
+    /* msn->IL.head = NULL; msn->IL.count = 0; */
 
     msn->list_count = -1;
     msn->flskip = 0;
     msn->nfd = -1;
     msn->in_syn = 0;
-    msn->thrid = -1;
+    msn->thrid = (pthread_t) -1;
     
     msn->fn_log[0] = 0;
     msn->fp_log = NULL;
+	
 }

@@ -1,4 +1,16 @@
 *******************************
+* Version 0.96beta            *
+*******************************
+~ buggy contact list add/remove (to be fixed in final)
++ personal message support (set/display)
++ MSNP12 support
++ new challenge/response implementation {Tibor}
+! fixed a memory leak in clist group realloc
+* contact list cleanup, corrected warnings
++ set nickname upon login [force_nick]
+
+
+*******************************
 * Version 0.94 (26 Dec 2007)  *
 *******************************
 * improved handling of `notify.pip'
@@ -165,5 +177,8 @@ Legend:
 * change/modification/update
 + addition
 - removal
+~ known bug
 <X> comments/suggestions by X
 {X} contributed code by X
+[x] configuration variable x
+

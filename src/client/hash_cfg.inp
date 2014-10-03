@@ -63,3 +63,4 @@ skip_says, 32
 safe_msg, 33
 err_connreset, 34
 auto_cl, 35
+force_nick, 36

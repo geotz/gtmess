@@ -2,7 +2,7 @@
  *    msn.c
  *
  *    gtmess - MSN Messenger client
- *    Copyright (C) 2002-2007  George M. Tzoumas
+ *    Copyright (C) 2002-2009  George M. Tzoumas
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -43,7 +43,9 @@ char *msn_stat_com[] = { "FLN", "HDN", "NLN", "IDL",
 char msn_stat_char[10] = "  >-=*_#&?";
 
 iconv_t msn_ic[2];
-        
+
+msn_group_t msn_group_0 = { "* individuals *", "", NULL };
+
 /******* contact lists *******/
 
 msn_contact_t *msn_clist_find(msn_clist_t *q, unsigned char lf, char *login)
@@ -52,6 +54,15 @@ msn_contact_t *msn_clist_find(msn_clist_t *q, unsigned char lf, char *login)
 
     for (p = q->head; p != NULL; p = p->next)
         if ((p->lflags & lf) == lf && strcmp(p->login, login) == 0) break;
+    return p;
+}
+
+msn_contact_t *msn_clist_findu(msn_clist_t *q, unsigned char lf, char *uuid)
+{
+    msn_contact_t *p;
+	
+    for (p = q->head; p != NULL; p = p->next)
+        if ((p->lflags & lf) == lf && strcmp(p->uuid, uuid) == 0) break;
     return p;
 }
 
@@ -83,14 +94,16 @@ int msn_clist_gcount(msn_clist_t *q, char *login)
      0 = contact in list, but up-to-date
      1 = contact updated
 */
-int msn_clist_update(msn_clist_t *q, unsigned char lf, char *login,
-                     char *nick, int status, int tm_last_char)
+int msn_clist_update(msn_clist_t *q, unsigned char lf, char *loginu,
+                     char *nick, int status, int tm_last_char, int byuuid)
 {
     msn_contact_t *p;
     int r = -1;
+    char *s;
 
-    for (p = q->head; p !=NULL; p = p->next)
-        if (((p->lflags & lf) == lf) && strcmp(p->login, login) == 0) {
+    for (p = q->head; p !=NULL; p = p->next) {
+        if (byuuid) s = p->uuid; else s = p->login;
+        if (((p->lflags & lf) == lf) && strcmp(s, loginu) == 0) {
             r = 0;
             if (nick != NULL) {
                 if (strcmp(p->nick, nick) != 0) p->dirty = 1;
@@ -101,6 +114,7 @@ int msn_clist_update(msn_clist_t *q, unsigned char lf, char *login,
             if (tm_last_char >= 0) p->tm_last_char = tm_last_char, r = 1;
             break;
         }
+    }
     return r;
 }
 
@@ -108,7 +122,9 @@ void msn_contact_free(msn_contact_t *q)
 {
     if (q->next != NULL) msn_contact_free(q->next);
     if (q->gid != NULL) {
+        int i;
         assert(q->gidsize > 0);
+        for (i = 0; i < q->groups; i++)	free(q->gid[i]);
         free(q->gid);
     }
     free(q);
@@ -117,8 +133,8 @@ void msn_contact_free(msn_contact_t *q)
 void msn_clist_free(msn_clist_t *q)
 {
     if (q->head != NULL) msn_contact_free(q->head);
-    q->head = NULL;
     q->count = 0;
+    q->head = NULL;
 }
 
 int msn_clist_rem_zombies(msn_clist_t *q)
@@ -136,7 +152,11 @@ int msn_clist_rem_zombies(msn_clist_t *q)
         }
         if (p != NULL) {
             next = p->next;
-            if (p->gid != NULL) free(p->gid);
+            if (p->gid != NULL) {
+                int i;
+                for (i = 0; i < p->groups; i++) free(p->gid[i]);
+                free(p->gid);
+            }
             free(p); c++;
             if (last != NULL) last->next = next; else q->head = next;
             p = next;
@@ -146,14 +166,15 @@ int msn_clist_rem_zombies(msn_clist_t *q)
     return c;
 }
 
-int msn_clist_rem_grp(msn_clist_t *q, int gid)
+int msn_clist_rem_grp(msn_clist_t *q, char *gid)
 {
     msn_contact_t *p;
     int i, c = 0;
 
     for (p = q->head; p != NULL; p = p->next) {
         /* linear search, no problem since #groups small */
-        for (i = 0; i < p->groups; i++) if (p->gid[i] == gid) {
+        for (i = 0; i < p->groups; i++) if (strcmp(p->gid[i], gid) == 0) {
+			free(p->gid[i]);
             if (i < p->groups-1) memmove(&p->gid[i], &p->gid[i+1], p->groups-i-1);
             p->groups--;
             c++;
@@ -165,33 +186,7 @@ int msn_clist_rem_grp(msn_clist_t *q, int gid)
     return c;
 }
 
-/*int msn_clist_rem_grp(msn_clist_t *q, msn_clist_t *rl, int gid)
-{
-    msn_contact_t *p, *rev;
-    msn_contact_t *last, *next;
-    int c = 0;
-
-    p = q->head;
-    last = NULL;
-    while (1) {
-        while (p != NULL && (p->gid != gid)) {
-            last = p;
-            p = p->next;
-        }
-        if (p != NULL) {
-            next = p->next;
-            if (rl != NULL && (rev = msn_clist_find(rl, p->login)) != NULL)
-                rev->gid--;
-            free(p); c++;
-            if (last != NULL) last->next = next; else q->head = next;
-            p = next;
-            q->count--;
-        } else break;
-    }
-    return c;
-}*/
-
-void msn_clist_rem(msn_clist_t *q, unsigned char lf, char *login, int gid)
+void msn_clist_rem(msn_clist_t *q, unsigned char lf, char *login, char *gid)
 {
     msn_contact_t *p;
     int i;
@@ -203,52 +198,22 @@ void msn_clist_rem(msn_clist_t *q, unsigned char lf, char *login, int gid)
         if (lf == msn_FL) {
             /* linear search, no problem since #groups small */
             i = 0;
-            if (p->gid != NULL) while (i < p->groups)
-                if (p->gid[i] == gid) {
+            if (p->gid != NULL && gid[0]) {
+                while (i < p->groups)
+                if (strcmp(p->gid[i], gid) == 0) {
+                    free(p->gid[i]);
                     if (i < p->groups-1) memmove(&p->gid[i], &p->gid[i+1], p->groups-i-1);
                     p->groups--;
                     break;
                 } else i++;
-            if (p->groups == 0) p->lflags &= ~msn_FL;
+                if (p->groups == 0) p->lflags &= ~msn_FL;
+            } else p->lflags &= ~msn_FL;
         } else p->lflags &= ~lf;
         
         break; /* weird style, isn't it? :-) */
     }
     msn_clist_rem_zombies(q);
 }
-
-/*
-int msn_clist_rem(msn_clist_t *q, unsigned char lf, char *login, int gid)
-{
-    msn_contact_t *p = q->head;
-    msn_contact_t *last = NULL, *next;
-    int i;
-
-    while (p != NULL && 
-          (strcmp(p->login, login) != 0 || ((p->flags & lf) != lf) || (gid >= 0 && p->gid != gid))) {
-        /* de morgan ! *
-        /* ! ((p == NULL) || (strcmp(p->login, login == 0) && (gid < 0 || p->gid == gid))) *
-        last = p;
-        p = p->next;
-    }
-    if (p != NULL) {
-        if (lf == msn_FL) for (i = 0; i < p->groups; i++) if (p->gid[i] == gid) {
-            if (i < p->groups-1) memmove(&p->gid[i], &p->gid[i+1], p->groups-i-1);
-            p->groups--;
-            break;
-        }
-        p->flags &= (~lf);
-        if (p->flags == 0) {
-            next = p->next;
-            free(p->gid);
-            free(p);
-            if (last != NULL) last->next = next; else q->head = next;
-            q->count--;
-            return 1;
-        }
-    }
-    return 0;
-} */
 
 /* int msn_clist_load(msn_clist_t *q, FILE *f, int count)
 {
@@ -288,19 +253,19 @@ int msn_clist_rem(msn_clist_t *q, unsigned char lf, char *login, int gid)
     return c;
 } */
 
-/* gid == -1: not gids will be stored (gid stays NULL) */
 
-msn_contact_t *msn_clist_add(msn_clist_t *q, unsigned char lf, char *login, char *nick, int gid)
+/* gid == NULL: no gids will be stored (contact gid stays NULL) */
+msn_contact_t *msn_clist_add(msn_clist_t *q, unsigned char lf, char *login, char *nick, char *gid, char *uuid)
 {
     msn_contact_t *p;
 
     if ((p = msn_clist_find(q, 0, login)) != NULL) {
-        if ((lf & msn_FL) == msn_FL) {
+        if (gid != NULL && gid[0] && (lf & msn_FL) == msn_FL) {
             if (p->groups >= p->gidsize) {
-                p->gidsize *= 2;
-                p->gid = realloc(p->gid, p->gidsize * sizeof(int));
+                if (p->gidsize == 0) p->gidsize = 4; else p->gidsize *= 2;
+                p->gid = (char **) realloc(p->gid, p->gidsize * sizeof(char *));
             }
-            p->gid[p->groups++] = gid;
+            p->gid[p->groups++] = strdup(gid);
         }
         p->lflags |= lf;
         return p;
@@ -310,9 +275,9 @@ msn_contact_t *msn_clist_add(msn_clist_t *q, unsigned char lf, char *login, char
     if (p == NULL) return NULL;
     p->lflags = lf;
     
-    if (gid >= 0) {
+    if (gid != NULL) {
         p->gidsize = 4;
-        p->gid = (int *) malloc(p->gidsize * sizeof(int));
+        p->gid = (char **) malloc(p->gidsize * sizeof(char *));
         if (p->gid == NULL) {
             free(p);
             return NULL;
@@ -325,7 +290,10 @@ msn_contact_t *msn_clist_add(msn_clist_t *q, unsigned char lf, char *login, char
     p->groups = 0;
     p->tm_last_char = 0;
     Strcpy(p->login, login, SML);
-    Strcpy(p->nick, nick, SML);
+    if (nick != NULL && nick[0]) Strcpy(p->nick, nick, SML);
+    else Strcpy(p->nick, p->login, SML);
+    if (uuid != NULL && uuid[0]) Strcpy(p->uuid, uuid, SNL);
+    else p->uuid[0] = 0;
     p->dirty = 0;
     p->status = MS_FLN;
     p->notify = 1;
@@ -341,9 +309,11 @@ void msn_contact_cpy(msn_contact_t *dest, msn_contact_t *src)
 {
     memcpy(dest, src, sizeof(msn_contact_t));
     if (dest->gid != NULL) {
-        dest->gid = (int *) malloc(dest->gidsize * sizeof(int));
-        memcpy(dest->gid, src->gid, dest->groups * sizeof(int));
+        int i;
+        dest->gid = (char **) malloc(dest->gidsize * sizeof(char *));
+		for (i = 0; i < dest->groups; i++) dest->gid[i] = strdup(src->gid[i]);
     }
+    dest->next = NULL;
 }
 
 void msn_clist_cpy(msn_clist_t *dest, msn_clist_t *src, unsigned char lf)
@@ -366,21 +336,21 @@ void msn_clist_cpy(msn_clist_t *dest, msn_clist_t *src, unsigned char lf)
 
 /******* group lists *******/
 
-msn_group_t *msn_glist_find(msn_glist_t *q, int gid)
+msn_group_t *msn_glist_find(msn_glist_t *q, char *gid)
 {
     msn_group_t *p;
 
     for (p = q->head; p != NULL; p = p->next)
-        if (p->gid == gid) break;
+        if (strcmp(p->gid, gid) == 0) break;
     return p;
 }
 
-char *msn_glist_findn(msn_glist_t *q, int gid)
+char *msn_glist_findn(msn_glist_t *q, char *gid)
 {
     msn_group_t *p;
 
     for (p = q->head; p != NULL; p = p->next)
-        if (p->gid == gid) return p->name;
+        if (strcmp(p->gid, gid) == 0) return p->name;
     return "<unknown>";
 }
 
@@ -397,22 +367,22 @@ void msn_glist_free(msn_glist_t *q)
     q->count = 0;
 }
 
-void msn_glist_ren(msn_glist_t *q, int gid, char *newname)
+void msn_glist_ren(msn_glist_t *q, char *gid, char *newname)
 {
     msn_group_t *p = q->head;
 
-    while (p != NULL && p->gid != gid) p = p->next;
+    while (p != NULL && strcmp(p->gid, gid) != 0) p = p->next;
     if (p != NULL) {
         Strcpy(p->name, newname, SML);
     }
 }
 
-void msn_glist_rem(msn_glist_t *q, int gid)
+void msn_glist_rem(msn_glist_t *q, char *gid)
 {
     msn_group_t *p = q->head;
     msn_group_t *last = NULL, *next;
 
-    while (p != NULL && p->gid != gid) {
+    while (p != NULL && strcmp(p->gid, gid) != 0) {
         last = p;
         p = p->next;
     }
@@ -461,23 +431,25 @@ int msn_glist_save(msn_glist_t *q, FILE *f)
     return c;
 } */
 
-void msn_glist_add(msn_glist_t *q, int gid, char *name)
+msn_group_t *msn_glist_add(msn_glist_t *q, char *gid, char *name)
 {
     msn_group_t *p, *cur, *last;
 
     p = (msn_group_t *) calloc(1, sizeof(msn_group_t));
-    if (p == NULL) return;
-    p->gid = gid;
+    if (p == NULL) return NULL;
+    Strcpy(p->gid, gid, SNL);
     Strcpy(p->name, name, SML);
 
     cur = q->head;
     last = NULL;
-    while (cur != NULL && p->gid > cur->gid) last = cur, cur = cur->next;
+    /* insertion sort by name */
+    while (cur != NULL && strcmp(p->name, cur->name) > 0) last = cur, cur = cur->next;
     p->next = cur;
     if (last != NULL) {
         last->next = p;
     } else q->head = p;
     q->count++;
+    return p;
 }
 
 void msn_glist_cpy(msn_glist_t *dest, msn_glist_t *src, msn_contact_t *ref)
@@ -492,7 +464,7 @@ void msn_glist_cpy(msn_glist_t *dest, msn_glist_t *src, msn_contact_t *ref)
         if (ref != NULL) {
             int i;
             for (i = 0; i < ref->groups; i++)
-                if (ref->gid[i] == p->gid) break;
+                if (strcmp(ref->gid[i], p->gid) == 0) break;
             if (i == ref->groups) continue;
         }
         q = (msn_group_t *) malloc(sizeof(msn_group_t));
@@ -502,26 +474,6 @@ void msn_glist_cpy(msn_glist_t *dest, msn_glist_t *src, msn_contact_t *ref)
         dest->head = q;
         dest->count++;
     }
-}
-
-int msn_glist_nextgid(msn_glist_t *q, int gid)
-{
-    msn_group_t *p = msn_glist_find(q, gid);
-    if (p == NULL) return 0; /* should be -1, but 0 is better for drawing */
-    if (p->next == NULL) return q->head->gid;
-    return p->next->gid;
-}
-
-int msn_glist_prevgid(msn_glist_t *q, int gid)
-{
-    msn_group_t *p, *last = q->head;
-    if (q->head == NULL) return 0; /* should be -1, but 0 is better for drawing */
-    for (p = q->head->next; p != NULL; p = p->next) {
-        if (p->gid == gid) return last->gid;
-        last = p;
-    }
-    if (gid == 0) return last->gid;
-    else return 0; /* should be -1, but 0 is better for drawing */
 }
 
 /******* string utility routines *******/
@@ -660,6 +612,42 @@ int is3(char *a, char *b)
     return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
 }
 
+
+/* buf contains server data, starting from "X=..." (just after tid)
+   if login/nick/uuid are not NULL, then parsed data are stored there;
+   if no data is found, then strings become EMPTY!
+   returns a pointer to the first character after the last token parsed (usually ' ') */
+char *msn_parse_contact_data(char *buf, char *login, char *nick, char *uuid)
+{
+    char *cur, t;
+    char tmp[SML];
+
+    if (login == NULL) login = &tmp[0];
+    if (nick == NULL) nick = &tmp[0];
+    if (uuid == NULL) uuid = &tmp[0];
+    login[0] = nick[0] = uuid[0] = 0;
+    cur = strchr(buf, '=');
+    while (1) {
+        char t;
+        tmp[0] = 0;
+        if (cur == NULL) return buf;
+        t = *(cur-1);
+        if (t == 'N') {
+            sscanf(cur+1, "%s", login);
+            cur += strlen(login) + 1; /* +1 for '=' */
+        } else if (t == 'F') {
+            sscanf(cur+1, "%s", tmp);
+            cur += strlen(tmp) + 1;
+            if (nick != &tmp[0]) url2str(tmp, nick);
+        } else if (t == 'C') {
+            sscanf(cur+1, "%s", uuid);
+            cur += strlen(uuid) + 1;
+        }
+        buf = cur;
+        cur = strchr(buf, '=');
+    }
+}
+
 /******* errors *******/
 
 char *msn_error_str(int err)
@@ -786,14 +774,117 @@ int msn_out(int fd)
     return write(fd, "OUT\r\n", 5);
 }
 
-/* reply to server challenge */
-int msn_qry(int fd, unsigned int tid, char *hash)
+int is_little_endian(void)
 {
-    char reply[SNL], hex[SNL];
+  int w = 1;
+  return *((char *) &w);
+}
 
-    strcat(hash, "Q1P7W2E4J9R8U3S5");
-    md5hex(hash, hex);
-    sprintf(reply, "QRY %u msmsgs@msnmsgr.com 32\r\n%s", tid, hex);
+unsigned int convert_endianess(unsigned int i)
+{
+    unsigned int r;
+    r  = (i & 0x000000FF) << 0x18;
+    r |= (i & 0x0000FF00) << 0x08;
+    r |= (i & 0x00FF0000) >> 0x08;
+    r |= (i & 0xFF000000) >> 0x18;
+    return r;
+}
+
+/* adapted from original code by Tibor Billes */
+int msn_chl(const char *challenge, const char *product_id, char *hash)
+{
+    char md5[36];
+    unsigned int i[4], *j;
+    int loop;
+    size_t size;
+
+    /* product_key must be equal to or greater than product_id */
+    static const char *product_key = "YMM8C_H7KCQ2S_KL";
+    char *chg;
+    long long int low = 0, high = 0;
+    int hash_[4], h1, h2, h3, h4;
+
+    size = strlen(challenge) + strlen(product_key) + 8;
+    chg = (char *) Malloc(size);
+    if (chg == NULL) return -1;
+    j = (unsigned int *) chg;
+
+    strcpy(chg, challenge); strcat(chg, product_key);
+    md5hex(chg, md5);
+
+    sscanf(md5, "%8x%8x%8x%8x", &i[0], &i[1], &i[2], &i[3]);
+
+    /* the string md5hex returned is big endian */
+    if (is_little_endian()) {
+        i[0] = convert_endianess(i[0]) & 0x7FFFFFFF;
+        i[1] = convert_endianess(i[1]) & 0x7FFFFFFF;
+        i[2] = convert_endianess(i[2]) & 0x7FFFFFFF;
+        i[3] = convert_endianess(i[3]) & 0x7FFFFFFF;
+    } else {
+        i[0] &= 0x7FFFFFFF;
+        i[1] &= 0x7FFFFFFF;
+        i[2] &= 0x7FFFFFFF;
+        i[3] &= 0x7FFFFFFF;
+    }
+
+    strcpy(chg, challenge); strcat(chg, product_id);
+    for (loop = strlen(chg); loop % 8; loop++) chg[loop] = '0';
+    chg[loop+1] = 0;
+
+    if (!is_little_endian()) {
+        for (loop = 0; loop < strlen(chg); loop += 4) {
+            /* `/4' looks more beautiful and should get converted to >> 2
+                by the compiler */
+            j[loop/4] = convert_endianess(j[loop/4]);
+        }
+    }
+
+    for (loop = 0; loop < strlen(chg)/4-1; loop += 2) {
+        long long int temp = j[loop];
+        temp = (temp * 0x0E79A9C1) % 0x7FFFFFFF;
+        temp += high;
+        temp = i[0] * temp + i[1];
+        temp = temp % 0x7FFFFFFF;
+        high = j[loop+1];
+        high = (high + temp) % 0x7FFFFFFF;
+        high = high * i[2] + i[3];
+        high = high % 0x7FFFFFFF;
+
+        low += high + temp;
+    }
+    high = (high + i[1]) % 0x7FFFFFFF;
+    low = (low + i[3]) % 0x7FFFFFFF;
+
+    sscanf(md5, "%8x%8x%8x%8x", &h1, &h2, &h3, &h4);
+
+    if (is_little_endian()) {
+        high = convert_endianess(high);
+        low = convert_endianess(low);
+        hash_[0] = h1^high;
+        hash_[1] = h2^low;
+        hash_[2] = h3^high;
+        hash_[3] = h4^low;
+
+    } else {
+        hash_[0] = convert_endianess(h1)^high;
+        hash_[1] = convert_endianess(h2)^low;
+        hash_[2] = convert_endianess(h3)^high;
+        hash_[3] = convert_endianess(h4)^low;
+    }
+
+    sprintf(hash, "%08x%08x%08x%08x", hash_[0], hash_[1], hash_[2], hash_[3]);
+    free(chg);
+    return 0;
+}
+
+/* reply to server challenge */
+int msn_qry(int fd, unsigned int tid, const char *challenge)
+{
+    char reply[SNL], hash[33];
+    static const char *product_id  = "PROD0090YUAUV{2B";
+
+    msn_chl(challenge, product_id, hash);
+    sprintf(reply, "QRY %u %s 32\r\n%s", tid, product_id, hash);
     return writestr(fd, reply);
 }
 
@@ -811,56 +902,70 @@ int msn_syn(int fd, unsigned int tid, unsigned int ver)
 {
     char s[SML];
 
-    sprintf(s, "SYN %u %u\r\n", tid, ver);
+    sprintf(s, "SYN %u %u 0\r\n", tid, ver);
     return writestr(fd, s);
 }
 
 /* change group name */
-int msn_reg(int fd, unsigned int tid, int gid, char *name)
+int msn_reg(int fd, unsigned int tid, char *gid, char *name)
 {
     char s[SML], urln[SML];
     
     str2url(name, urln);
-    sprintf(s, "REG %u %d %s 0\r\n", tid, gid, urln);
+    sprintf(s, "REG %u %s %s\r\n", tid, gid, urln);
     return writestr(fd, s);
 }
 
-/* change name */
-int msn_rea(int fd, unsigned int tid, char *login, char *name)
+/* change contact name */
+int msn_sbp(int fd, unsigned int tid, char *uuid, char *name)
 {
     char s[SML], urln[SML];
    
     str2url(name, urln);
-    sprintf(s, "REA %u %s %s\r\n", tid, login, urln);
+    sprintf(s, "SBP %u %s MFN %s\r\n", tid, uuid, urln);
+    return writestr(fd, s);
+}
+
+/* change MY name */
+int msn_prp(int fd, unsigned int tid, char *name)
+{
+    char s[SML], urln[SML];
+
+    str2url(name, urln);
+    sprintf(s, "PRP %u MFN %s\r\n", tid, urln);
     return writestr(fd, s);
 }
 
 /* remove from contact list */
-int msn_rem(int fd, unsigned int tid, char list, char *login, int gid)
+int msn_rem(int fd, unsigned int tid, char list, char *loginu, char *gid)
 {
     char s[SML];
     
-    if (list == 'F') sprintf(s, "REM %u %cL %s %d\r\n", tid, list, login, gid);
-    else sprintf(s, "REM %u %cL %s\r\n", tid, list, login);
+    if (list == 'F') {
+        if (gid != NULL) sprintf(s, "REM %u FL %s %s\r\n", tid, loginu, gid);
+        else sprintf(s, "REM %u FL %s\r\n", tid, loginu);
+    } else sprintf(s, "REM %u %cL %s\r\n", tid, list, loginu);
     return writestr(fd, s);
 }
 
 /* add to contact list */
-int msn_add(int fd, unsigned int tid, char list, char *login, int gid)
+int msn_adc(int fd, unsigned int tid, char list, char *loginu, char *gid)
 {
     char s[SML];
     
-    if (list == 'F') sprintf(s, "ADD %u %cL %s %s %d\r\n", tid, list, login, login, gid);
-    else sprintf(s, "ADD %u %cL %s %s\r\n", tid, list, login, login);
+    if (list == 'F') {
+        if (gid != NULL && gid[0]) sprintf(s, "ADC %u FL N=%s F=%s\r\n", tid, loginu, loginu);
+        else sprintf(s, "ADC %u FL C=%s %s\r\n", tid, loginu, gid);
+    } else sprintf(s, "ADC %u %cL N=%s\r\n", tid, list, loginu);
     return writestr(fd, s);
 }
 
 /* remove group */
-int msn_rmg(int fd, unsigned int tid, int gid)
+int msn_rmg(int fd, unsigned int tid, char *gid)
 {
     char s[SML];
     
-    sprintf(s, "RMG %u %d\r\n", tid, gid);
+    sprintf(s, "RMG %u %s\r\n", tid, gid);
     return writestr(fd, s);
 }
 
@@ -870,7 +975,7 @@ int msn_adg(int fd, unsigned int tid, char *group)
     char s[SML], urln[SML];
     
     str2url(group, urln);
-    sprintf(s, "ADG %u %s 0\r\n",tid, urln);
+    sprintf(s, "ADG %u %s\r\n",tid, urln);
     return writestr(fd, s);
 }
 
@@ -917,12 +1022,12 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
     int err;
     char s[SXL], rep[SXL], tmp[SML];
     
-    sprintf(s, "VER %u MSNP9 CVR0\r\n", tid++);
+    sprintf(s, "VER %u MSNP12 CVR0\r\n", tid++);
     if (writestr(fd, s) < 0) return -1;
 
     if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
     if (sscanf(rep, "VER %*u %s", tmp) != 1 || 
-        strcmp(tmp, "MSNP9") != 0) {
+        strcmp(tmp, "MSNP12") != 0) {
             close(fd);
             if (sscanf(rep, "%d", &err) == 1) return err;
             return -3;
@@ -955,23 +1060,23 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
 }
 
 /* finalizes the login procedure to a notification server using TWN authentication
-it retrieves the user's nickname into `nick'
     uses 1 tid
     returns 
     0 on success */
-int msn_login_twn(int fd, unsigned int tid, char *ticket, char *nick)
+int msn_login_twn(int fd, unsigned int tid, char *ticket)
 {
     int err;
-    char s[SXL], rep[SXL];
+    char s[SXL];
+    int foo;
     
     sprintf(s, "USR %u TWN S %s\r\n", tid, ticket);
     if (writestr(fd, s) < 0) return -1;
     
-    if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
-    if (sscanf(rep, "USR %*u OK %*s %s", s) != 1) {
-        if (sscanf(rep, "%d", &err) == 1) return err;
+    if (readlnt(fd, s, SXL, SOCKET_TIMEOUT) == NULL) return -2;
+    if (sscanf(s, "USR %*u OK %*s %d", &foo) != 1) {
+        if (sscanf(s, "%d", &err) == 1) return err;
         return -3;
-    } else if (nick != NULL) url2str(s, nick);
+    }
     
     return 0;
 }
