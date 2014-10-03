@@ -661,14 +661,16 @@ void screen_init(int colors)
     initscr();
     if (colors == 1 || (colors == 0 && has_colors())) {
         start_color();
-        init_pair(1, COLOR_RED, COLOR_BLACK);
+        use_default_colors();
+#define COLOR_BG -1
+        init_pair(1, COLOR_RED, COLOR_BG);
         lstatattrs[MS_FLN] = lstatattrs[MS_HDN] =
                 attrs[C_ERR] = COLOR_PAIR(1);
 
-        init_pair(2, COLOR_GREEN, COLOR_BLACK);
+        init_pair(2, COLOR_GREEN, COLOR_BG);
         lstatattrs[MS_NLN] = attrs[C_DBG] = COLOR_PAIR(2);
 
-        init_pair(3, COLOR_CYAN, COLOR_BLACK);
+        init_pair(3, COLOR_CYAN, COLOR_BG);
         lstatattrs[MS_BRB] = attrs[C_MSG] = COLOR_PAIR(3);
 
         init_pair(4, COLOR_WHITE, COLOR_RED);
@@ -678,7 +680,7 @@ void screen_init(int colors)
         statattrs[MS_NLN] = attrs[C_MNU] = COLOR_PAIR(5);
         statattrs[MS_HDN] = attrs[C_EBX] = COLOR_PAIR(5) | A_REVERSE;
 
-        init_pair(6, COLOR_MAGENTA, COLOR_BLACK);
+        init_pair(6, COLOR_MAGENTA, COLOR_BG);
         lstatattrs[MS_BSY] = lstatattrs[MS_PHN] = COLOR_PAIR(6);
 
         init_pair(7, COLOR_BLACK, COLOR_CYAN);
@@ -691,14 +693,14 @@ void screen_init(int colors)
         init_pair(9, COLOR_BLACK, COLOR_GREEN);
         statattrs[MS_BRB] = COLOR_PAIR(9);
 
-        init_pair(10, COLOR_YELLOW, COLOR_BLACK);
+        init_pair(10, COLOR_YELLOW, COLOR_BG);
         lstatattrs[MS_IDL] = lstatattrs[MS_AWY] =
                 lstatattrs[MS_LUN] = COLOR_PAIR(10) | A_BOLD;
 
-        init_pair(11, COLOR_BLUE, COLOR_BLACK);
+        init_pair(11, COLOR_BLUE, COLOR_BG);
         attrs[C_GRP] = COLOR_PAIR(11);
         
-        init_pair(12, COLOR_WHITE, COLOR_BLACK);
+        init_pair(12, COLOR_WHITE, COLOR_BG);
         attrs[C_NORMAL] = lstatattrs[MS_UNK] = COLOR_PAIR(12);
     }
     cbreak();
