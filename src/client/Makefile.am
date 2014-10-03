@@ -19,7 +19,7 @@
 
 AUTOMAKE_OPTIONS = gnu
 bin_PROGRAMS = gtmess gtmess-gw
-AM_CFLAGS = -DDATADIR=\"@datadir@\"
+AM_CFLAGS = -DDATADIR=\"${pkgdatadir}\"
 EXTRA_DIST = hash_cfg.inp
  
 gtmess_SOURCES = gtmess.c editbox.c hash_cfg.c hlist.c md5.c msn.c pass.c \

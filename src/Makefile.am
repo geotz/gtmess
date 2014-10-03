@@ -19,5 +19,7 @@
 
 AUTOMAKE_OPTIONS = gnu
 SUBDIRS = inty client
+DISTCLEANFILES = gtmess-notify
 
-dist_bin_SCRIPTS = gtmess_w gtmess-notify
+bin_SCRIPTS = gtmess-notify
+dist_bin_SCRIPTS = gtmess_w

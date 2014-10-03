@@ -4,7 +4,7 @@ INSTALLATION
 Contents
 
 1. SYSTEM SETUP
-    1.1. From source .tar.gz package
+    1.1. From source distribution
     1.2. From binary .tar.gz package
     1.3. From binary RPM package
 
@@ -59,15 +59,15 @@ Contents
 
 	    1. Simply extract the contents of the package, i.e.
 
-		    tar zxf gtmess.X.Y.Z-Linux-i386.tar.gz
+		    tar zxf gtmess.X.Y.Z-Linux-i686.tar.gz
 
 	    The created directory contains the binaries.
 	
     1.3. From binary RPM package
 
-	Install the rpm package in your system (as root):
+	Install the rpm package in your system (as root), i.e.
 
-	    rpm -i gtmess-X.Y.Z.i386.rpm
+	    rpm -i gtmess-X.Y.Z.i686.rpm
 
 2. USER SETUP
 
@@ -87,6 +87,11 @@ Contents
     
     From now on, just run the client as `gtmess'. Your configuration
     data will be loaded automatically.
+    
+    NOTE: If gtmess has been compiled with the `--enable-home' option,
+    then don't forget to copy the runtime data files to ~/.gtmess.
+    The only data file used for now is `root.pem' which contains trusted
+    root certificates.
 
 
 3. GENERIC INSTRUCTIONS USING `configure'

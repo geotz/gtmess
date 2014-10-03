@@ -1,4 +1,4 @@
-#!/bin/sh
+#! /bin/sh
 
 # gtmess - MSN Messenger client
 # (c) 2002-2003 by George M. Tzoumas

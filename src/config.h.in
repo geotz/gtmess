@@ -129,6 +129,9 @@
 /* read run-time data from ~/.gtmess */
 #undef HOME
 
+/* enable old MSNP7 protocol */
+#undef MSNP7
+
 /* Name of package */
 #undef PACKAGE
 

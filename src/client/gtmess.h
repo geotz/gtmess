@@ -57,6 +57,7 @@ typedef struct {
     int msnftpd;
     
     char cfgdir[SCL];
+    char datadir[SCL];
     char ca_list[SCL];
     FILE *cfg_fp;
 } config_t;

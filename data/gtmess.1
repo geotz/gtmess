@@ -1,4 +1,4 @@
-.TH gtmess 1 "November 7, 2003" "" "gtmess messenger"
+.TH gtmess 1 "November 15, 2003" "" "gtmess messenger"
 
 .SH NAME
 gtmess - MSN messenger client
@@ -11,7 +11,7 @@ gtmess [options]
 gtmess is an MSN messenger client, which allows you to use
 the MSN messenger service. It is a console application that
 uses the curses library to present a friendly user interface.
-This manpage corresponds to version 0.8.1.
+This manpage corresponds to version 0.8.2.
 
 .SH OPTIONS
 .TP
@@ -27,7 +27,7 @@ line
 flags that follow.
 The configuration file name is
 .BR ~/.gtmess/config .
-The incoming files directory ~/.gtmess/incoming and the named pipe
+The incoming files directory ~/.gtmess/received and the named pipe
 ~/.gtmess/notify.pip are also created.
 
 .TP
@@ -55,7 +55,9 @@ with only two possible values, 0 and 1. 0 is for True and 1 is for False.
 If
 .I B
 is 1 and a certificate cannot be verified against
-.BR ca_list ,
+the list of trusted certificate authorities (see the
+.B FILES
+section),
 the user is asked if the login process should continue. 
 Three options are given,
 .IR Yes ,
@@ -110,10 +112,15 @@ The default value is
 .BI cvr "" = S
 Sets the consumer versioning (CVR) string that is sent to the server during
 the login process. This string provides information about the client. For more
-information you should look at the protocol specification.
+information you should look at the protocol specification. The protocol requires
+from version MSNP8 and above your login account to be the last part
+of the CVR string. In this case, your login account 
+is appended automatically at the end by the client. On the other hand, 
+older protocol versions (MSNP7) do not require an extra string at the end 
+and therefore, nothing is appended.
 .br
 The default value is
-.BR "0x0409 linux 2.2.4 i386 GTMESS 0.8.1 MSMSGS null" .
+.BR "0x0409 linux 2.2.4 i386 GTMESS 0.8.2 MSMSGS" .
 
 .TP 
 .BI initial_status "" = N
@@ -152,8 +159,7 @@ section.
 .BI login "" = S
 Sets the default login account. If
 .I S
-does not contain a `@' character, then the string `@hotmail.com' is
-automatically appended.
+does not contain a `@' character, then the string `@hotmail.com' is appended.
 
 .TP
 .BI log_traffic "" = B
@@ -666,7 +672,7 @@ last entry
 show contact/group information
 
 .TP
-.BR SPACE " or " ENTER"
+.BR SPACE " or " ENTER
 select
 
 .TP
@@ -717,6 +723,18 @@ delete entry
 .TP
 .B ?
 mini help
+
+.SS TYPING NOTIFICATIONS
+.PP
+When a user is typing a message, a typing notification is usually sent by the user's client.
+Not all clients are able to send or receive typing notifications. However, gtmess both sends
+and receives typing notifications. It is also able to do some kind of spoofing 
+(see next section). When a typing notification is received, an exclamation mark (`!')
+is displayed on the left of the user's name on the contact list. This means that the
+user is typing a message in some switchboard window. Although it is possible to
+know the specific s/b window, the current version does not distinguish between s/b windows.
+Hopefully this will be fixed in the future.
+
 
 .SH ADVANCED FEATURES
 .PP
@@ -833,7 +851,7 @@ No automatic offline user rename.
 
 
 .SH ACKNOWLEDGEMENTS
-I would like to thank the following people:
+Credits go to the following people:
 
 .I "Mike Mintz"
 for his excellent site on the MSN Messenger Protocol.
@@ -843,6 +861,9 @@ for his excellent site on the MSN Messenger Protocol.
 .I "L. Peter Deutsch"
 for his MD5 module.
 
+.I "Eric Rescorla"
+for his article on SSL programming:
+.BR "An introduction to OpenSSL Programming" .
 
 .SH AUTHORS
 

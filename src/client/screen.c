@@ -215,8 +215,10 @@ void evd_lst(scrlst_t *e)
 
     lines = 0;
     total = e->g.count;
-    for (p = e->p.head; p != NULL; p = p->next) 
-        if (Config.online_only == 0 || p->status >= MS_NLN) total++;
+    if (Config.online_only == 0) total += e->p.count;
+    else 
+        for (p = e->p.head; p != NULL; p = p->next)
+            if (p->status >= MS_NLN) total++;
     time(&now);
     for (g = e->g.head; g != NULL; g = g->next) {
         if (lines >= e->skip && lines < total + e->skip) {

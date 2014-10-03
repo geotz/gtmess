@@ -83,20 +83,24 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 RANLIB = @RANLIB@
+TCLDATADIR = @TCLDATADIR@
 VERSION = @VERSION@
+WISHPROG = @WISHPROG@
 am__include = @am__include@
 am__quote = @am__quote@
 install_sh = @install_sh@
 
 AUTOMAKE_OPTIONS = gnu
 SUBDIRS = inty client
+DISTCLEANFILES = gtmess-notify
 
-dist_bin_SCRIPTS = gtmess_w gtmess-notify
+bin_SCRIPTS = gtmess-notify
+dist_bin_SCRIPTS = gtmess_w
 subdir = src
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
 CONFIG_HEADER = config.h
-CONFIG_CLEAN_FILES =
-SCRIPTS = $(dist_bin_SCRIPTS)
+CONFIG_CLEAN_FILES = gtmess-notify
+SCRIPTS = $(bin_SCRIPTS) $(dist_bin_SCRIPTS)
 
 DIST_SOURCES =
 
@@ -105,7 +109,7 @@ RECURSIVE_TARGETS = info-recursive dvi-recursive install-info-recursive \
 	install-exec-recursive installdirs-recursive install-recursive \
 	uninstall-recursive check-recursive installcheck-recursive
 DIST_COMMON = $(dist_bin_SCRIPTS) ./stamp-h.in Makefile.am Makefile.in \
-	config.h.in
+	config.h.in gtmess-notify.in
 DIST_SUBDIRS = $(SUBDIRS)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
@@ -143,6 +147,29 @@ $(srcdir)/./stamp-h.in: $(top_srcdir)/configure.ac $(ACLOCAL_M4)
 
 distclean-hdr:
 	-rm -f config.h
+gtmess-notify: $(top_builddir)/config.status gtmess-notify.in
+	cd $(top_builddir) && CONFIG_FILES=$(subdir)/$@ CONFIG_HEADERS= CONFIG_LINKS= $(SHELL) ./config.status
+install-binSCRIPTS: $(bin_SCRIPTS)
+	@$(NORMAL_INSTALL)
+	$(mkinstalldirs) $(DESTDIR)$(bindir)
+	@list='$(bin_SCRIPTS)'; for p in $$list; do \
+	  f="`echo $$p|sed '$(transform)'`"; \
+	  if test -f $$p; then \
+	    echo " $(INSTALL_SCRIPT) $$p $(DESTDIR)$(bindir)/$$f"; \
+	    $(INSTALL_SCRIPT) $$p $(DESTDIR)$(bindir)/$$f; \
+	  elif test -f $(srcdir)/$$p; then \
+	    echo " $(INSTALL_SCRIPT) $(srcdir)/$$p $(DESTDIR)$(bindir)/$$f"; \
+	    $(INSTALL_SCRIPT) $(srcdir)/$$p $(DESTDIR)$(bindir)/$$f; \
+	  else :; fi; \
+	done
+
+uninstall-binSCRIPTS:
+	@$(NORMAL_UNINSTALL)
+	@list='$(bin_SCRIPTS)'; for p in $$list; do \
+	  f="`echo $$p|sed '$(transform)'`"; \
+	  echo " rm -f $(DESTDIR)$(bindir)/$$f"; \
+	  rm -f $(DESTDIR)$(bindir)/$$f; \
+	done
 install-dist_binSCRIPTS: $(dist_bin_SCRIPTS)
 	@$(NORMAL_INSTALL)
 	$(mkinstalldirs) $(DESTDIR)$(bindir)
@@ -297,7 +324,7 @@ check: check-recursive
 all-am: Makefile $(SCRIPTS) config.h
 installdirs: installdirs-recursive
 installdirs-am:
-	$(mkinstalldirs) $(DESTDIR)$(bindir)
+	$(mkinstalldirs) $(DESTDIR)$(bindir) $(DESTDIR)$(bindir)
 
 install: install-recursive
 install-exec: install-exec-recursive
@@ -318,6 +345,7 @@ clean-generic:
 
 distclean-generic:
 	-rm -f Makefile $(CONFIG_CLEAN_FILES) stamp-h stamp-h[0-9]*
+	-test -z "$(DISTCLEANFILES)" || rm -f $(DISTCLEANFILES)
 
 maintainer-clean-generic:
 	@echo "This command is intended for maintainers to use"
@@ -340,7 +368,7 @@ info-am:
 
 install-data-am: install-dist_binSCRIPTS
 
-install-exec-am:
+install-exec-am: install-binSCRIPTS
 
 install-info: install-info-recursive
 
@@ -356,7 +384,8 @@ mostlyclean: mostlyclean-recursive
 
 mostlyclean-am: mostlyclean-generic
 
-uninstall-am: uninstall-dist_binSCRIPTS uninstall-info-am
+uninstall-am: uninstall-binSCRIPTS uninstall-dist_binSCRIPTS \
+	uninstall-info-am
 
 uninstall-info: uninstall-info-recursive
 
@@ -364,15 +393,16 @@ uninstall-info: uninstall-info-recursive
 	clean-generic clean-recursive distclean distclean-generic \
 	distclean-hdr distclean-recursive distclean-tags distdir dvi \
 	dvi-am dvi-recursive info info-am info-recursive install \
-	install-am install-data install-data-am install-data-recursive \
-	install-dist_binSCRIPTS install-exec install-exec-am \
-	install-exec-recursive install-info install-info-am \
-	install-info-recursive install-man install-recursive \
-	install-strip installcheck installcheck-am installdirs \
-	installdirs-am installdirs-recursive maintainer-clean \
-	maintainer-clean-generic maintainer-clean-recursive mostlyclean \
-	mostlyclean-generic mostlyclean-recursive tags tags-recursive \
-	uninstall uninstall-am uninstall-dist_binSCRIPTS \
+	install-am install-binSCRIPTS install-data install-data-am \
+	install-data-recursive install-dist_binSCRIPTS install-exec \
+	install-exec-am install-exec-recursive install-info \
+	install-info-am install-info-recursive install-man \
+	install-recursive install-strip installcheck installcheck-am \
+	installdirs installdirs-am installdirs-recursive \
+	maintainer-clean maintainer-clean-generic \
+	maintainer-clean-recursive mostlyclean mostlyclean-generic \
+	mostlyclean-recursive tags tags-recursive uninstall \
+	uninstall-am uninstall-binSCRIPTS uninstall-dist_binSCRIPTS \
 	uninstall-info-am uninstall-info-recursive uninstall-recursive
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.

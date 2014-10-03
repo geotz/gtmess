@@ -24,7 +24,7 @@
 
 void pass_init();
 void pass_done();
-#ifdef MSNP8
+#ifndef MSNP7
 char *get_login_server(char *dest);
 int get_ticket(char *server, char *login, char *pass, char *param, char *dest);
 #endif

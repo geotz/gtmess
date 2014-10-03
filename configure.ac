@@ -24,8 +24,8 @@ dnl Process this file with autoconf to produce a configure script.
 
 AC_INIT
 PACKAGE="gtmess"
-VERSION="0.8.1"
-VDATE="7 Nov 2003"
+VERSION="0.8.2"
+VDATE="15 Nov 2003"
 AM_INIT_AUTOMAKE($PACKAGE, $VERSION)
 AM_CONFIG_HEADER(src/config.h)
 AC_CONFIG_SRCDIR(src/client/gtmess.c)
@@ -60,7 +60,15 @@ AC_ARG_ENABLE(home,
                 AC_DEFINE_UNQUOTED(HOME, [ ], [read run-time data from ~/.gtmess])
                 AC_MSG_NOTICE([runtime data will be read from ~/.gtmess])
               fi],
-              [AC_MSG_NOTICE([runtime data will be read from $datadir])])
+              [AC_MSG_NOTICE([runtime data will be read from ${datadir}/gtmess])])
+
+AC_ARG_ENABLE(msnp7, 
+              [AC_HELP_STRING([--enable-msnp7], [enable old MSNP7 protocol (no)])],
+              [if eval "test x$enable_msnp7 = xyes"; then
+                AC_DEFINE_UNQUOTED(MSNP7, [ ], [enable old MSNP7 protocol])
+                AC_MSG_NOTICE([old protocol MSNP7 enabled])
+              fi])
+
 
 AC_ARG_WITH(ssl,
             [AC_HELP_STRING([--with-ssl], [non-standard path for openssl (/usr/local/ssl)])],
@@ -93,6 +101,9 @@ AC_CHECK_LIB(ncurses, initscr, ,
                [AC_CHECK_LIB(curses, initscr, ,
                             [AC_MSG_ERROR([cannot find curses library])])])
 
+if eval "test x$enable_msnp7 = xyes"; then
+    :;
+else
 AC_CHECK_LIB(ssl, SSL_library_init, ,
               [
                 AC_MSG_CHECKING([if -lssl exists in alternate location]);
@@ -106,10 +117,38 @@ AC_CHECK_LIB(ssl, SSL_library_init, ,
                     AC_MSG_ERROR([cannot find ssl library])
                 fi
               ], [-lcrypto])
+fi
 
-dnl The following variables should be substituted in Makefile.in
+AC_MSG_CHECKING([for Tcl/Tk interpreter])
+WISHPROG=`which wish 2>/dev/null`
+if test x$WISHPROG = x; then
+    for i in `whereis wish`; do
+        if test -x $i; then
+            WISHPROG=$i
+            break
+        fi
+    done
+fi
+if test x$WISHPROG = x; then
+    AC_MSG_RESULT(not found)
+    AC_MSG_WARN(edit gtmess-notify script by hand to set the interpreter)
+else
+    AC_MSG_RESULT($WISHPROG)
+fi
+
+dnl The following variables should be substituted in *.in
+
+AC_SUBST(WISHPROG)
+if test x$enable_home = xyes; then
+    TCLDATADIR='$env(HOME)/.gtmess'
+else
+    eval TCLDATADIR=${datadir}/gtmess
+fi
+AC_SUBST(TCLDATADIR)
 
 dnl AM_CONDITIONAL(OS_IRIX, test x`uname` = xIRIX64)
 
 AC_CONFIG_FILES(Makefile src/Makefile src/inty/Makefile src/client/Makefile data/Makefile)
+AC_CONFIG_FILES(src/gtmess-notify, chmod a+x src/gtmess-notify)
+
 AC_OUTPUT

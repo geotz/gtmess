@@ -25,6 +25,8 @@
 #include<string.h>
 #include<iconv.h>
 
+#include"../config.h"
+
 #include"md5.h"
 #include"msn.h"
 #include"../inty/inty.h"
@@ -673,10 +675,13 @@ int msn_blp(int fd, unsigned int tid, char c)
     return write(fd, s, strlen(s));
 }
 
-int msn_cvr(int fd, unsigned int tid, char *cvr)
+int msn_cvr(int fd, unsigned int tid, char *cvr, char *login)
 {
     char s[SML];
-    sprintf(s, "CVR %u %s\r\n", tid, cvr);
+    if (login == NULL)
+        sprintf(s, "CVR %u %s\r\n", tid, cvr);
+    else
+        sprintf(s, "CVR %u %s %s\r\n", tid, cvr, login);
     return write(fd, s, strlen(s));
 }
 
@@ -695,27 +700,27 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
     int err;
     char s[SXL], rep[SXL], tmp[SML];
     
-#ifdef MSNP8
-    sprintf(s, "VER %u MSNP8 CVR0\r\n", tid++);
-#else
+#ifdef MSNP7
     sprintf(s, "VER %u MSNP7 CVR0\r\n", tid++);
+#else
+    sprintf(s, "VER %u MSNP8 CVR0\r\n", tid++);
 #endif
     if (write(fd, s, strlen(s)) < 0) return -1;
 
     if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
     if (sscanf(rep, "VER %*u %s", tmp) != 1 || 
-#ifdef MSNP8
-        strcmp(tmp, "MSNP8") != 0) {
-#else
+#ifdef MSNP7
         strcmp(tmp, "MSNP7") != 0) {
+#else
+        strcmp(tmp, "MSNP8") != 0) {
 #endif
             close(fd);
             if (sscanf(rep, "%d", &err) == 1) return err;
             return -3;
     }
 
-#ifdef MSNP8
-    if (msn_cvr(fd, tid++, cvr) < 0) return -1;
+#ifndef MSNP7
+    if (msn_cvr(fd, tid++, cvr, login) < 0) return -1;
     
     if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
     if (sscanf(rep, "%s", tmp) != 1 || strcmp(tmp, "CVR") != 0) {
@@ -725,10 +730,10 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
     }
 #endif
 
-#ifdef MSNP8
-    sprintf(s, "USR %u TWN I %s\r\n", tid++, login);
-#else
+#ifdef MSNP7
     sprintf(s, "USR %u MD5 I %s\r\n", tid++, login);
+#else
+    sprintf(s, "USR %u TWN I %s\r\n", tid++, login);
 #endif
     if (write(fd, s, strlen(s)) < 0) return -1;
 
@@ -746,29 +751,7 @@ int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest)
     return 0;
 }
 
-#ifdef MSNP8
-/* finalizes the login procedure to a notification server using TWN authentication
-it retrieves the user's nickname into `nick'
-    uses 1 tid
-    returns 
-    0 on success */
-int msn_login_twn(int fd, unsigned int tid, char *ticket, char *nick)
-{
-    int err;
-    char s[SXL], rep[SXL];
-    
-    sprintf(s, "USR %u TWN S %s\r\n", tid, ticket);
-    if (write(fd, s, strlen(s)) < 0) return -1;
-    
-    if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
-    if (sscanf(rep, "USR %*u OK %*s %s", s) != 1) {
-        if (sscanf(rep, "%d", &err) == 1) return err;
-        return -3;
-    } else if (nick != NULL) url2str(s, nick);
-    
-    return 0;
-}
-#else
+#ifdef MSNP7
 /* finalizes the login procedure to a notification server using MD5 authentication
 it retrieves the user's nickname into `nick'
     uses 1 tid
@@ -785,6 +768,28 @@ int msn_login_md5(int fd, unsigned int tid, char *pass, char *md5hash, char *nic
     sprintf(s, "USR %u MD5 S %s\r\n", tid, md5digest);
     if (write(fd, s, strlen(s)) < 0) return -1;
 
+    if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
+    if (sscanf(rep, "USR %*u OK %*s %s", s) != 1) {
+        if (sscanf(rep, "%d", &err) == 1) return err;
+        return -3;
+    } else if (nick != NULL) url2str(s, nick);
+    
+    return 0;
+}
+#else
+/* finalizes the login procedure to a notification server using TWN authentication
+it retrieves the user's nickname into `nick'
+    uses 1 tid
+    returns 
+    0 on success */
+int msn_login_twn(int fd, unsigned int tid, char *ticket, char *nick)
+{
+    int err;
+    char s[SXL], rep[SXL];
+    
+    sprintf(s, "USR %u TWN S %s\r\n", tid, ticket);
+    if (write(fd, s, strlen(s)) < 0) return -1;
+    
     if (readlnt(fd, rep, SXL, SOCKET_TIMEOUT) == NULL) return -2;
     if (sscanf(rep, "USR %*u OK %*s %s", s) != 1) {
         if (sscanf(rep, "%d", &err) == 1) return err;

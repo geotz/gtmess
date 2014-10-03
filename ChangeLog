@@ -1,4 +1,15 @@
 *******************************
+* Version 0.8.2 (15 Nov 2003) * 
+*******************************
+! when only online contacts are shown, contact list scroll limits
+  are correctly calculated
++ added --enable-msnp7 option at configure, to compile with MSNP7 support
+  (MD5 authentication, no SSL)
++ improved configure script
+! CVR string sent fixed: MSNP8 requires the login account 
+  at the end instead of `null'
+
+*******************************
 * Version 0.8.1 (7 Nov 2003)  * 
 *******************************
 + autoconf/automake configure script for compilation

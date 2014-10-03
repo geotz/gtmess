@@ -19,7 +19,13 @@
  *    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* PATCHED VERSION */
+
 /* TODO
+FYI: this list holds things that COULD be done, or SHOULD be done,
+but there's no guarantee that they WILL be done! :-)
+
+type notif on sb, too
 auto filename complete or file selector
 what happens if a malicious user puts garbage in clist cache?
 show ETA on transfers!
@@ -67,6 +73,8 @@ histlen
 
 #include<iconv.h>
 
+#include"../config.h"
+
 #include"../inty/inty.h"
 #include"md5.h"
 
@@ -81,8 +89,6 @@ histlen
 
 #include"gtmess.h"
 
-#include"../config.h"
-
 static struct cfg_entry ConfigTbl[] =
   {
     {"log_traffic", "", 0, 1, 0, 1},
@@ -90,8 +96,8 @@ static struct cfg_entry ConfigTbl[] =
     {"sound", "", 1, 1, 0, 2},
     {"popup", "", 1, 1, 0, 1},
     {"time_user_types", "", 5, 1, 1, 60},
-/*    {"cvr", "0x0409 win 4.10 i386 MSNMSGR 5.0.0544 MSMSGS null", 0, 0, 0, 0},*/
-    {"cvr", "0x0409 linux 2.2.4 i386 GTMESS 0.8.1 MSMSGS null", 0, 0, 0, 0},
+/*    {"cvr", "0x0409 win 4.10 i386 MSNMSGR 5.0.0544 MSMSGS", 0, 0, 0, 0},*/
+    {"cvr", "0x0409 linux 2.2.4 i386 GTMESS 0.8.2 MSMSGS", 0, 0, 0, 0},
     {"cert_prompt", "", 1, 1, 0, 1},
     {"common_name_prompt", "", 1, 1, 0, 1},
     {"console_encoding", "ISO_8859-7", 0, 0, 0, 0},
@@ -121,9 +127,7 @@ typedef struct {
     msn_clist_t FL, RL, AL, BL; /* forward, reverse, allow, block */
     msn_clist_t IL; /* initial status */
     unsigned int SYN; /* syn list version */
-#ifdef MSNP8
     int list_count; /* number of LST responses */
-#endif
     
     int flskip; /* FL list line skip (for display) */
     pthread_mutex_t lock;
@@ -399,9 +403,7 @@ void msn_init(msn_t *msn)
 
     msn->IL.head = NULL; msn->IL.count = 0;
 
-#ifdef MSNP8    
     msn->list_count = -1;
-#endif
     msn->flskip = 0;
     msn->nfd = -1;
     msn->thrid = -1;
@@ -968,10 +970,10 @@ void *msn_ndaemon(void *dummy)
 
         /* reverse list prompting */
 
-#ifdef MSNP8
-            sscanf(s + 4, "%s", arg2);
-#else
+#ifdef MSNP7
             sscanf(s + 4, "%*s %*s %s", arg2);
+#else
+            sscanf(s + 4, "%s", arg2);
 #endif
             LOCK(&msn.lock);
             msn.GTC = arg2[0];
@@ -981,10 +983,10 @@ void *msn_ndaemon(void *dummy)
 
         /* privacy mode */
 
-#ifdef MSNP8
-            sscanf(s + 4, "%s", arg2);
-#else
+#ifdef MSNP7
             sscanf(s + 4, "%*s %*s %s", arg2);
+#else
+            sscanf(s + 4, "%s", arg2);
 #endif
             LOCK(&msn.lock);
             msn.BLP = arg2[0];
@@ -1038,10 +1040,10 @@ void *msn_ndaemon(void *dummy)
 
             int gid;
 
-#ifdef MSNP8
-            sscanf(s + 4, "%d %s", &gid, arg2);
-#else
+#ifdef MSNP7
             sscanf(s + 4, "%*s %*s %*s %*s %d %s", &gid, arg2);
+#else
+            sscanf(s + 4, "%d %s", &gid, arg2);
 #endif
             url2str(arg2, nick);
             LOCK(&msn.lock);
@@ -1199,64 +1201,7 @@ void *msn_ndaemon(void *dummy)
 
         /* contact lists */
 
-#ifdef MSNP8
-            int lst, gid;
-            char gids[SML], *tmp;
-            
-            sscanf(s + 4, "%s %s %d %s", arg1, arg2, &lst, gids);
-            url2str(arg2, nick);
-            LOCK(&msn.lock);
-            if (lst & 1) {
-                /* FL */
-                tmp = gids;
-                while (1) {
-                    if (sscanf(tmp, "%d", &gid) == 1)
-                        msn_clist_add(&msn.FL, gid, arg1, nick);
-                    else break;
-                    tmp = strchr(tmp, ',');
-                    if (tmp == NULL) break; else tmp++;
-                }
-            }
-            if (lst & 2) {
-                /* AL */
-                msn_clist_add(&msn.AL, -1, arg1, nick);
-            }
-            if (lst & 4) {
-                /* BL */
-                msn_clist_add(&msn.BL, -1, arg1, nick);
-                if ((p = msn_clist_find(&msn.FL, arg1)) != NULL)
-                    p->blocked = 1;
-            }
-            if (lst & 8) {
-                /* RL */
-                q = msn_clist_add(&msn.RL, 0, arg1, nick);
-                if ((p = msn_clist_find(&msn.FL, arg1)) == NULL) {
-                    if (msn.GTC == 'A' && msn_clist_find(&msn.AL, arg1) == NULL &&
-                        msn_clist_find(&msn.BL, arg1) == NULL)
-                            msg(C_MSG, "%s <%s> has added you to his/her contact list\n",
-                                nick, arg1);
-                } else for (p = msn.FL.head; p != NULL; p = p->next)
-                    if (strcmp(arg1, p->login) == 0) q->gid++;
-            }
-            if (--msn.list_count == 0) {
-            /* end of sync -- last LST rmember */
-                msg(C_MSG, "FL/RL contacts: %d/%d\n", msn.FL.count, msn.RL.count);
-                for (p = msn.FL.head; p != NULL; p = p->next)
-                    if (msn_clist_find(&msn.RL, p->login) == NULL)
-                        /* bug: multiple same warnings, when user on multiple groups! */
-                        msg(C_MSG, "%s <%s> has removed you from his/her contact list\n",
-                            p->nick, p->login);
-
-                /* update FL with IL */
-                for (p = msn.IL.head; p != NULL; p = p->next)
-                    msn_clist_update(&msn.FL, p->login, p->nick, p->status, -1, -1);
-                msn_clist_free(&msn.IL);
-
-                draw_lst(1);
-                write_syn_cache();
-            }
-            UNLOCK(&msn.lock);
-#else
+#ifdef MSNP7
             int c, gid;
             char lst[SML], gids[SML], *tmp;
 
@@ -1315,8 +1260,69 @@ void *msn_ndaemon(void *dummy)
 
                         draw_lst(1);
                         write_syn_cache();
+                        /* initial status to log in */
+                        msn_chg(msn.nfd, nftid(), Config.initial_status);
                     }
                     break;
+            }
+            UNLOCK(&msn.lock);
+#else
+            int lst, gid;
+            char gids[SML], *tmp;
+            
+            sscanf(s + 4, "%s %s %d %s", arg1, arg2, &lst, gids);
+            url2str(arg2, nick);
+            LOCK(&msn.lock);
+            if (lst & 1) {
+                /* FL */
+                tmp = gids;
+                while (1) {
+                    if (sscanf(tmp, "%d", &gid) == 1)
+                        msn_clist_add(&msn.FL, gid, arg1, nick);
+                    else break;
+                    tmp = strchr(tmp, ',');
+                    if (tmp == NULL) break; else tmp++;
+                }
+            }
+            if (lst & 2) {
+                /* AL */
+                msn_clist_add(&msn.AL, -1, arg1, nick);
+            }
+            if (lst & 4) {
+                /* BL */
+                msn_clist_add(&msn.BL, -1, arg1, nick);
+                if ((p = msn_clist_find(&msn.FL, arg1)) != NULL)
+                    p->blocked = 1;
+            }
+            if (lst & 8) {
+                /* RL */
+                q = msn_clist_add(&msn.RL, 0, arg1, nick);
+                if ((p = msn_clist_find(&msn.FL, arg1)) == NULL) {
+                    if (msn.GTC == 'A' && msn_clist_find(&msn.AL, arg1) == NULL &&
+                        msn_clist_find(&msn.BL, arg1) == NULL)
+                            msg(C_MSG, "%s <%s> has added you to his/her contact list\n",
+                                nick, arg1);
+                } else for (p = msn.FL.head; p != NULL; p = p->next)
+                    if (strcmp(arg1, p->login) == 0) q->gid++;
+            }
+            if (--msn.list_count == 0) {
+            /* end of sync -- last LST rmember */
+                msg(C_MSG, "FL/RL contacts: %d/%d\n", msn.FL.count, msn.RL.count);
+                for (p = msn.FL.head; p != NULL; p = p->next)
+                    if (msn_clist_find(&msn.RL, p->login) == NULL)
+                        /* bug: multiple same warnings, when user on multiple groups! */
+                        msg(C_MSG, "%s <%s> has removed you from his/her contact list\n",
+                            p->nick, p->login);
+
+                /* update FL with IL */
+                for (p = msn.IL.head; p != NULL; p = p->next)
+                    msn_clist_update(&msn.FL, p->login, p->nick, p->status, -1, -1);
+                msn_clist_free(&msn.IL);
+
+                draw_lst(1);
+                write_syn_cache();
+                /* initial status to log in */
+                msn_chg(msn.nfd, nftid(), Config.initial_status);
             }
             UNLOCK(&msn.lock);
 #endif
@@ -1329,6 +1335,8 @@ void *msn_ndaemon(void *dummy)
                 read_syn_cache_data();
                 msg(C_MSG, "Contacts loaded\n");
                 draw_lst(1);
+                /* initial status to log in */
+                msn_chg(msn.nfd, nftid(), Config.initial_status);
                 UNLOCK(&msn.lock);
             } else {
                 if (syn_cache_fp != NULL) fclose(syn_cache_fp);
@@ -1469,7 +1477,7 @@ int do_login()
 {
     int r;
     char hash[SXL];
-#ifdef MSNP8
+#ifndef MSNP7
     char dalogin[SXL], ticket[SXL];
 #endif
     char udir[SML];
@@ -1490,7 +1498,12 @@ int do_login()
         return -3;
     }
 
-#ifdef MSNP8
+#ifdef MSNP7
+    if ((r = msn_login_md5(msn.nfd, nftid(), msn.pass, hash, msn.nick)) != 0) {
+        msg(C_ERR, "%s\n", msn_ios_str(r));
+        return -3;
+    }
+#else
     if (get_login_server(dalogin) != NULL) {
         if ((r = get_ticket(dalogin, msn.login, msn.pass, hash, ticket)) == 0) {
             if ((r = msn_login_twn(msn.nfd, nftid(), ticket, msn.nick)) != 0) {
@@ -1506,12 +1519,6 @@ int do_login()
         msg(C_ERR, "PASSPORT: Could not get a login server\n");
         return -4;
     }
-    
-#else
-    if ((r = msn_login_md5(msn.nfd, nftid(), msn.pass, hash, msn.nick)) != 0) {
-        msg(C_ERR, "%s\n", msn_ios_str(r));
-        return -3;
-    }
 #endif
     draw_status(0);
     msg(C_MSG, "Login successful\n");
@@ -1523,13 +1530,8 @@ int do_login()
     pthread_create(&msn.thrid, NULL, msn_ndaemon, (void *) NULL);
     pthread_detach(msn.thrid);
 
-    /* initial status to log in */
-    LOCK(&msn.lock);
-    msn_chg(msn.nfd, nftid(), Config.initial_status);
-    UNLOCK(&msn.lock);
-
-#ifndef MSNP8
-    msn_cvr(msn.nfd, nftid, Config.cvr);
+#ifdef MSNP7
+    msn_cvr(msn.nfd, nftid, Config.cvr, NULL);
 #endif
 
     /* sync lists */
@@ -2184,8 +2186,13 @@ void sboard_next_pending()
 void set_flskip(int delta)
 {
     int total;
+    msn_contact_t *p;
     LOCK(&msn.lock);
-    total = msn.FL.count + msn.GL.count;
+    total = msn.GL.count;
+    if (Config.online_only == 0) total += msn.FL.count;
+    else 
+        for (p = msn.FL.head; p != NULL; p = p->next)
+            if (p->status >= MS_NLN) total++;
     msn.flskip += delta;
     if (msn.flskip < -total) msn.flskip = -total;
     if (msn.flskip > total) msn.flskip = total;
@@ -2428,10 +2435,11 @@ void config_init()
     Config.syn_cache = ConfigTbl[c++].ival;
     Config.msnftpd = ConfigTbl[c++].ival;
 #ifdef HOME
-    sprintf(Config.ca_list, "%s/root.pem", Config.cfgdir);
+    sprintf(Config.datadir, "%s", Config.cfgdir);
 #else
-    sprintf(Config.ca_list, "%s/%s/root.pem", DATADIR, PACKAGE);
+    sprintf(Config.datadir, "%s", DATADIR);
 #endif
+    sprintf(Config.ca_list, "%s/root.pem", Config.datadir);
     
     if (Config.login[0] && strchr(Config.login, '@') == NULL) strcat(Config.login, "@hotmail.com");
     strcpy(msn.notaddr, Config.server);

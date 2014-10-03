@@ -25,8 +25,6 @@
 #include<iconv.h>
 #include<stdio.h>
 
-#define MSNP8
-
 #define SXL 1024
 #define SML 512
 #define SNL 80
@@ -117,12 +115,12 @@ int msn_rmg(int fd, unsigned int tid, int gid);
 int msn_adg(int fd, unsigned int tid, char *group);
 int msn_gtc(int fd, unsigned int tid, char c);
 int msn_blp(int fd, unsigned int tid, char c);
-int msn_cvr(int fd, unsigned int tid, char *cvr);
+int msn_cvr(int fd, unsigned int tid, char *cvr, char *login);
 int msn_login_init(int fd, unsigned int tid, char *login, char *cvr, char *dest);
-#ifdef MSNP8
-int msn_login_twn(int fd, unsigned int tid, char *ticket, char *nick);
-#else
+#ifdef MSNP7
 int msn_login_md5(int fd, unsigned int tid, char *pass, char *md5hash, char *nick);
+#else
+int msn_login_twn(int fd, unsigned int tid, char *ticket, char *nick);
 #endif
 int msn_msg_typenotif(int fd, unsigned int tid, char *user);
 int msn_msg_text(int fd, unsigned int tid, char *text);

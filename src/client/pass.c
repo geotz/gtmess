@@ -34,10 +34,12 @@
 #include<pthread.h>
 #include<ctype.h>
 
+#include"../config.h"
+
 #include"gtmess.h"
 #include"msn.h"
 
-#ifdef MSNP8
+#ifndef MSNP7
 
 #include<openssl/ssl.h>
 #include<openssl/err.h>
@@ -50,7 +52,7 @@
 
 #define SBL 5120
 
-#ifdef MSNP8
+#ifndef MSNP7
 SSL_CTX *ssl_ctx;
 
 SSL_CTX *initialize_ctx()
@@ -179,7 +181,7 @@ char *CRLF = "\r\n";
 
 int http_get(char *purl, char version, char*headers, char *response, int size, int *rcode)
 {
-#ifdef MSNP8
+#ifndef MSNP7
     SSL *ssl;
     BIO *sbio;
 #endif
@@ -220,7 +222,7 @@ int http_get(char *purl, char version, char*headers, char *response, int size, i
             return fd;
         }        
         
-#ifdef MSNP8
+#ifndef MSNP7
         if (port == 443) {
             ssl = SSL_new(ssl_ctx);
             sbio = BIO_new_socket(fd, BIO_NOCLOSE);
@@ -252,7 +254,7 @@ int http_get(char *purl, char version, char*headers, char *response, int size, i
             write(fd, request, strlen(request));
             memset(response, 0, size);
             readx(fd, response, size-1);
-#ifdef MSNP8
+#ifndef MSNP7
         }
 #endif
         free(host);
@@ -277,7 +279,7 @@ int http_get(char *purl, char version, char*headers, char *response, int size, i
     return 0;
 }
 
-#ifdef MSNP8
+#ifndef MSNP7
 char *get_login_server(char *dest)
 {
     char buf[SBL], *s, *s2;
@@ -330,14 +332,14 @@ int get_ticket(char *server, char *login, char *pass, char *param, char *dest)
 
 void pass_init()
 {
-#ifdef MSNP8
+#ifndef MSNP7
     ssl_ctx = initialize_ctx();
 #endif
 }
 
 void pass_done()
 {
-#ifdef MSNP8
+#ifndef MSNP7
     SSL_CTX_free(ssl_ctx);
 #endif
 }
